@@ -4,21 +4,20 @@
 # This will likely become a minimal solver with just refraction.
 # REQUIRES AN EXAMPLE AND CLEANING UP
 
-"""PARTICLE TRACKER
+"""MINIMAL PHYSICS SOLVER - 6 Vector description of rays
 BASED ON: https://journals.aps.org/pre/abstract/10.1103/PhysRevE.61.895
 
 SOLVES: 
 $ \frac{d\vec{v}}{dt} = -\nabla \left( \frac{c^2}{2} \frac{n_e}{n_c} \right) $
-
 $ \frac{d\vec{x}}{dt} = \vec{v} $
 
-CODE BY: Aidan CRILLY
-REFACTORING: Jack HARE
+BASED VERSION CODED BY: Aidan CRILLY / Jack HARE
+MODIFIED BY: Stefano MERLINI
 
 EXAMPLES:
 #############################
 #NULL TEST: no deflection
-import particle_tracker as pt
+import minimal_solver as ms
 
 ## Create the coordiantes for a cube with 201x201x201 cells, 
 ## and attach a [-5,5] mm coordinate system to them.
@@ -30,7 +29,7 @@ x = np.linspace(-extent,extent,M_V)
 y = np.linspace(-extent,extent,M_V)
 z = np.linspace(-extent,extent,M_V)
 
-null = pt.ElectronCube(x,y,z)
+null = ms.ScalarDomain(x,y,z)
 null.test_null()
 null.calc_dndr()
 
@@ -76,7 +75,7 @@ fig.tight_layout()
 
 ###########################
 #SLAB TEST: Deflect rays in -ve x-direction
-import particle_tracker as pt
+import minimal_solver as ms
 
 N_V = 100
 M_V = 2*N_V+1
@@ -85,7 +84,7 @@ x = np.linspace(-extent,extent,M_V)
 y = np.linspace(-extent,extent,M_V)
 z = np.linspace(-extent,extent,M_V)
 
-slab = pt.ElectronCube(x,y,z)
+slab = ms.ScalarDomain(x,y,z)
 slab.test_slab(s=8, n_e0=1e25)
 slab.calc_dndr()
 
@@ -124,8 +123,11 @@ from datetime import datetime
 
 c = sc.c # honestly, this could be 3e8 *shrugs*
 
-class ElectronCube:
-    """A class to hold and generate electron density cubes
+# Define scalar domain
+class ScalarDomain:
+    """
+    A class to hold and generate scalar domains.
+    This contains also the method to propagate rays through the scara domain
     """
     
     def __init__(self, x, y, z, probing_direction = 'z'):
@@ -401,13 +403,14 @@ class ElectronCube:
             np.save(f, self.rf)
 
     
-def dsdt(t, s, ElectronCube):
-    """Returns an array with the gradients and velocity per ray for ode_int. Cannot be a method of ElectronCube due to expected call signature for the ODE solver
+# ODEs of photon paths
+def dsdt(t, s, ScalarDomain):
+    """Returns an array with the gradients and velocity per ray for ode_int. Cannot be a method of ScalarDomain due to expected call signature for the ODE solver
 
     Args:
         t (float array): I think this is a dummy variable for ode_int - our problem is time invarient
         s (6N float array): flattened 6xN array of rays used by ode_int
-        ElectronCube (ElectronCube): an ElectronCube object which can calculate gradients
+        ScalarDomain (ScalarDomain): an ScalarDomain object which can calculate gradients
 
     Returns:
         6N float array: flattened array for ode_int
@@ -419,7 +422,7 @@ def dsdt(t, s, ElectronCube):
     v = s[3:,:]
     x = s[:3,:]
 
-    sprime[3:6,:] = ElectronCube.dndr(x)
+    sprime[3:6,:] = ScalarDomain.dndr(x)
     sprime[:3,:]  = v
 
     return sprime.flatten()

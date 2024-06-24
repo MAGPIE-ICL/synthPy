@@ -1,22 +1,17 @@
-# This is the most up to date version of the ray tracing solver
-# this will be the more general version of the ray tracer that can handle polarisation and phase shift
-# REQUIRES changing name and examples
-
-"""PARTICLE TRACKER
+"""FULL PHYSICS SOLVER - 9 Vector description of rays - Include Phase and Polarisation
 BASED ON: https://journals.aps.org/pre/abstract/10.1103/PhysRevE.61.895
 
 SOLVES: 
 $ \frac{d\vec{v}}{dt} = -\nabla \left( \frac{c^2}{2} \frac{n_e}{n_c} \right) $
-
 $ \frac{d\vec{x}}{dt} = \vec{v} $
 
-CODE BY: Aidan CRILLY
-REFACTORING: Jack HARE
+BASED VERSION CODED BY: Aidan CRILLY / Jack HARE
+MODIFIED BY: Stefano MERLINI
 
 EXAMPLES:
 #############################
 #NULL TEST: no deflection
-import particle_tracker as pt
+import full_solver as fs
 
 N_V = 100
 M_V = 2*N_V+1
@@ -25,12 +20,12 @@ ne_x = np.linspace(-ne_extent,ne_extent,M_V)
 ne_y = np.linspace(-ne_extent,ne_extent,M_V)
 ne_z = np.linspace(-ne_extent,ne_extent,M_V)
 
-null = pt.ElectronCube(ne_x,ne_y,ne_z,ne_extent)
+null = fs.ScalarDomain(ne_x,ne_y,ne_z,ne_extent)
 null.test_null()
 null.calc_dndr()
 
 ### Initialise rays
-s0 = pt.init_beam(Np = 100000, beam_size=5e-3, divergence = 0.5e-3, ne_extent = ne_extent)
+s0 = fs.init_beam(Np = 100000, beam_size=5e-3, divergence = 0.5e-3, ne_extent = ne_extent)
 ### solve
 null.solve(s0)
 rf = null.rf
@@ -52,7 +47,7 @@ fig.tight_layout()
 
 ###########################
 #SLAB TEST: Deflect rays in -ve x-direction
-import particle_tracker as pt
+import fs as fs
 
 N_V = 100
 M_V = 2*N_V+1
@@ -61,12 +56,12 @@ ne_x = np.linspace(-ne_extent,ne_extent,M_V)
 ne_y = np.linspace(-ne_extent,ne_extent,M_V)
 ne_z = np.linspace(-ne_extent,ne_extent,M_V)
 
-slab = pt.ElectronCube(ne_x,ne_y,ne_z,ne_extent)
+slab = fs.ScalarDomain(ne_x,ne_y,ne_z,ne_extent)
 slab.test_slab(s=10, n_e0=1e25)
 slab.calc_dndr()
 
 ## Initialise rays and solve
-s0 = pt.init_beam(Np = 100000, beam_size=5e-3, divergence = 0, ne_extent = ne_extent)
+s0 = fs.init_beam(Np = 100000, beam_size=5e-3, divergence = 0, ne_extent = ne_extent)
 slab.solve(s0)
 rf = slab.rf
 
@@ -94,8 +89,11 @@ import scipy.constants as sc
 
 c = sc.c # honestly, this could be 3e8 *shrugs*
 
-class ElectronCube:
-    """A class to hold and generate electron density cubes
+# Define a scalar domain
+class ScalarDomain:
+    """
+    A class to hold and generate scalar domains.
+    This contains also the method to propagate rays through the scara domain
     """
     
     def __init__(self, x, y, z, extent, B_on = False, inv_brems = False, phaseshift = False, probing_direction = 'z'):
@@ -394,13 +392,13 @@ class ElectronCube:
         self.rf = None
     
 # ODEs of photon paths
-def dsdt(t, s, ElectronCube):
+def dsdt(t, s, ScalarDomain):
     """Returns an array with the gradients and velocity per ray for ode_int
 
     Args:
         t (float array): I think this is a dummy variable for ode_int - our problem is time invarient
         s (9N float array): flattened 9xN array of rays used by ode_int
-        ElectronCube (ElectronCube): an ElectronCube object which can calculate gradients
+        ScalarDomain (ScalarDomain): an ScalarDomain object which can calculate gradients
 
     Returns:
         9N float array: flattened array for ode_int
@@ -416,13 +414,14 @@ def dsdt(t, s, ElectronCube):
     p = s[7,:]
     r = s[8,:]
 
-    sprime[3:6,:] = ElectronCube.dndr(x)
+    sprime[3:6,:] = ScalarDomain.dndr(x)
     sprime[:3,:]  = v
-    sprime[6,:]   = ElectronCube.atten(x)*a
-    sprime[7,:]   = ElectronCube.phase(x)
-    sprime[8,:]   = ElectronCube.neB(x,v)
+    sprime[6,:]   = ScalarDomain.atten(x)*a
+    sprime[7,:]   = ScalarDomain.phase(x)
+    sprime[8,:]   = ScalarDomain.neB(x,v)
     return sprime.flatten()
 
+# Initialise beam
 def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z'):
     """[summary]
 
