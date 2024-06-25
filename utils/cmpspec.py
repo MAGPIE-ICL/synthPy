@@ -44,7 +44,7 @@ def movingaverage(interval, window_size):
 #  (__)    (____/  (__)  (__)(____)\____/(____/  (____/(__)  (____)\___) (__) (__\_)\____/\_)(_/
 # Method to compute spectrum from 1D Field
 
-def compute1Dspectrum(r,lx, smooth):
+def compute1Dspectrum(r,lx, smooth =  False):
     """
      Parameters:
     ----------------------------------------------------------------
@@ -91,7 +91,7 @@ def compute1Dspectrum(r,lx, smooth):
 # (____)    (____/  (__)  (__)(____)\____/(____/  (____/(__)  (____)\___) (__) (__\_)\____/\_)(_/
 # Method to compute spectrum from 2D Field
 
-def compute2Dspectrum(r,lx, ly, smooth):
+def compute2Dspectrum(r,lx, ly, smooth = False):
     """
      Parameters:
     ----------------------------------------------------------------
@@ -144,7 +144,7 @@ def compute2Dspectrum(r,lx, ly, smooth):
 # (____/    (____/  (__)  (__)(____)\____/(____/  (____/(__)  (____)\___) (__) (__\_)\____/\_)(_/
 # Method to compute spectrum from 3D Field
 
-def compute3Dspectrum(r,lx, ly, lz, smooth):
+def compute3Dspectrum(r,lx, ly, lz, smooth = False):
     """
      Parameters:
     ----------------------------------------------------------------

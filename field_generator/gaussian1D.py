@@ -13,10 +13,12 @@ import numpy as np
 
 class gaussian1D:
     def __init__(self, k_func):
+
         """
             Parameters:
                 k_func {function} -- a function which takes an input k 
         """
+        self.xc = None
         self.k_func = k_func
 
     def cos(self, lx, nx, nmodes, wn1):
@@ -84,18 +86,20 @@ class gaussian1D:
         psi = 2.0*np.pi*np.random.uniform(0.0,1.0,nmodes)
         kx = wn
         # computing the center position of the cell
-        xc = dx/2.0 + np.arange(0,nx)*dx
+        self.xc = dx/2.0 + np.arange(0,nx)*dx
         _r = np.zeros(nx)
         print("Generating 1-D turbulence...")
         for i in range(0,nx):
             # for every step i along x-direction do the fourier summation
-            arg1 = kx*xc[i] + phi
+            arg1 = kx*self.xc[i] + phi
             bmx = A_m * np.sqrt(2.0) *(np.cos(arg1))
             _r[i] = np.sum(bmx)
         print("Done! 1-D Turbulence has been generated!")
+        
+        self.ne = _r
         return _r
     
-    def fft(self, N):
+    def fft(self, N, d = 1):
         """A FFT based generator for scalar gaussian fields in 1D
         Reference:Timmer, J and König, M. “On Generating Power Law Noise.” Astronomy & Astrophysics 300 (1995):
         1–30. https://doi.org/10.1017/CBO9781107415324.004.
@@ -120,7 +124,7 @@ class gaussian1D:
             ax.plot(x, sig)
         """
         M=2*N+1
-        k=np.fft.fftfreq(M) #these are the frequencies, starting from 0 up to f_max, then -f_max to 0.
+        k=np.fft.fftfreq(M, d) #these are the frequencies, starting from 0 up to f_max, then -f_max to 0.
 
         K=np.sqrt(k**2)
         K=np.fft.fftshift(K)#numpy convention, highest frequencies at the centre
@@ -141,5 +145,62 @@ class gaussian1D:
 
         signal=np.fft.ifftn(F_shift)
         
-        return signal.real
+        self.ne = signal.real
 
+        return self.ne
+    
+
+    def export_scalar_field(self, property: str = 'ne', fname: str = None):
+
+        '''
+        Export the current scalar electron density profile as a pvti file format, property added for future scalability to export temperature, B-field, etc.
+
+        Args:
+            property: str, 'ne': export the electron density (default)
+            
+            fname: str, file path and name to save under. A VTI pointed to by a PVTI file are saved in this location. If left blank, the name will default to:
+
+                    ./plasma_PVTI_DD_MM_YYYY_HR_MIN
+        
+        
+        '''
+    
+        if fname is None:
+            import datetime as dt
+            year = dt.datetime.now().year
+            month = dt.datetime.now().month
+            day = dt.datetime.now().day
+            min = dt.datetime.now().minute
+            hour = dt.datetime.now().hour
+
+
+            fname = f'./plasma_PVTI_{day}_{month}_{year}_{hour}_{min}' #default fname to the current date and time 
+
+
+        if property == 'ne':
+
+            try: #check to ensure electron density has been added
+                np.shape(self.ne)
+                rnec = self.ne
+            except:
+                raise Exception('No electron density currently loaded!')
+
+
+            if self.xc is None:
+                extent = (np.shape(self.ne)[0])//2 + 1/2
+                xc = np.arange(-extent,extent, 1)
+            else:
+                xc = self.xc
+
+
+            #scaling
+
+            # Add the data values to the cell data
+
+        x_y_data = np.column_stack((xc,self.ne))
+
+        print(x_y_data)
+        with open(f'{fname}.pvti', 'w') as file:
+            np.save(f'{fname}.npy', x_y_data)
+
+        print(f'Scalar Domain electron density succesfully saved under {fname}.npy !')
