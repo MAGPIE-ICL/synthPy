@@ -6,7 +6,6 @@ Example code for plotting data produced by hpc runs
 import matplotlib.pyplot as plt
 import numpy as np
 import pickle
-import ray_transfer_matrix as rtm
 
 sc = pickle.load( open( "./Schlieren.pkl", "rb" ) )
 sh = pickle.load( open( "./Shadowgraphy.pkl", "rb" ) )
