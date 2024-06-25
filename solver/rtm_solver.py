@@ -7,7 +7,11 @@ import sympy as sym
 import numpy as np
 import matplotlib.pyplot as plt
 
-'''
+'''OPTICS - RAY TRANSFER METRIX METHOD
+
+BASED VERSION CODED BY: Aidan CRILLY / Jack HARE
+MODIFIED/UPDATED BY: Stefano MERLINI
+
 Example:
 
 ###INITIALISE RAYS###
