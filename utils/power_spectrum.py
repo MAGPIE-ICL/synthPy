@@ -193,7 +193,7 @@ def movingaverage(interval, window_size):
     window = np.ones(int(window_size)) / float(window_size)
     return np.convolve(interval, window, 'same')
 
-def scalar1D_knyquist(r,lx, smooth):
+def scalar1D_knyquist(r,lx, smooth = False):
     """
      Parameters:
     ----------------------------------------------------------------
@@ -232,7 +232,7 @@ def scalar1D_knyquist(r,lx, smooth):
     #
     return knyquist, wave_numbers, tke_spectrum
 
-def scalar2D_knyquist(r,lx, ly, smooth):
+def scalar2D_knyquist(r,lx, ly, smooth = False):
     """
      Parameters:
     ----------------------------------------------------------------
@@ -275,7 +275,7 @@ def scalar2D_knyquist(r,lx, ly, smooth):
     #
     return knyquist, wave_numbers, tke_spectrum
 
-def scalar3D_knyquist(r,lx, ly, lz, smooth):
+def scalar3D_knyquist(r,lx, ly, lz, smooth = False):
     """
      Parameters:
     ----------------------------------------------------------------
