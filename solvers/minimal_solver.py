@@ -401,6 +401,94 @@ class ScalarDomain:
             fn = '{}.npy'.format(fn)
         with open(fn,'wb') as f:
             np.save(f, self.rf)
+    
+    def export_scalar_field(self, property: str = 'ne', fname: str = None):
+
+        '''
+        Export the current scalar electron density profile as a pvti file format, property added for future scalability to export temperature, B-field, etc.
+
+        Args:
+            property: str, 'ne': export the electron density (default)
+            
+            fname: str, file path and name to save under. A VTI pointed to by a PVTI file are saved in this location. If left blank, the name will default to:
+
+                    ./plasma_PVTI_DD_MM_YYYY_HR_MIN
+        
+        
+        '''
+        import pyvista as pv
+
+    
+        if fname is None:
+            import datetime as dt
+            year = dt.datetime.now().year
+            month = dt.datetime.now().month
+            day = dt.datetime.now().day
+            min = dt.datetime.now().minute
+            hour = dt.datetime.now().hour
+
+
+            fname = f'./plasma_PVTI_{day}_{month}_{year}_{hour}_{min}' #default fname to the current date and time 
+
+
+        if property == 'ne':
+
+            try: #check to ensure electron density has been added
+                np.shape(self.ne)
+                rnec = self.ne
+            except:
+                raise Exception('No electron density currently loaded!')
+        
+            # Create the spatial reference  
+            grid = pv.ImageData()
+
+            # Set the grid dimensions: shape + 1 because we want to inject our values on
+            # the CELL data
+            grid.dimensions = np.array(rnec.shape) + 1
+            # Edit the spatial reference
+            grid.origin = (0, 0, 0)  # The bottom left corner of the data set
+
+            #scaling
+            x_size = np.max(self.x) / ((np.shape(self.ne)[0] - 1)//2 )  #assuming centering about the origin
+            y_size = np.max(self.y) / ((np.shape(self.ne)[1] - 1)//2 ) 
+            z_size = np.max(self.z) / ((np.shape(self.ne)[2] - 1)//2 )
+            grid.spacing = (x_size, y_size, z_size)  # These are the cell sizes along each axis
+
+            # Add the data values to the cell data
+            grid.cell_data["rnec"] = rnec.flatten(order="F")  # Flatten the array
+
+            grid.save(f'{fname}.vti')
+
+            print(f'VTI saved under {fname}.vti')
+
+        #prep values to write the pvti, written to match the exported vti using pyvista
+
+        relative_fname = fname.split('/')[-1]
+        spacing_x = (2*self.extent_x)/np.shape(self.x)[0]
+        spacing_y = (2*self.extent_y)/np.shape(self.y)[0]
+        spacing_z = (2*self.extent_z)/np.shape(self.z)[0]
+        content = f'''<?xml version="1.0"?>
+<VTKFile type="PImageData" version="0.1" byte_order="LittleEndian" header_type="UInt32" compressor="vtkZLibDataCompressor">
+    <PImageData WholeExtent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" GhostLevel="0" Origin="0 0 0" Spacing="{spacing_x} {spacing_y} {spacing_z}">
+         <PCellData Scalars="rnec">
+             <PDataArray type="Float64" Name="rnec">
+             </PDataArray>
+         </PCellData>
+         <Piece Extent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" Source="{relative_fname}.vti"/>
+    </PImageData>
+</VTKFile>'''
+
+
+    
+        # write file
+
+        with open(f'{fname}.pvti', 'w') as file:
+            file.write(content)
+        
+        print(f'Scalar Domain electron density succesfully saved under {fname}.pvti !')
+        
+
+
 
     
 # ODEs of photon paths

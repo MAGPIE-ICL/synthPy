@@ -17,6 +17,9 @@ class gaussian3D:
             Parameters:
                 k_func {function} -- a function which takes an input k 
         """
+        # define self.xc now to check whether cos or fft was used in generation
+        self.xc = None
+        
         self.k_func = k_func
 
     def cos(self, lx, ly, lz, nx, ny, nz, nmodes, wn1):
@@ -121,21 +124,16 @@ class gaussian3D:
         phi = 2.0*np.pi*np.random.uniform(0.0,1.0,nmodes)
 
         #
-        kx = np.sin(theta) * np.cos(phi) * wn;
-        ky = np.sin(theta) * np.sin(phi) * wn;
-        kz = np.cos(theta) * wn;
-
-        # Computing the vector [xc,yc,zc]
-        xc = dx / 2.0 + np.arange(0, nx) * dx
-        yc = dy / 2.0 + np.arange(0, ny) * dy
-        zc = dz / 2.0 + np.arange(0, nz) * dz
+        kx = np.sin(theta) * np.cos(phi) * wn
+        ky = np.sin(theta) * np.sin(phi) * wn
+        kz = np.cos(theta) * wn
 
         # Looping through 3-Dimensions nx, ny, nz and perfom the Fourier Summation
 
         # computing the center position of the cell
-        xc = dx/2.0 + np.arange(0,nx)*dx
-        yc = dy/2.0 + np.arange(0,ny)*dy
-        zc = dz/2.0 + np.arange(0,nz)*dz
+        self.xc = dx/2.0 + np.arange(0,nx)*dx
+        self.yc = dy/2.0 + np.arange(0,ny)*dy
+        self.zc = dz/2.0 + np.arange(0,nz)*dz
 
         _r = np.zeros((nx,ny,nz))
 
@@ -144,14 +142,17 @@ class gaussian3D:
             for j in range(0,ny):
                 for i in range(0,nx):
                     # for every step i along x-y-z direction do the fourier summation
-                    arg1 = kx*xc[i] + ky*yc[j] + kz*zc[k] + psi_1
-                    arg2 = kx*xc[i] + ky*yc[j] - kz*zc[k] + psi_2
-                    arg3 = kx*xc[i] - ky*yc[j] + kz*zc[k] + psi_3
-                    arg4 = kx*xc[i] - ky*yc[j] - kz*zc[k] + psi_4
+                    arg1 = kx*self.xc[i] + ky*self.yc[j] + kz*self.zc[k] + psi_1
+                    arg2 = kx*self.xc[i] + ky*self.yc[j] - kz*self.zc[k] + psi_2
+                    arg3 = kx*self.xc[i] - ky*self.yc[j] + kz*self.zc[k] + psi_3
+                    arg4 = kx*self.xc[i] - ky*self.yc[j] - kz*self.zc[k] + psi_4
                     bm = A_m * np.sqrt(2.0) * (np.cos(arg1) + np.cos(arg2) + np.cos(arg3) + np.cos(arg4))
                     _r[i,j,k] = np.sum(bm)
 
         print("Done! 3-D Turbulence has been generated!")
+
+        self.ne = _r
+
         return _r
 
     def fft(self, N):
@@ -181,6 +182,8 @@ class gaussian3D:
                 d=sig[r,:,:]
                 a.imshow(d, cmap='bwr', extent=[-N,N,-N,N])
                 a.set_title("y="+str(r))    """
+        
+
         M = 2*N+1
         k = np.fft.fftfreq(M) #these are the frequencies, starting from 0 up to f_max, then -f_max to 0.
 
@@ -203,5 +206,103 @@ class gaussian3D:
         F_shift[0,0,0] = 0 # 0 mean
 
         signal = np.fft.ifftn(F_shift)
+
+        self.ne = signal.real
         
-        return signal.real
+        return self.ne
+    
+
+
+
+    def export_scalar_field(self, property: str = 'ne', fname: str = None):
+
+        '''
+        Export the current scalar electron density profile as a pvti file format, property added for future scalability to export temperature, B-field, etc.
+
+        Args:
+            property: str, 'ne': export the electron density (default)
+            
+            fname: str, file path and name to save under. A VTI pointed to by a PVTI file are saved in this location. If left blank, the name will default to:
+
+                    ./plasma_PVTI_DD_MM_YYYY_HR_MIN
+        
+        
+        '''
+        import pyvista as pv
+
+    
+        if fname is None:
+            import datetime as dt
+            year = dt.datetime.now().year
+            month = dt.datetime.now().month
+            day = dt.datetime.now().day
+            min = dt.datetime.now().minute
+            hour = dt.datetime.now().hour
+
+
+            fname = f'./plasma_PVTI_{day}_{month}_{year}_{hour}_{min}' #default fname to the current date and time 
+
+
+        if property == 'ne':
+
+            try: #check to ensure electron density has been added
+                np.shape(self.ne)
+                rnec = self.ne
+            except:
+                raise Exception('No electron density currently loaded!')
+        
+            # Create the spatial reference  
+            grid = pv.ImageData()
+
+            # Set the grid dimensions: shape + 1 because we want to inject our values on
+            # the CELL data
+            grid.dimensions = np.array(rnec.shape) + 1
+            # Edit the spatial reference
+            grid.origin = (0, 0, 0)  # The bottom left corner of the data set
+
+            if self.xc is None:
+                extent = (np.shape(self.ne)[0])//2
+                xc,yc,zc = np.arange(-extent,extent, 1), np.arange(-extent,extent, 1), np.arange(-extent,extent, 1)
+            else:
+                xc = self.xc
+                yc = self.yc
+                zc = self.zc
+
+            #scaling
+            x_size = np.max(xc) / ((np.shape(self.ne)[0] - 1)//2 )  #assuming centering about the origin
+            y_size = np.max(yc) / ((np.shape(self.ne)[1] - 1)//2 ) 
+            z_size = np.max(zc) / ((np.shape(self.ne)[2] - 1)//2 )
+            grid.spacing = (x_size, y_size, z_size)  # These are the cell sizes along each axis
+
+            # Add the data values to the cell data
+            grid.cell_data["rnec"] = rnec.flatten(order="F")  # Flatten the array
+
+            grid.save(f'{fname}.vti')
+
+            print(f'VTI saved under {fname}.vti')
+
+        #prep values to write the pvti, written to match the exported vti using pyvista
+
+        relative_fname = fname.split('/')[-1]
+        spacing_x = (2*xc.max())/np.shape(xc)[0]
+        spacing_y = (2*yc.max())/np.shape(yc)[0]
+        spacing_z = (2*zc.max())/np.shape(zc)[0]
+        content = f'''<?xml version="1.0"?>
+<VTKFile type="PImageData" version="0.1" byte_order="LittleEndian" header_type="UInt32" compressor="vtkZLibDataCompressor">
+    <PImageData WholeExtent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" GhostLevel="0" Origin="0 0 0" Spacing="{x_size} {y_size} {z_size}">
+         <PCellData Scalars="rnec">
+             <PDataArray type="Float64" Name="rnec">
+             </PDataArray>
+         </PCellData>
+         <Piece Extent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" Source="{relative_fname}.vti"/>
+    </PImageData>
+</VTKFile>'''
+
+
+    
+        # write file
+
+        with open(f'{fname}.pvti', 'w') as file:
+            file.write(content)
+        
+        print(f'Scalar Domain electron density succesfully saved under {fname}.pvti !')

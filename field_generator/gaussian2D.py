@@ -17,6 +17,9 @@ class gaussian2D:
             Parameters:
                 k_func {function} -- a function which takes an input k 
         """
+        # define self.xc now to check whether cos or fft was used in generation
+        self.xc = None
+
         self.k_func = k_func
 
     def cos(self, lx, ly, nx, ny, nmodes, wn1):
@@ -105,14 +108,12 @@ class gaussian2D:
         #
         kx = np.cos(theta)*wn
         ky = np.sin(theta)*wn
-        # Computing the vector [xc,yc]
-        xc = dx / 2.0 + np.arange(0, nx) * dx
-        yc = dy / 2.0 + np.arange(0, ny) * dy
-        # Looping through 2-Dimensions nx, ny and perfom the Fourier Summation
+
+        # perfom the Fourier Summation
 
         # computing the center position of the cell
-        xc = dx/2.0 + np.arange(0,nx)*dx
-        yc = dy/2.0 + np.arange(0,ny)*dy
+        self.xc = dx/2.0 + np.arange(0,nx)*dx
+        self.yc = dy/2.0 + np.arange(0,ny)*dy
 
         _r = np.zeros((nx,ny))
 
@@ -120,11 +121,14 @@ class gaussian2D:
         for j in range(0,ny):
             for i in range(0,nx):
                 # for every step i along x-y direction do the fourier summation
-                arg1 = kx*xc[i] + ky*yc[j] + phi
-                arg2 = kx*xc[i] - ky*yc[j] + psi
+                arg1 = kx*self.xc[i] + ky*self.yc[j] + phi
+                arg2 = kx*self.xc[i] - ky*self.yc[j] + psi
                 bm = A_m * np.sqrt(2.0) *(np.cos(arg1) + np.cos(arg2))
                 _r[i,j] = np.sum(bm)
         print("Done! 2-D Turbulence has been generated!")
+
+        _r = self.ne
+
         return _r
 
     def fft(self, N):
@@ -176,5 +180,79 @@ class gaussian2D:
         F_shift[0,0]=0 # 0 mean
 
         signal=np.fft.ifftn(F_shift)
+
+        self.ne = signal.real
         
-        return signal.real
+        return self.ne
+    
+
+    def export_scalar_field(self, property: str = 'ne', fname: str = None):
+
+        '''
+        Export the current scalar electron density profile as a pvti file format, property added for future scalability to export temperature, B-field, etc.
+
+        Args:
+            property: str, 'ne': export the electron density (default)
+            
+            fname: str, file path and name to save under. A VTI pointed to by a PVTI file are saved in this location. If left blank, the name will default to:
+
+                    ./plasma_PVTI_DD_MM_YYYY_HR_MIN
+        
+        Returns:
+
+            pickle file : x_values = [:, 0], y_values = [:,1], field_values = [:,2]
+        
+        load in file with e.g: 
+
+            import pickle
+
+            ne = pickle.load( open(fname.pkl, "rb" ) )
+        
+        
+        '''
+        import pyvista as pv
+
+        import pickle
+
+    
+        if fname is None:
+            import datetime as dt
+            year = dt.datetime.now().year
+            month = dt.datetime.now().month
+            day = dt.datetime.now().day
+            min = dt.datetime.now().minute
+            hour = dt.datetime.now().hour
+
+
+            fname = f'./plasma_PVTI_{day}_{month}_{year}_{hour}_{min}' #default fname to the current date and time 
+
+
+
+        if property == 'ne':
+
+            try: #check to ensure electron density has been added
+                np.shape(self.ne)
+                rnec = self.ne
+            except:
+                raise Exception('No electron density currently loaded!')
+
+            #get scale information 
+
+            if self.xc is None:
+                extent = (np.shape(self.ne)[0])//2
+                print(extent)
+                xc, yc = np.arange(-extent,extent + 1, 1), np.arange(-extent,extent + 1, 1)
+            else:
+                xc = self.xc
+                yc = self.yc
+            
+            spatial_vals = np.column_stack((xc, yc))
+
+            values = np.concatenate((spatial_vals, rnec), axis = 1)
+
+
+        filehandler = open(f'{fname}.pkl',"wb")
+        pickle.dump(values,filehandler)
+        filehandler.close()
+        
+        
