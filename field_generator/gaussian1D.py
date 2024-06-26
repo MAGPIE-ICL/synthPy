@@ -18,7 +18,9 @@ class gaussian1D:
             Parameters:
                 k_func {function} -- a function which takes an input k 
         """
+        # define self.xc now to check whether cos or fft was used in generation
         self.xc = None
+
         self.k_func = k_func
 
     def cos(self, lx, nx, nmodes, wn1):
@@ -153,15 +155,24 @@ class gaussian1D:
     def export_scalar_field(self, property: str = 'ne', fname: str = None):
 
         '''
-        Export the current scalar electron density profile as a pvti file format, property added for future scalability to export temperature, B-field, etc.
+        Export the current scalar electron density profile as a npy file format, 'property' added for future scalability to export temperature, B-field, etc.
 
         Args:
             property: str, 'ne': export the electron density (default)
             
-            fname: str, file path and name to save under. A VTI pointed to by a PVTI file are saved in this location. If left blank, the name will default to:
+            fname: str, file path and name to save under. A .npy file will be saved. If left blank, the name will default to:
 
                     ./plasma_PVTI_DD_MM_YYYY_HR_MIN
         
+        returns:
+            text file : x_values = [:, 0], field_values = [:,1]
+        
+            
+        load in file with e.g: 
+
+            import numpy
+
+            ne = numpy.loadtxt(fname, dtype = float)
         
         '''
     
@@ -181,14 +192,13 @@ class gaussian1D:
 
             try: #check to ensure electron density has been added
                 np.shape(self.ne)
-                rnec = self.ne
             except:
                 raise Exception('No electron density currently loaded!')
 
 
             if self.xc is None:
-                extent = (np.shape(self.ne)[0])//2 + 1/2
-                xc = np.arange(-extent,extent, 1)
+                extent = (np.shape(self.ne)[0])//2
+                xc = np.arange(-extent,extent + 1, 1)
             else:
                 xc = self.xc
 
@@ -199,8 +209,9 @@ class gaussian1D:
 
         x_y_data = np.column_stack((xc,self.ne))
 
-        print(x_y_data)
-        with open(f'{fname}.pvti', 'w') as file:
-            np.save(f'{fname}.npy', x_y_data)
+        # write the file to fname
 
-        print(f'Scalar Domain electron density succesfully saved under {fname}.npy !')
+        with open(f'{fname}.txt', 'w') as file:
+            np.savetxt(f'{fname}.txt', x_y_data)
+
+        print(f'Scalar Domain electron density succesfully saved under {fname}.txt !')

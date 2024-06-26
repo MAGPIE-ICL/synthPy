@@ -17,7 +17,9 @@ class gaussian3D:
             Parameters:
                 k_func {function} -- a function which takes an input k 
         """
+        # define self.xc now to check whether cos or fft was used in generation
         self.xc = None
+        
         self.k_func = k_func
 
     def cos(self, lx, ly, lz, nx, ny, nz, nmodes, wn1):
