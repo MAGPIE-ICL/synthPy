@@ -328,7 +328,7 @@ class ScalarDomain:
 
         start = time()
         dsdt_ODE = lambda t, y: dsdt(t, y, self)
-        sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t, method = method)
+        sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t, method = 'RK45')
         finish = time()
         print("Ray trace completed in:\t",finish-start,"s")
 
@@ -386,6 +386,21 @@ class ScalarDomain:
             ray_p[3] = np.arctan(vy/vz)
 
         return ray_p
+    
+    def clear_memory(self):
+        """
+        Clears variables not needed by solve method, saving memory
+
+        Can also use after calling solve to clear ray positions - important when running large number of rays
+
+        """
+        self.dndx = None
+        self.dndx = None
+        self.dndx = None
+        self.ne = None
+        self.ne_nc = None
+        self.sf = None
+        self.rf = None
 
     def save_output_rays(self, fn = None):
         """

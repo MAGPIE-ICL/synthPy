@@ -74,7 +74,7 @@ fig.subplots_adjust(left=0, bottom=0.14, right=0.98, top=0.89, wspace=0.1, hspac
 r0[3,:]=α(r0[2,:],n_e0=ne_ramp(r0[0,:], ne0, s), w=w, Dx=Dx, x0=x0)
 
 ###SOLVE FOR RAYS###
-b=BurdiscopeRays(r0)
+b=refractometerRays(r0)
 sh=ShadowgraphyRays(r0)
 sc=SchlierenRays(r0)
 
@@ -182,9 +182,9 @@ def d2r(d):
     # helper function, degrees to radians
     return d*np.pi/180
 
-class BurdiscopeOptics:
+class RefractometerOptics:
     """
-    Class to hold the Burdiscope optics
+    Class to hold the Refractometer optics
     """
     x, y, θ, ϕ, L = sym.symbols('x, y, θ, ϕ, L', real=True)
     #our two lenses. f1 is spherical, f2 is composite spherical/cylindrical
@@ -288,7 +288,7 @@ class Rays:
             self.clear_rays()
 
     def plot(self, ax, clim=None, cmap=None):
-        ax.imshow(self.H, interpolation='nearest', origin='low', clim=clim, cmap=cmap,
+        ax.imshow(self.H, interpolation='nearest', origin='lower', clim=clim, cmap=cmap,
                 extent=[self.xedges[0], self.xedges[-1], self.yedges[0], self.yedges[-1]])
 
     def clear_rays(self):
@@ -298,12 +298,12 @@ class Rays:
         self.r0 = None
         self.rf = None
 
-class BurdiscopeRays(Rays):
+class RefractometerRays(Rays):
     '''
     Simple class to keep all the ray properties together
     '''              
     def solve(self):
-        O=BurdiscopeOptics
+        O=RefractometerOptics
         
         rr0=transform(O.X3(0), self.r0) # small displacement, currently does nothing
 
