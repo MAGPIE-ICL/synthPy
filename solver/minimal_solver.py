@@ -317,7 +317,7 @@ class ScalarDomain:
             s0[2,:] = -self.extent
         self.s0 = s0
 
-    def solve(self, method = method):
+    def solve(self, method = 'RK45'):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
@@ -328,7 +328,7 @@ class ScalarDomain:
 
         start = time()
         dsdt_ODE = lambda t, y: dsdt(t, y, self)
-        sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t, method = 'RK45')
+        sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t, method = method)
         finish = time()
         print("Ray trace completed in:\t",finish-start,"s")
 
