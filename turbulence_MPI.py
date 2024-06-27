@@ -27,76 +27,64 @@ Np_ray_split = int(5e5)
 num_processors = comm.size
 print(num_processors)
 
+def power_spectrum(k,a):
+    return k**-a
+	
+def k41(k):
+    return power_spectrum(k, 5/3)
 
 
+def k41_mod(k):
+	return power_spectrum(k, 10/3)
 
 
 if(rank == 0):
-    print('rank 0!')
+	print('rank 0!')
     # generate field
-    def power_spectrum(k,a):
-        return k**-a
+	field = g1.gaussian1D(k41)
 
-    def k41(k):
-        return power_spectrum(k, 5/3)
+	field_mod = g1.gaussian1D(k41_mod)
 
+	n_extent = 1000
 
-    field = g1.gaussian1D(k41)
-
-
-    # N_modes = 10000, n_x = 1000, n_y = 1000
-    nmodes = int(100)
-    nx = 100
-
-    lx = 10e-3
-
-    def power_spectrum(k,a):
-        return k**-a
-
-    def k41(k):
-        return power_spectrum(k, 5/3)
-    field = g1.gaussian1D(k41)
-
-    ne_pert = field.cos(lx,nx,nmodes,2*np.pi/lx)
+	ne_pert = field.fft(n_extent)
 
 
-    #make all positive
+	#make all positive and normalise 
+	ne_pert = ne_pert/np.max(ne_pert)
+	ne_vals = 1e24 + 1e24*ne_pert
 
-    ne_vals = 1e24 + 1e24*ne_pert
-
-    extent = lx
-    xs = np.linspace(-extent/2, extent/2, nx)
-    ys = np.linspace(-extent/2, extent/2, nx)
-    zs = np.linspace(-extent/2, extent/2, nx)
-
-
-    ne_flatten = (list(ne_vals)*nx*nx)
-
-    ne = np.array(ne_flatten).reshape((100,100,100)).T
-
-    print(np.shape(ne))
-    #construct electron cube
-
-    field = s.ScalarDomain(xs,ys,zs)
-
-    field.external_ne(ne)
+	extent = 10e-3
+	xs = np.linspace(-extent/2, extent/2, nx)
+	ys = np.linspace(-extent/2, extent/2, nx)
+	zs = np.linspace(-extent/2, extent/2, nx)
 
 
-    field.export_scalar_field(fname = './output/1D_turb_pert')
+	ne_flatten = (list(ne_vals)*len(ne_vals)*len(ne_vals))
 
-    field.calc_dndr()
-	
-    field.clear_memory()
-    
+	ne = np.array(ne_flatten).reshape((100,100,100)).T
+
+	print(np.shape(ne))
+	#construct electron cube
+
+	field = s.ScalarDomain(xs,ys,zs)
+
+	field.external_ne(ne)
+
+	field.export_scalar_field(fname = './output/1D_turb_pert')
+
+	field.calc_dndr()
+
+	field.clear_memory()
 
 
-    print(f'''Field created, with
-    extent = {lx/2}
-    nmodes = {nmodes}
-    min length scale = {lx/nx}
-    power spectrum = {-5/3}''')
 
-    print('''ray tracing''')
+	print(f'''Field created, with
+	extent = {extent}
+	n_cells = {2*n_extent}
+	power spectrum = {-5/3}''')
+
+	print('''ray tracing''')
 	
 
 else:
