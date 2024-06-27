@@ -1,6 +1,6 @@
 import sys
 
-sys.path.insert(1, 'C:/Users/UROP/OneDrive - Imperial College London/MAGPIE/python/synthPy')
+sys.path.insert(1, 'z:\synthPy')
 
 import numpy as np
 from mpi4py import MPI
@@ -15,7 +15,7 @@ import utils.cmpspec as cm
 import solver.minimal_solver as s
 import solver.rtm_solver as rtm
 import matplotlib.pyplot as plt
-from memory_profiler import profile
+import gc
 
 ## Initialise the MPI
 comm = MPI.COMM_WORLD
