@@ -74,7 +74,7 @@ fig.subplots_adjust(left=0, bottom=0.14, right=0.98, top=0.89, wspace=0.1, hspac
 r0[3,:]=α(r0[2,:],n_e0=ne_ramp(r0[0,:], ne0, s), w=w, Dx=Dx, x0=x0)
 
 ###SOLVE FOR RAYS###
-b=refractometerRays(r0)
+r=RefractometerRays(r0)
 sh=ShadowgraphyRays(r0)
 sc=SchlierenRays(r0)
 
@@ -82,8 +82,8 @@ sh.solve(displacement=10)
 sh.histogram(bin_scale=10)
 sc.solve()
 sc.histogram(bin_scale=10)
-b.solve()
-b.histogram(bin_scale=10)
+r.solve()
+r.histogram(bin_scale=10)
 
 ###PLOT DATA###
 fig, axs = plt.subplots(1,3,figsize=(6.67, 1.8))
@@ -94,7 +94,7 @@ clim=[0,100]
 sh.plot(axs[1], clim=clim, cmap=cm)
 #axs[0].imshow(nn.T, extent=[-5,5,-5,5])
 sc.plot(axs[0], clim=clim, cmap=cm)
-b.plot(axs[2], clim=clim, cmap=cm)
+r.plot(axs[2], clim=clim, cmap=cm)
 
 for ax in axs:
     ax.axis('off')
