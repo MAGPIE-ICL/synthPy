@@ -317,7 +317,7 @@ class ScalarDomain:
             s0[2,:] = -self.extent
         self.s0 = s0
 
-    def solve(self, method = 'RK45'):
+    def solve(self, method = method):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
