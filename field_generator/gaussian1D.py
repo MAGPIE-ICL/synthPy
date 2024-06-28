@@ -207,8 +207,10 @@ class gaussian1D:
 
             # Add the data values to the cell data
 
-        x_y_data = np.column_stack((xc,self.ne))
+            x_y_data = np.column_stack((xc,self.ne))
 
+        else:
+            x_y_data = None
         # write the file to fname
 
         with open(f'{fname}.txt', 'w') as file:
