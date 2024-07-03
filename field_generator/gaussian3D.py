@@ -211,7 +211,53 @@ class gaussian3D:
         
         return self.ne
     
+    def domain_fft(self, l_max, l_min, extent, res):
+        '''
+        Generate a Gaussian random field with a fourier spectrum following k_func in the domain 2*pi/l_max to 2*pi/l_min, and 0 outside
 
+    
+        Args:
+            l_max: max length scale, usually = 2*extent due to physical boundary conditions
+            l_min: min length scale, either resolution, or scale at which energy in = energy out (Re = 1)
+            extent: field is made about the origin, from +extent to -extent in each dimension
+            res: resolution, number of cells from 0 to extent, (total number of cells = 2*res*N_dim)
+        
+        Returns:
+            x: spatial coordinates
+            y: spatial coordinates
+            z: spatial coordinates
+            field: 2*res x 2*res x 2*res array of GRF noise
+        '''
+
+        dx = extent / res
+        x = y = z =  np.linspace(-extent, extent, 2*res, endpoint=False)
+        self.xc, self.yc, self.zc = x, y, z
+        xx, yy, zz = np.meshgrid(x, y, z)
+
+        kx = ky = kz =  2 * np.pi * np.fft.fftfreq(2*res, d=dx)
+        kxx, kyy, kzz = np.meshgrid(kx, ky, kz)
+        k = np.sqrt(kxx**2 + kyy**2 + kzz**2)
+
+        k_min = 2 * np.pi / l_max
+        k_max = 2 * np.pi / l_min
+
+        # Create the power spectrum
+        S = np.zeros_like(k)
+        mask = (k >= k_min) & (k <= k_max)
+        S[mask] = self.k_func(k[mask])
+
+        # Generate complex Gaussian noise
+        noise = np.random.normal(0, 1, k.shape) + 1j * np.random.normal(0, 1, k.shape)
+
+        # Apply the power spectrum
+        fft_field = noise * np.sqrt(S)
+
+        # Inverse Fourier transform 
+        field = np.fft.ifftn(fft_field).real
+        
+        self.ne = field
+
+        return xx, yy, zz, field
 
 
     def export_scalar_field(self, property: str = 'ne', fname: str = None):
