@@ -1,10 +1,11 @@
 import sys
 
-sys.path.insert(1, 'z:\synthPy')
+sys.path.insert(1, 'z/:synthPy')
 
 import numpy as np
 from mpi4py import MPI
 import pickle
+from mpi4py.util import pkl5
 
 import field_generator.gaussian1D as g1
 import field_generator.gaussian2D as g2
@@ -18,14 +19,13 @@ import matplotlib.pyplot as plt
 import gc
 
 ## Initialise the MPI
-comm = MPI.COMM_WORLD
+comm = pkl5.Intracomm(MPI.COMM_WORLD)
 
 rank = comm.Get_rank()
 
 Np_ray_split = int(5e5)
 
-num_processors = comm.size
-print(num_processors)
+num_processors = comm.Get_size()
 
 def power_spectrum(k,a):
     return k**-a
@@ -34,64 +34,58 @@ def k41(k):
     return power_spectrum(k, 5/3)
 
 
-def k41_mod(k):
-	return power_spectrum(k, 10/3)
-
+n_extent = 300
 
 if(rank == 0):
 	print('rank 0!')
     # generate field
 	field = g1.gaussian1D(k41)
 
-	field_mod = g1.gaussian1D(k41_mod)
 
-	n_extent = 1000
 
 	ne_pert = field.fft(n_extent)
 
-
-	#make all positive and normalise 
+	#make all positive and normalise
 	ne_pert = ne_pert/np.max(ne_pert)
 	ne_vals = 1e24 + 1e24*ne_pert
 
-	extent = 10e-3
-	xs = np.linspace(-extent/2, extent/2, nx)
-	ys = np.linspace(-extent/2, extent/2, nx)
-	zs = np.linspace(-extent/2, extent/2, nx)
+	field.ne = ne_vals
+
+	field.export_scalar_field(fname = './1D_export')
 
 
-	ne_flatten = (list(ne_vals)*len(ne_vals)*len(ne_vals))
 
-	ne = np.array(ne_flatten).reshape((100,100,100)).T
+	ne = MPI.pickle.dumps(ne_vals)
 
-	print(np.shape(ne))
-	#construct electron cube
+	requests = []
 
-	field = s.ScalarDomain(xs,ys,zs)
+	for i in range(1, num_processors):
 
-	field.external_ne(ne)
-
-	field.export_scalar_field(fname = './output/1D_turb_pert')
-
-	field.calc_dndr()
-
-	field.clear_memory()
-
-
+		req = comm.isend(ne, dest=i, tag=0)
+		requests.append(req)
+	
 
 	print(f'''Field created, with
-	extent = {extent}
+	extent = {10e-3}
 	n_cells = {2*n_extent}
 	power spectrum = {-5/3}''')
 
 	print('''ray tracing''')
-	
 
-else:
-    field = None
 	
+	
+comm.barrier()
 
-field = comm.bcast(field, root=0)
+
+if(rank != 0):
+    serialized_ne = comm.recv(source=0, tag=0)
+    
+    ne_vals = MPI.pickle.loads(serialized_ne)
+
+    print(f"Processor {rank} received the field")
+
+
+comm.barrier()
 
 
 def system_solve(Np,beam_size,divergence,cube):
@@ -114,15 +108,15 @@ def system_solve(Np,beam_size,divergence,cube):
 	## Ray transfer matrix
 	r = rtm.RefractometerRays(rf)
 	r.solve()
-	r.histogram(clear_mem = True)
+	r.histogram(bin_scale = 1, clear_mem = True)
 
 	sh=rtm.ShadowgraphyRays(rf)
 	sh.solve(displacement = 0)
-	sh.histogram(clear_mem=True)
+	sh.histogram(bin_scale = 1, clear_mem=True)
 
 	sc=rtm.SchlierenRays(rf)
 	sc.solve()
-	sc.histogram(clear_mem=True)
+	sc.histogram(bin_scale = 1, clear_mem=True)
 
 	return sc,sh,r
 
@@ -139,6 +133,29 @@ if rank == 0 :
 
 beam_size = 5e-3 # 5 mm
 divergence = 0.05e-3 #0.05 mrad, realistic
+
+extent = 10e-3
+xs = np.linspace(-extent/2, extent/2, 2*n_extent + 1)
+ys = np.linspace(-extent/2, extent/2, 2*n_extent + 1)
+zs = np.linspace(-extent/2, extent/2, 2*n_extent + 1)
+field = s.ScalarDomain(xs,ys,zs)
+
+
+
+D = len(ne_vals)
+ne_flatten = list(ne_vals)*D*D
+ne = np.array(ne_flatten).reshape((D,D,D)).T
+
+
+
+
+field.external_ne(ne)
+
+field.calc_dndr()
+
+if(rank == 0):
+	field.export_scalar_field(fname = './output/1D_vti_export')
+field.clear_memory()
 
 # May trip memory limit, so split up calculation
 
