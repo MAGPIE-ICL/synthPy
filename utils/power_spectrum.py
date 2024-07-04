@@ -321,9 +321,6 @@ def scalar3D_knyquist(r,lx, ly, lz, smooth = False):
     #
     return knyquist, wave_numbers, tke_spectrum
 
-
-
-
 def radial_1Dspectrum(r, lx, smooth = False):
     """
      Parameters:
