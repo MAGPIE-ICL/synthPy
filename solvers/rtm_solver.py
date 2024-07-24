@@ -272,8 +272,8 @@ class Rays:
             pix_x (int, optional): number of x pixels in detector plane. Defaults to 3448.
             pix_y (int, optional): number of y pixels in detector plane. Defaults to 2574.
         """        
-        x=self.rf[0,:]
-        y=self.rf[2,:]
+        x=self.r0[0,:]
+        y=self.r0[2,:]
 
         x=x[~np.isnan(x)]
         y=y[~np.isnan(y)]
