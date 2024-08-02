@@ -150,7 +150,7 @@ class ScalarDomain:
         """
         self.ne = n_e0*(1.0+s1*self.XX/self.extent)*(1+s2*np.cos(2*np.pi*self.YY/Ly))
         
-    def test_exponential_cos(self,n_e0=1e24,Ly=1e-3, s=2e-3):
+    def test_exponential_cos(self,n_e0=2e23,Ly=1e-3, s=2e-3):
         """Exponentially growing sinusoidal perturbation
 
         Args:
@@ -454,9 +454,9 @@ class ScalarDomain:
         #prep values to write the pvti, written to match the exported vti using pyvista
 
         relative_fname = fname.split('/')[-1]
-        spacing_x = (2*self.extent)/np.shape(self.x)[0]
-        spacing_y = (2*self.extent)/np.shape(self.y)[0]
-        spacing_z = (2*self.extent)/np.shape(self.z)[0]
+        spacing_x = (2*self.extent)/np.size(self.x)[0]
+        spacing_y = (2*self.extent)/np.size(self.y)[0]
+        spacing_z = (2*self.extent)/np.size(self.z)[0]
         content = f'''<?xml version="1.0"?>
 <VTKFile type="PImageData" version="0.1" byte_order="LittleEndian" header_type="UInt32" compressor="vtkZLibDataCompressor">
     <PImageData WholeExtent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" GhostLevel="0" Origin="0 0 0" Spacing="{spacing_x} {spacing_y} {spacing_z}">
@@ -638,7 +638,7 @@ def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z', bea
         s0[1,:] = 0.0
         s0[2,:] = -ne_extent
 
-    if(beam_type == 'even'): # evenly distributed circular ray using concentric discs
+    elif(beam_type == 'even'): # evenly distributed circular ray using concentric discs
         # number of concentric discs and points
         num_of_circles = (-1 + np.sqrt(1 + 8*(Np//6)))/2 
         Np = 3*(num_of_circles + 1) * num_of_circles + 1 
@@ -715,7 +715,7 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction = 'z'):
     """
     Np = ode_sol.shape[1] # number of photons
     ray_p = np.zeros((4,Np))
-    ray_J = np.zeros((2,Np),dtype=np.complex)
+    ray_J = np.zeros((2,Np))
 
     x, y, z, vx, vy, vz = ode_sol[0], ode_sol[1], ode_sol[2], ode_sol[3], ode_sol[4], ode_sol[5]
 
@@ -754,8 +754,8 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction = 'z'):
     E_x_init = np.zeros(Np)
     E_y_init = np.ones(Np)
     # Perform rotation for polarisation, multiplication for amplitude, and complex rotation for phase
-    ray_J[0] = amp*(np.cos(phase)+1.0j*np.sin(phase))*(np.cos(pol)*E_x_init-np.sin(pol)*E_y_init)
-    ray_J[1] = amp*(np.cos(phase)+1.0j*np.sin(phase))*(np.sin(pol)*E_x_init+np.cos(pol)*E_y_init)
+    #ray_J[0] = amp*(np.cos(phase)+1.0j*np.sin(phase))*(np.cos(pol)*E_x_init-np.sin(pol)*E_y_init)
+    #ray_J[1] = amp*(np.cos(phase)+1.0j*np.sin(phase))*(np.sin(pol)*E_x_init+np.cos(pol)*E_y_init)
 
     # ray_p [x,phi,y,theta], ray_J [E_x,E_y]
 
