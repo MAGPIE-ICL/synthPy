@@ -359,7 +359,7 @@ class ScalarDomain:
 
         return pol
 
-    def solve(self, s0):
+    def solve(self, s0, return_E = False):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
@@ -378,9 +378,12 @@ class ScalarDomain:
         self.sf = sol.y[:,-1].reshape(9,Np)
 
         self.rf,self.Jf = ray_to_Jonesvector(self.sf, self.extent, probing_direction = self.probing_direction)
-        return self.rf
+        if return_E:
+            return self.rf, self.Jf
+        else:
+            return self.rf
     
-    def solve_at_extent(self, s0, z):
+    def solve_at_depth(self, s0, z):
         '''
         Solve intial rays up until a given depth, z, assuming self.extent variable is the extent in propagation direction
 
@@ -405,35 +408,6 @@ class ScalarDomain:
 
         self.rf,self.Jf = ray_to_Jonesvector(self.sf, z, probing_direction = self.probing_direction)
         return self.rf
-
-    
-    
-    def solve_with_E(self, s0):
-        '''
-        Input 9xN initial ray array, and output the rays at the output side of the plasma, and the electric field
-
-        Outputs:
-            tuple: (final 9xN rays numpy array), (Electric field [E_x, E_y] corresponding to each ray)
-
-        '''
-        # Need to make sure all rays have left volume
-        # Conservative estimate of diagonal across volume
-        # Then can backproject to surface of volume
-
-        t  = np.linspace(0.0,np.sqrt(8.0)*self.extent/c,2)
-
-        s0 = s0.flatten() #odeint insists
-
-        start = time()
-        dsdt_ODE = lambda t, y: dsdt(t, y, self)
-        sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t)
-        finish = time()
-        print("Ray trace completed in:\t",finish-start,"s")
-
-        Np = s0.size//9
-        self.sf = sol.y[:,-1].reshape(9,Np)
-        self.rf,self.Jf = ray_to_Jonesvector(self.sf, self.extent, probing_direction = self.probing_direction)
-        return self.rf, self.Jf
 
     def clear_memory(self):
         """

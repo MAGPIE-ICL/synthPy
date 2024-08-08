@@ -116,7 +116,7 @@ if __name__ == '__main__':
 		## Initialise laser beam
 		ss = s.init_beam(Np = Np, beam_size=beam_size, divergence = divergence, ne_extent = ne_extent, beam_type = 'circular', probing_direction = probing_direction)
 		## Propogate rays through ne_cube
-		rf, E = field.solve_with_E(ss)
+		rf, E = field.solve(ss, include_E = True)
 		# Save memory by deleting initial ray positions
 		del ss
 		# Convert to mm

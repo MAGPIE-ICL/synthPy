@@ -346,27 +346,19 @@ class ShadowgraphyRays(Rays):
     '''
     Simple class to keep all the ray properties together
     '''              
-    def solve(self, displacement=0, interfere = False, wl = None):
+    def solve(self, displacement=0):
         O=ShadowgraphyOptics
         rr0=transform(O.X3(displacement), self.r0) #small displacement
-
-
-        
+    
         rr1=transform(O.L1(self.L), rr0) #lens 1
         r1=circular_aperture(self.R, rr1) # cut off
-
 
         rr2=transform(O.L2(self.L), r1) #lens 2
         r2=circular_aperture(self.R, rr2) # cut off
 
-
         rr3=transform(O.X3(self.L), r2) #detector
         #r3=rect_aperture(self.Lx/2,self.Ly/2,rr3) # detector cutoff
-
-
         self.rf=rr3
-               
-
 
 class SchlierenRays(Rays):
     '''
@@ -403,11 +395,9 @@ class InterferometerRays(Rays):
         lwl = wl
         k = 2* np.pi / lwl
         E0 = self.E*np.exp(1.0j * k * (np.sqrt(dx**2 + dy**2)))
-
         del dx
         del dy
 
-        
         rr1=transform(O.L1(self.L), rr0) #lens 1
         dx = rr1[0,:] - rr0[0,:]
         dy = rr1[2,:] - rr0[2,:]
@@ -422,19 +412,15 @@ class InterferometerRays(Rays):
         dy = rr2[2,:] - rr1[2,:]
         k = 2* np.pi / lwl
         E2 = E1*np.exp(1.0j * k * (np.sqrt(dx**2 + dy**2)))
-
         r2 = rr2
 
         rr3=transform(O.X3(self.L), r2) #detector
         #3=rect_aperture(self.Lx/2,self.Ly/2,rr3) # detector cutoff
-
         dx = rr3[0,:] - rr2[0,:]
         dy = rr3[2,:] - rr2[2,:]
         k = 2* np.pi / lwl
         E3 = E2*np.exp(1.0j * k * (np.sqrt(dx**2 + dy**2)))
         self.rE = E3
-
-
         self.rf=rr3
     
     def interferogram(self, bin_scale=1, pix_x=3448, pix_y=2574, clear_mem=False):
@@ -455,11 +441,8 @@ class InterferometerRays(Rays):
         amplitude_x = np.zeros((len(y_bins)-1, len(x_bins)-1), dtype=complex)
         amplitude_y = np.zeros((len(y_bins)-1, len(x_bins)-1), dtype=complex)
 
-
-
         x_indices = np.digitize(self.rf[0,:], x_bins) - 1
         y_indices = np.digitize(self.rf[2,:], y_bins) - 1
-
 
         for i in range(self.rf.shape[1]):
             if 0 <= x_indices[i] < amplitude_x.shape[1] and 0 <= y_indices[i] < amplitude_x.shape[0]:

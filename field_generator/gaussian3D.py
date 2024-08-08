@@ -155,63 +155,7 @@ class gaussian3D:
 
         return _r
 
-    def fft(self, N):
-        """A FFT based generator for scalar gaussian fields in 1D
-        Reference:Timmer, J and König, M. “On Generating Power Law Noise.” Astronomy & Astrophysics 300 (1995):
-        1–30. https://doi.org/10.1017/CBO9781107415324.004.
-        Arguments:
-            N {int}  -- size of domain will be (2*N+1)^3
-            k_func {function} -- a function which takes an input k 
-        Returns:
-            signal {3D array of floats} -- a realisation of a 3D Gaussian process.
-        Example:
-            N = 100
-            def power_spectrum(k,a):
-                return k**-a
-
-            def k41(k):
-                return power_spectrum(k, 5/3)        
-            
-            sig = gaussian3D_FFT(N, k41)
-            
-            fig,ax=plt.subplots(3,3, figsize=(8,8), sharex=True, sharey=True)
-            ax=ax.flatten()
-            
-            for a in ax:
-                r=np.random.randint(0,ny)
-                d=sig[r,:,:]
-                a.imshow(d, cmap='bwr', extent=[-N,N,-N,N])
-                a.set_title("y="+str(r))    """
-        
-
-        M = 2*N+1
-        k = np.fft.fftfreq(M) #these are the frequencies, starting from 0 up to f_max, then -f_max to 0.
-
-        KX,KY,KZ = np.meshgrid(k,k,k)
-        K = np.sqrt(KX**2+KY**2+KZ**2)
-        K = np.fft.fftshift(K)#numpy convention, highest frequencies at the centre
-
-        Wr = np.random.randn(M, M, M) # random number from Gaussian for both 
-        Wi = np.random.randn(M, M, M) # real and imaginary components
-
-        Wr = Wr + np.flip(Wr) #f(-k)=f*(k)
-        Wi = Wi - np.flip(Wi)
-
-        W = Wr+1j*Wi
-
-        F = W*np.sqrt(self.k_func(K)) # power spectra follows power law, so sqrt here.
-
-        F_shift = np.fft.ifftshift(F)
-
-        F_shift[0,0,0] = 0 # 0 mean
-
-        signal = np.fft.ifftn(F_shift)
-
-        self.ne = signal.real
-        
-        return self.ne
-
-    def domain_fft(self, l_max, l_min, extent, res, factor):
+    def fft(self, l_max, l_min, extent, res, factor):
         '''
         Generate a Gaussian random field with a fourier spectrum following k_func in the domain 2*pi/l_max to 2*pi/l_min, and 0 outside
 
@@ -354,11 +298,7 @@ class gaussian3D:
          <Piece Extent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" Source="{relative_fname}.vti"/>
     </PImageData>
 </VTKFile>'''
-
-
-    
         # write file
-
         with open(f'{fname}.pvti', 'w') as file:
             file.write(content)
         
