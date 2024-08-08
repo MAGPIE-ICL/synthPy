@@ -320,3 +320,159 @@ def scalar3D_knyquist(r,lx, ly, lz, smooth = False):
         tke_spectrum = tkespecsmooth
     #
     return knyquist, wave_numbers, tke_spectrum
+
+
+
+
+def radial_1Dspectrum(r, lx, smooth = False):
+    """
+     Parameters:
+    ----------------------------------------------------------------
+    r:  float-vector
+        The 3D random field
+    lx: float
+        the domain size in the x-direction.
+    nx: integer
+        the number of grid points in the x-direction
+    smooth: boolean
+        Active/Disactive smooth function for visualisation
+    -----------------------------------------------------------------
+"""
+    import numpy as np
+    from numpy.fft import fft2, fftshift, fftn, fft
+
+    nx = len(r)
+    
+    rh = fftshift(fft(r))
+    
+
+    tkeh = (np.abs(rh)**2) / (nx)**2  # Normalized power spectrum
+    
+    # Set up wavenumbers
+    kx = 2.0 * np.pi * np.fft.fftfreq(nx, d=lx/nx)
+    k = fftshift(kx)
+    
+    # Make radial bins, evenly spaced in logspace for ease of plotting
+    k_bins = np.logspace(np.log10(k[k>0].min()), np.log10(k.max()), num=100)
+    tke_spectrum = np.zeros(len(k_bins)-1)
+    
+    for i in range(len(k_bins)-1):
+        mask = (k >= k_bins[i]) & (k < k_bins[i+1])
+        tke_spectrum[i] = np.mean(tkeh[mask])
+    
+    k_centers = np.sqrt(k_bins[:-1] * k_bins[1:])
+    
+    knyquist = np.max(k) / 2
+
+    if smooth:
+        tke_spectrum = movingaverage(tke_spectrum, 5)
+    
+    return knyquist, k_centers, tke_spectrum
+
+
+
+def radial_2Dspectrum(r, lx, ly, smooth=False):
+    """
+     Parameters:
+    ----------------------------------------------------------------
+    r:  float-vector
+        The 3D random field
+    lx: float
+        the domain size in the x-direction.
+    nx: integer
+        the number of grid points in the x-direction
+    smooth: boolean
+        Active/Disactive smooth function for visualisation
+    -----------------------------------------------------------------
+"""
+    import numpy as np
+    from numpy.fft import fft2, fftshift, fftn, fft
+    
+    nx, ny = r.shape
+    
+    rh = fftshift(fft2(r))
+    
+
+    tkeh = (np.abs(rh)**2) / (nx * ny)**2  # Normalized power spectrum
+    
+    # Set up wavenumbers
+    kx = 2.0 * np.pi * np.fft.fftfreq(nx, d=lx/nx)
+    ky = 2.0 * np.pi * np.fft.fftfreq(ny, d=ly/ny)
+    kx, ky = np.meshgrid(kx, ky)
+    kx, ky = fftshift(kx), fftshift(ky)
+    k = np.sqrt(kx**2 + ky**2)
+    
+    # Make radial bins, evenly spaced in logspace for ease of plotting
+    k_bins = np.logspace(np.log10(k[k>0].min()), np.log10(k.max()), num=100)
+    tke_spectrum = np.zeros(len(k_bins)-1)
+    
+    for i in range(len(k_bins)-1):
+        mask = (k >= k_bins[i]) & (k < k_bins[i+1])
+        tke_spectrum[i] = np.mean(tkeh[mask])
+    
+    k_centers = np.sqrt(k_bins[:-1] * k_bins[1:])
+    
+    knyquist = np.max(k) / 2
+
+    if smooth:
+        tke_spectrum = movingaverage(tke_spectrum, 5)
+    
+    return knyquist, k_centers, tke_spectrum
+
+
+
+def radial_3Dspectrum(r, lx, ly, lz, smooth=False):
+    """
+     Parameters:
+    ----------------------------------------------------------------
+    r:  float-vector
+        The 3D random field
+    lx: float
+        the domain size in the x-direction.
+    nx: integer
+        the number of grid points in the x-direction
+    smooth: boolean
+        Active/Disactive smooth function for visualisation
+    -----------------------------------------------------------------
+"""
+    import numpy as np
+    from numpy.fft import fft2, fftshift, fftn, fft
+    
+    nx, ny, nz = r.shape
+    
+    rh = fftshift(fftn(r))
+    
+
+    tkeh = (np.abs(rh)**2) / (nx * ny * nz)**2  # Normalized power spectrum
+    
+    # Set up wavenumbers
+    kx = 2.0 * np.pi * np.fft.fftfreq(nx, d=lx/nx)
+    ky = 2.0 * np.pi * np.fft.fftfreq(ny, d=ly/ny)
+    kz = 2.0 * np.pi * np.fft.fftfreq(nz, d=lz/nz)
+    kx, ky, kz = np.meshgrid(kx, ky, kz)
+    kx, ky, kz = fftshift(kx), fftshift(ky), fftshift(kz)
+    k = np.sqrt(kx**2 + ky**2 + kz**2)
+    
+    # Make radial bins, evenly spaced in logspace for ease of plotting
+    k_bins = np.logspace(np.log10(k[k>0].min()), np.log10(k.max()), num=50)
+    tke_spectrum = np.zeros(len(k_bins)-1)
+    
+    for i in range(len(k_bins)-1):
+        mask = (k >= k_bins[i]) & (k < k_bins[i+1])
+        tke_spectrum[i] = np.mean(tkeh[mask])
+    
+    k_centers = np.sqrt(k_bins[:-1] * k_bins[1:])
+    
+    knyquist = np.max(k) / 2
+
+    if smooth:
+        tke_spectrum = movingaverage(tke_spectrum, 5)
+    
+    return knyquist, k_centers, tke_spectrum
+
+
+
+
+
+
+
