@@ -170,7 +170,7 @@ class ScalarDomain:
             n_e0 ([type], optional): mean density. Defaults to 2e23 m^-3.
         """
         self.XX, self.YY, self.ZZ = np.meshgrid(self.x,self.y,self.z, indexing='ij')
-        self.ne = n_e0*(1.0+s*self.XX/self.extent_x)
+        self.ne = n_e0*(1.0+s*self.XX)
         
     def test_linear_cos(self,s1=0.1,s2=0.1,n_e0=2e23,Ly=1):
         """Linearly growing sinusoidal perturbation

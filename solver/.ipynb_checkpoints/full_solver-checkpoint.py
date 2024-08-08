@@ -87,7 +87,6 @@ from scipy.interpolate import RegularGridInterpolator
 from time import time
 import scipy.constants as sc
 
-
 c = sc.c # honestly, this could be 3e8 *shrugs*
 
 # Define a scalar domain
@@ -381,16 +380,11 @@ class ScalarDomain:
         return self.rf
     
     def solve_at_extent(self, s0, z):
-        '''
-        Solve intial rays up until a given depth, z, assuming self.extent variable is the extent in propagation direction
-
-
-        '''
     # Need to make sure all rays have left volume
     # Conservative estimate of diagonal across volume
     # Then can backproject to surface of volume
-        length = self.extent + z
-        t  = np.linspace(0.0,length/c,2)
+
+        t  = np.linspace(0.0,z/c,2)
 
         s0 = s0.flatten() #odeint insists
 
@@ -409,13 +403,6 @@ class ScalarDomain:
     
     
     def solve_with_E(self, s0):
-        '''
-        Input 9xN initial ray array, and output the rays at the output side of the plasma, and the electric field
-
-        Outputs:
-            tuple: (final 9xN rays numpy array), (Electric field [E_x, E_y] corresponding to each ray)
-
-        '''
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
@@ -535,22 +522,6 @@ class ScalarDomain:
             file.write(content)
         
         print(f'Scalar Domain electron density succesfully saved under {fname}.pvti !')
-    
-    def save_output_rays(self, fn = None):
-        """
-        Saves the output rays as a binary numpy format for minimal size.
-        Auto-names the file using the current date and time.
-        """
-        from datetime import datetime
-        now = datetime.now()
-        dt_string = now.strftime("%Y-%m-%d_%H-%M-%S")
-
-        if fn is None:
-            fn = '{} rays.npy'.format(dt_string)
-        else:
-            fn = '{}.npy'.format(fn)
-        with open(fn,'wb') as f:
-            np.save(f, self.rf)
 
 
 
@@ -827,13 +798,8 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction = 'z'):
     return ray_p,ray_J
 
 
-
 def interfere_ref_beam(rf, E, n_fringes, deg):
-        ''' input beam ray positions and electric field component, and desired angle of evenly spaced background fringes. 
-        Deg is angle in degrees from the vertical axis
-        returns:
-            'interfered with' E field
-        '''
+        ''' input beam ray positions and electric field component, and desired angle of background fringes.'''
         if deg >= 45:
             deg = - np.abs(deg - 90)
 

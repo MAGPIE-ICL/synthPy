@@ -229,6 +229,8 @@ class gaussian2D:
         # Inverse Fourier transform 
         field = np.fft.ifft2(fft_field).real
 
+        field = (field) / (np.abs(field).max())
+
         self.ne = field
 
         return xx, yy, field

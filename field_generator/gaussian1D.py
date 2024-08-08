@@ -191,6 +191,8 @@ class gaussian1D:
         # Inverse Fourier transform 
         field = np.fft.ifft(fft_field).real
 
+        field = (field) / (np.abs(field).max())
+
         self.ne = field
 
         return x, field
