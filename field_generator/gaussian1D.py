@@ -151,6 +151,52 @@ class gaussian1D:
 
         return self.ne
     
+    def domain_fft(self, l_max, l_min, extent, res):
+        '''
+        Generate a Gaussian random field with a fourier spectrum following k_func in the domain 2*pi/l_max to 2*pi/l_min, and 0 outside
+
+    
+        Args:
+            l_max: max length scale, usually = 2*extent due to physical boundary conditions
+            l_min: min length scale, either resolution, or scale at which energy in = energy out (Re = 1)
+            extent: field is made about the origin, from +extent to -extent in each dimension
+            res: resolution, number of cells from 0 to extent, (total number of cells = 2*res*N_dim)
+        
+        Returns:
+            x: spatial coordinates
+            field: array of GRF noise of length 2*res
+        '''
+
+        dx = extent / res
+        x = np.linspace(-extent, extent, 2*res, endpoint=False)
+
+        self.xc = x
+
+        k = 2 * np.pi * np.fft.fftfreq(2*res, d=dx)
+
+        k_min = 2 * np.pi / l_max
+        k_max = 2 * np.pi / l_min
+
+        # Create the power spectrum
+        S = np.zeros_like(k)
+        mask = (k >= k_min) & (k <= k_max)
+        S[mask] = self.k_func(k[mask])
+
+        # Generate complex Gaussian noise
+        noise = np.random.normal(0, 1, k.shape) + 1j * np.random.normal(0, 1, k.shape)
+
+        # Apply the power spectrum
+        fft_field = noise * np.sqrt(S)
+
+        # Inverse Fourier transform 
+        field = np.fft.ifft(fft_field).real
+
+        field = (field) / (np.abs(field).max())
+
+        self.ne = field
+
+        return x, field
+    
 
     def export_scalar_field(self, property: str = 'ne', fname: str = None):
 
@@ -207,8 +253,10 @@ class gaussian1D:
 
             # Add the data values to the cell data
 
-        x_y_data = np.column_stack((xc,self.ne))
+            x_y_data = np.column_stack((xc,self.ne))
 
+        else:
+            x_y_data = None
         # write the file to fname
 
         with open(f'{fname}.txt', 'w') as file:

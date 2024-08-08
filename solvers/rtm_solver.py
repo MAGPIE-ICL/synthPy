@@ -74,7 +74,7 @@ fig.subplots_adjust(left=0, bottom=0.14, right=0.98, top=0.89, wspace=0.1, hspac
 r0[3,:]=α(r0[2,:],n_e0=ne_ramp(r0[0,:], ne0, s), w=w, Dx=Dx, x0=x0)
 
 ###SOLVE FOR RAYS###
-r=RefractometerRays(r0)
+b=refractometerRays(r0)
 sh=ShadowgraphyRays(r0)
 sc=SchlierenRays(r0)
 
@@ -82,8 +82,8 @@ sh.solve(displacement=10)
 sh.histogram(bin_scale=10)
 sc.solve()
 sc.histogram(bin_scale=10)
-r.solve()
-r.histogram(bin_scale=10)
+b.solve()
+b.histogram(bin_scale=10)
 
 ###PLOT DATA###
 fig, axs = plt.subplots(1,3,figsize=(6.67, 1.8))
@@ -94,7 +94,7 @@ clim=[0,100]
 sh.plot(axs[1], clim=clim, cmap=cm)
 #axs[0].imshow(nn.T, extent=[-5,5,-5,5])
 sc.plot(axs[0], clim=clim, cmap=cm)
-r.plot(axs[2], clim=clim, cmap=cm)
+b.plot(axs[2], clim=clim, cmap=cm)
 
 for ax in axs:
     ax.axis('off')
@@ -248,11 +248,32 @@ class SchlierenOptics:
     L2=sym.lambdify([L], f2*d1, "numpy") #second lens
     X3=sym.lambdify([L], d1, "numpy")
 
+class InterferometryOptics:
+    """
+    Class to hold the Interferometry optics (currently identical to shadowgraphy)
+    """
+    x, y, θ, ϕ, L = sym.symbols('x, y, θ, ϕ, L', real=True)
+    #lenses
+    f1=sym_lens(L/2)
+    f2=sym_lens(L/3)
+    #distances
+    d1=distance(L)
+    d2=distance(3*L/2)
+    d3=d1
+    #ray-vector at selected planes
+    X0=ray(x, θ, y, ϕ)
+    X1=f1*d1*X0 #ray directly after f1
+    X2=d1*X1 #ray directly after second f1
+    #lambdify allows for numerical evaluation of symbolic expressions
+    #these are the matrices which transfer rays between planes
+    L1=sym.lambdify([L], f1*d1, "numpy")
+    L2=sym.lambdify([L], f2*d2, "numpy")
+    X3=sym.lambdify([L], d1, "numpy")
 class Rays:
     """
     Inheritable class for ray diagnostics.
     """
-    def __init__(self, r0, L=400, R=25, Lx=18, Ly=13.5):
+    def __init__(self, r0, E = None, L=400, R=25, Lx=18, Ly=13.5):
         """Initialise ray diagnostic.
 
         Args:
@@ -262,7 +283,7 @@ class Rays:
             Lx (int, optional): Detector size in x. Defaults to 18.
             Ly (float, optional): Detector size in y. Defaults to 13.5.
         """        
-        self.r0, self.L, self.R, self.Lx, self.Ly = r0, L, R, Lx, Ly
+        self.r0, self.E, self.L, self.R, self.Lx, self.Ly = r0, E, L, R, Lx, Ly
     def histogram(self, bin_scale=10, pix_x=3448, pix_y=2574, clear_mem=False):
         """Bin data into a histogram. Defaults are for a KAF-8300.
         Outputs are H, the histogram, and xedges and yedges, the bin edges.
@@ -307,35 +328,46 @@ class RefractometerRays(Rays):
         
         rr0=transform(O.X3(0), self.r0) # small displacement, currently does nothing
 
-        rr1=transform(O.L1(self.L), rr0) # first lens
-        r1=circular_aperture(self.R, rr1) # first lens cutoff
+        rr1=transform(O.L1(self.L), rr0) #lens 1
+        r1=circular_aperture(self.R, rr1) # cut off
+
 
         rr2=transform(O.L2(self.L), r1) # second lens
-        r2=circular_aperture(self.R, rr2) # second lens cutoff
+        r2=circular_aperture(self.R, rr2) # cut off
+
 
         rr3=transform(O.X3(self.L), r2) #detector
         #3=rect_aperture(self.Lx/2,self.Ly/2,rr3) # detector cutoff
+
+
         self.rf=rr3
         
 class ShadowgraphyRays(Rays):
     '''
     Simple class to keep all the ray properties together
     '''              
-    def solve(self, displacement=10):
+    def solve(self, displacement=0, interfere = False, wl = None):
         O=ShadowgraphyOptics
-        
         rr0=transform(O.X3(displacement), self.r0) #small displacement
+
+
         
         rr1=transform(O.L1(self.L), rr0) #lens 1
         r1=circular_aperture(self.R, rr1) # cut off
 
+
         rr2=transform(O.L2(self.L), r1) #lens 2
         r2=circular_aperture(self.R, rr2) # cut off
 
+
         rr3=transform(O.X3(self.L), r2) #detector
-        #r3=rect_aperture(self.Lx/2,self.Ly/2,rr3) #cut off
+        #r3=rect_aperture(self.Lx/2,self.Ly/2,rr3) # detector cutoff
+
+
         self.rf=rr3
-        
+               
+
+
 class SchlierenRays(Rays):
     '''
     Simple class to keep all the ray properties together
@@ -343,7 +375,7 @@ class SchlierenRays(Rays):
     def solve(self):
         O=SchlierenOptics
         
-        rr0=transform(O.X3(0), self.r0) #small displacement
+        rr0=transform(O.X3(0), self.r0) #small displacement, does nothing
 
         rr1=transform(O.L1(self.L), rr0) #first lens
         r1=circular_aperture(self.R, rr1) #cut off
@@ -357,3 +389,84 @@ class SchlierenRays(Rays):
         rr3=transform(O.X3(self.L), r2) #detector
         #r3=rect_aperture(self.Lx/2,self.Ly/2,rr3) #cut off
         self.rf=rr3
+
+class InterferometerRays(Rays):
+    '''
+    Simple class to keep all the ray properties together
+    '''           
+    def solve(self, wl = 532e-9):
+        O=InterferometryOptics
+        rr0=transform(O.X3(0), self.r0) #small displacement, does nothing
+        # propagate E field
+        dx = rr0[0,:] - self.r0[0,:]
+        dy = rr0[2,:] - self.r0[2,:]
+        lwl = wl
+        k = 2* np.pi / lwl
+        E0 = self.E*np.exp(1.0j * k * (np.sqrt(dx**2 + dy**2)))
+
+        del dx
+        del dy
+
+        
+        rr1=transform(O.L1(self.L), rr0) #lens 1
+        dx = rr1[0,:] - rr0[0,:]
+        dy = rr1[2,:] - rr0[2,:]
+        k = 2* np.pi / lwl
+        E1 = E0*np.exp(1.0j * k * (np.sqrt(dx**2 + dy**2)))
+        del dx
+        del dy
+        r1 = rr1
+
+        rr2=transform(O.L2(self.L), r1) #lens 2
+        dx = rr2[0,:] - rr1[0,:]
+        dy = rr2[2,:] - rr1[2,:]
+        k = 2* np.pi / lwl
+        E2 = E1*np.exp(1.0j * k * (np.sqrt(dx**2 + dy**2)))
+
+        r2 = rr2
+
+        rr3=transform(O.X3(self.L), r2) #detector
+        #3=rect_aperture(self.Lx/2,self.Ly/2,rr3) # detector cutoff
+
+        dx = rr3[0,:] - rr2[0,:]
+        dy = rr3[2,:] - rr2[2,:]
+        k = 2* np.pi / lwl
+        E3 = E2*np.exp(1.0j * k * (np.sqrt(dx**2 + dy**2)))
+        self.rE = E3
+
+
+        self.rf=rr3
+    
+    def interferogram(self, bin_scale=1, pix_x=3448, pix_y=2574, clear_mem=False):
+        """Bin data into a histogram. Defaults are for a KAF-8300.
+        Outputs are H, the histogram, and xedges and yedges, the bin edges.
+
+        Args:
+            bin_scale (int, optional): bin size, same in x and y. Defaults to 1.
+            pix_x (int, optional): number of x pixels in detector plane. Defaults to 3448.
+            pix_y (int, optional): number of y pixels in detector plane. Defaults to 2574.
+        """        
+        x=self.rf[0,:]
+        y=self.rf[2,:]
+
+        x_bins = np.linspace(-self.Lx//2,self.Lx//2, pix_x // bin_scale)
+        y_bins = np.linspace(-self.Ly//2, self.Ly //2 , pix_y // bin_scale)
+        
+        amplitude_x = np.zeros((len(y_bins)-1, len(x_bins)-1), dtype=complex)
+        amplitude_y = np.zeros((len(y_bins)-1, len(x_bins)-1), dtype=complex)
+
+
+
+        x_indices = np.digitize(self.rf[0,:], x_bins) - 1
+        y_indices = np.digitize(self.rf[2,:], y_bins) - 1
+
+
+        for i in range(self.rf.shape[1]):
+            if 0 <= x_indices[i] < amplitude_x.shape[1] and 0 <= y_indices[i] < amplitude_x.shape[0]:
+                amplitude_x[y_indices[i], x_indices[i]] += self.rE[0, i]
+                amplitude_y[y_indices[i], x_indices[i]] += self.rE[1, i]
+
+        amplitude = np.sqrt(np.real(amplitude_x)**2 + np.real(amplitude_y)**2)
+        
+        # amplitude_normalised = (amplitude - amplitude.min()) / (amplitude.max() - amplitude.min()) # this line needs work and is currently causing problems
+        self.H = amplitude
