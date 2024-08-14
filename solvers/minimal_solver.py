@@ -483,15 +483,15 @@ class ScalarDomain:
         spacing_y = (2*self.extent_y)/np.shape(self.y)[0]
         spacing_z = (2*self.extent_z)/np.shape(self.z)[0]
         content = f'''<?xml version="1.0"?>
-<VTKFile type="PImageData" version="0.1" byte_order="LittleEndian" header_type="UInt32" compressor="vtkZLibDataCompressor">
-    <PImageData WholeExtent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" GhostLevel="0" Origin="0 0 0" Spacing="{spacing_x} {spacing_y} {spacing_z}">
-         <PCellData Scalars="rnec">
-             <PDataArray type="Float64" Name="rnec">
-             </PDataArray>
-         </PCellData>
-         <Piece Extent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" Source="{relative_fname}.vti"/>
-    </PImageData>
-</VTKFile>'''
+        <VTKFile type="PImageData" version="0.1" byte_order="LittleEndian" header_type="UInt32" compressor="vtkZLibDataCompressor">
+            <PImageData WholeExtent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" GhostLevel="0" Origin="0 0 0" Spacing="{spacing_x} {spacing_y} {spacing_z}">
+                <PCellData Scalars="rnec">
+                    <PDataArray type="Float64" Name="rnec">
+                    </PDataArray>
+                </PCellData>
+                <Piece Extent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" Source="{relative_fname}.vti"/>
+            </PImageData>
+        </VTKFile>'''
 
 
     
@@ -503,9 +503,6 @@ class ScalarDomain:
         print(f'Scalar Domain electron density succesfully saved under {fname}.pvti !')
         
 
-
-
-    
 # ODEs of photon paths
 def dsdt(t, s, ScalarDomain):
     """Returns an array with the gradients and velocity per ray for ode_int. Cannot be a method of ScalarDomain due to expected call signature for the ODE solver

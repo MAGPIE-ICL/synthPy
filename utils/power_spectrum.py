@@ -7,7 +7,6 @@ Date: 25/06/24
 import numpy as np
 
 #  Method 1 - Calculate Power Spectrum 
-
 def scalar1D_fft(data, dx, k_bin_num=100):
     """Calculates and returns the 2D spectrum for a 2D gaussian field of scalars, assuming isotropy of the turbulence
         Example:
@@ -62,7 +61,6 @@ def scalar1D_fft(data, dx, k_bin_num=100):
         spect1D[i-1] = f_filtered.mean() #and take their mean.
         
     return k_bins_weighted, spect1D
-
 
 def scalar2D_fft(data, dx, k_bin_num=100):
     """Calculates and returns the 2D spectrum for a 2D gaussian field of scalars, assuming isotropy of the turbulence
@@ -120,7 +118,6 @@ def scalar2D_fft(data, dx, k_bin_num=100):
         spect2D[i-1] = f_filtered.mean() #and take their mean.
         
     return k_bins_weighted, spect2D
-
 
 def scalar3D_fft(data, dx, k_bin_num=100):
     """Calculates and returns the 3D spectrum for a 3D gaussian field of scalars, assuming isotropy of the turbulence
@@ -206,7 +203,7 @@ def scalar1D_knyquist(r,lx, smooth = False):
     smooth: boolean
         Active/Disactive smooth function for visualisation
     -----------------------------------------------------------------
-"""
+    """
     nx = len(r)
     nt = nx
     n = nx
@@ -245,7 +242,7 @@ def scalar2D_knyquist(r,lx, ly, smooth = False):
     smooth: boolean
         Active/Disactive smooth function for visualisation
     -----------------------------------------------------------------
-"""
+    """
     nx = len(r[:,0])
     ny = len(r[0,:])
     nt = nx*ny
@@ -288,7 +285,7 @@ def scalar3D_knyquist(r,lx, ly, lz, smooth = False):
     smooth: boolean
         Active/Disactive smooth function for visualisation
     -----------------------------------------------------------------
-"""
+    """
     nx = len(r[:,0,0])
     ny = len(r[0,:,0])
     nz = len(r[0,0,:])

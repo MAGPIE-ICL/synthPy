@@ -6,7 +6,7 @@ this library uses MPI (read the hpc wiki on MPI) for python library, and is run 
 mpiexec -n python script.py
 
 When the terminal sees mpiexec, it gets n cpus to run the process in parallel. Therefore, we add steps that can only be done for the 0th 'root' process, these steps include initialising
-the domain, and saving the data at the end. (Nessecary becuase we only want to do these things once, as oppose to have every process run it)
+the domain, and saving the data at the end. (Necessary becuase we only want to do these things once, as oppose to have every process run it)
 
 This method is quick, but uses lots of memory. Every process has its own memory store, and thus if the script takes x GB of RAM on one processor, it will take n*x GB in paralllel, this 
 issue is fixed by the next method, but takes slightly longer.
