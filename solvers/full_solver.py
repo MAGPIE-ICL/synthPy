@@ -87,6 +87,7 @@ from scipy.interpolate import RegularGridInterpolator
 from time import time
 import scipy.constants as sc
 
+
 c = sc.c # honestly, this could be 3e8 *shrugs*
 
 # Define a scalar domain
@@ -112,8 +113,8 @@ class ScalarDomain:
             z (float array): z coordinates, m
             extent (float): physical size, m
         """
-        self.z,self.y,self.x = z, y, x
-        self.XX, self.YY, self.ZZ = np.meshgrid(x,y,z, indexing='ij')
+        self.z,self.y,self.x = np.float32(z), np.float32(y), np.float32(x)
+        self.XX, self.YY, self.ZZ = np.meshgrid(x,y,z, indexing='ij', copy = False)
         self.extent = extent
         self.probing_direction = probing_direction
         # Logical switches
@@ -216,7 +217,7 @@ class ScalarDomain:
         if (self.B_on):
             self.VerdetConst = 2.62e-13*lwl**2 # radians per Tesla per m^2
 
-        self.ne_nc = self.ne/nc #normalise to critical density
+        self.ne_nc = np.array(self.ne/nc, dtype = np.float32) #normalise to critical density
         
         #More compact notation is possible here, but we are explicit
         self.dndx = -0.5*c**2*np.gradient(self.ne_nc,self.x,axis=0)
@@ -326,6 +327,8 @@ class ScalarDomain:
     # Phase shift introduced by refractive index
     def phase(self,x):
         if(self.phaseshift):
+
+            self.refractive_index_interp = RegularGridInterpolator((self.x, self.y, self.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
             return self.omega*(self.refractive_index_interp(x.T)-1.0)
         else:
             return 0.0
@@ -356,7 +359,7 @@ class ScalarDomain:
 
         return pol
 
-    def solve(self, s0):
+    def solve(self, s0, return_E = False):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
@@ -373,7 +376,37 @@ class ScalarDomain:
 
         Np = s0.size//9
         self.sf = sol.y[:,-1].reshape(9,Np)
+
         self.rf,self.Jf = ray_to_Jonesvector(self.sf, self.extent, probing_direction = self.probing_direction)
+        if return_E:
+            return self.rf, self.Jf
+        else:
+            return self.rf
+    
+    def solve_at_depth(self, s0, z):
+        '''
+        Solve intial rays up until a given depth, z, assuming self.extent variable is the extent in propagation direction
+
+
+        '''
+    # Need to make sure all rays have left volume
+    # Conservative estimate of diagonal across volume
+    # Then can backproject to surface of volume
+        length = self.extent + z
+        t  = np.linspace(0.0,length/c,2)
+
+        s0 = s0.flatten() #odeint insists
+
+        start = time()
+        dsdt_ODE = lambda t, y: dsdt(t, y, self)
+        sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t)
+        finish = time()
+        print("Ray trace completed in:\t",finish-start,"s")
+
+        Np = s0.size//9
+        self.sf = sol.y[:,-1].reshape(9,Np)
+
+        self.rf,self.Jf = ray_to_Jonesvector(self.sf, z, probing_direction = self.probing_direction)
         return self.rf
 
     def clear_memory(self):
@@ -384,8 +417,8 @@ class ScalarDomain:
 
         """
         self.dndx = None
-        self.dndx = None
-        self.dndx = None
+        self.dndy = None
+        self.dndz = None
         self.ne = None
         self.ne_nc = None
         self.sf = None
@@ -454,9 +487,9 @@ class ScalarDomain:
         #prep values to write the pvti, written to match the exported vti using pyvista
 
         relative_fname = fname.split('/')[-1]
-        spacing_x = (2*self.extent)/np.shape(self.x)[0]
-        spacing_y = (2*self.extent)/np.shape(self.y)[0]
-        spacing_z = (2*self.extent)/np.shape(self.z)[0]
+        spacing_x = (2*np.max(self.x))/np.shape(self.x)[0]
+        spacing_y = (2*np.max(self.y))/np.shape(self.y)[0]
+        spacing_z = (2*np.max(self.z))/np.shape(self.z)[0]
         content = f'''<?xml version="1.0"?>
 <VTKFile type="PImageData" version="0.1" byte_order="LittleEndian" header_type="UInt32" compressor="vtkZLibDataCompressor">
     <PImageData WholeExtent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" GhostLevel="0" Origin="0 0 0" Spacing="{spacing_x} {spacing_y} {spacing_z}">
@@ -476,6 +509,22 @@ class ScalarDomain:
             file.write(content)
         
         print(f'Scalar Domain electron density succesfully saved under {fname}.pvti !')
+    
+    def save_output_rays(self, fn = None):
+        """
+        Saves the output rays as a binary numpy format for minimal size.
+        Auto-names the file using the current date and time.
+        """
+        from datetime import datetime
+        now = datetime.now()
+        dt_string = now.strftime("%Y-%m-%d_%H-%M-%S")
+
+        if fn is None:
+            fn = '{} rays.npy'.format(dt_string)
+        else:
+            fn = '{}.npy'.format(fn)
+        with open(fn,'wb') as f:
+            np.save(f, self.rf)
 
 
 
@@ -514,7 +563,7 @@ def dsdt(t, s, ScalarDomain):
     return sprime.flatten()
 
 # Initialise beam
-def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z'):
+def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z', beam_type = 'circular'):
     """[summary]
 
     Args:
@@ -528,51 +577,161 @@ def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z'):
         s0, 9 x N float: N rays with (x, y, z, vx, vy, vz) in m, m/s and amplitude, phase and polarisation (a, p, r) 
     """
     s0 = np.zeros((9,Np))
-    # position, uniformly within a circle
-    t  = 2*np.pi*np.random.rand(Np) #polar angle of position
-    u  = np.random.rand(Np)+np.random.rand(Np) # radial coordinate of position
-    u[u > 1] = 2-u[u > 1]
-    # angle
-    ϕ = np.pi*np.random.rand(Np) #azimuthal angle of velocity
-    χ = divergence*np.random.randn(Np) #polar angle of velocity
+    if(beam_type == 'circular'):
+        # position, uniformly within a circle
+        t  = 2*np.pi*np.random.rand(Np) #polar angle of position
+        u  = np.random.rand(Np)+np.random.rand(Np) # radial coordinate of position
+        u[u > 1] = 2-u[u > 1]
+        # angle
+        ϕ = np.pi*np.random.rand(Np) #azimuthal angle of velocity
+        χ = divergence*np.random.randn(Np) #polar angle of velocity
 
-    if(probing_direction == 'x'):
+        if(probing_direction == 'x'):
+            # Initial velocity
+            s0[3,:] = c * np.cos(χ)
+            s0[4,:] = c * np.sin(χ) * np.cos(ϕ)
+            s0[5,:] = c * np.sin(χ) * np.sin(ϕ)
+            # Initial position
+            s0[0,:] = -ne_extent
+            s0[1,:] = beam_size*u*np.cos(t)
+            s0[2,:] = beam_size*u*np.sin(t)
+        elif(probing_direction == 'y'):
+            # Initial velocity
+            s0[4,:] = c * np.cos(χ)
+            s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
+            s0[5,:] = c * np.sin(χ) * np.sin(ϕ)
+            # Initial position
+            s0[0,:] = beam_size*u*np.cos(t)
+            s0[1,:] = -ne_extent
+            s0[2,:] = beam_size*u*np.sin(t)
+        elif(probing_direction == 'z'):
+            # Initial velocity
+            s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
+            s0[4,:] = c * np.sin(χ) * np.sin(ϕ)
+            s0[5,:] = c * np.cos(χ)
+            # Initial position
+            s0[0,:] = beam_size*u*np.cos(t)
+            s0[1,:] = beam_size*u*np.sin(t)
+            s0[2,:] = -ne_extent
+        else: # Default to y
+            print("Default to y")
+            # Initial velocity
+            s0[4,:] = c * np.cos(χ)
+            s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
+            s0[5,:] = c * np.sin(χ) * np.sin(ϕ)        
+            # Initial position
+            s0[0,:] = beam_size*u*np.cos(t)
+            s0[1,:] = -ne_extent
+            s0[2,:] = beam_size*u*np.sin(t)
+    elif(beam_type == 'square'):
+        # position, uniformly within a square
+        t  = 2*np.random.rand(Np)-1.0
+        u  = 2*np.random.rand(Np)-1.0
+        # angle
+        ϕ = np.pi*np.random.rand(Np) #azimuthal angle of velocity
+        χ = divergence*np.random.randn(Np) #polar angle of velocity
+
+        if(probing_direction == 'x'):
+            # Initial velocity
+            s0[3,:] = c * np.cos(χ)
+            s0[4,:] = c * np.sin(χ) * np.cos(ϕ)
+            s0[5,:] = c * np.sin(χ) * np.sin(ϕ)
+            # Initial position
+            s0[0,:] = -ne_extent
+            s0[1,:] = beam_size*u
+            s0[2,:] = beam_size*t
+        elif(probing_direction == 'y'):
+            # Initial velocity
+            s0[4,:] = c * np.cos(χ)
+            s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
+            s0[5,:] = c * np.sin(χ) * np.sin(ϕ)
+            # Initial position
+            s0[0,:] = beam_size*u
+            s0[1,:] = -ne_extent
+            s0[2,:] = beam_size*t
+        elif(probing_direction == 'z'):
+            # Initial velocity
+            s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
+            s0[4,:] = c * np.sin(χ) * np.sin(ϕ)
+            s0[5,:] = c * np.cos(χ)
+            # Initial position
+            s0[0,:] = beam_size*u
+            s0[1,:] = beam_size*t
+            s0[2,:] = -ne_extent
+        else: # Default to y
+            print("Default to y")
+            # Initial velocity
+            s0[4,:] = c * np.cos(χ)
+            s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
+            s0[5,:] = c * np.sin(χ) * np.sin(ϕ)        
+            # Initial position
+            s0[0,:] = beam_size*u
+            s0[1,:] = -ne_extent
+            s0[2,:] = beam_size*t
+    elif(beam_type == 'rectangular'):
+        # position, uniformly within a square
+        t  = 2*np.random.rand(Np)-1.0
+        u  = 2*np.random.rand(Np)-1.0
+        # angle
+        ϕ = np.pi*np.random.rand(Np) #azimuthal angle of velocity
+        χ = divergence*np.random.randn(Np) #polar angle of velocity
+
+        beam_size_1 = beam_size[0] #m
+        beam_size_2 = beam_size[1] #m
+
+        if(probing_direction == 'x'):
+            # Initial velocity
+            s0[3,:] = c * np.cos(χ)
+            s0[4,:] = c * np.sin(χ) * np.cos(ϕ)
+            s0[5,:] = c * np.sin(χ) * np.sin(ϕ)
+            # Initial position
+            s0[0,:] = -ne_extent
+            s0[1,:] = beam_size_1*u
+            s0[2,:] = beam_size_2*t
+        elif(probing_direction == 'y'):
+            # Initial velocity
+            s0[4,:] = c * np.cos(χ)
+            s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
+            s0[5,:] = c * np.sin(χ) * np.sin(ϕ)
+            # Initial position
+            s0[0,:] = beam_size_1*u
+            s0[1,:] = -ne_extent
+            s0[2,:] = beam_size_2*t
+        elif(probing_direction == 'z'):
+            # Initial velocity
+            s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
+            s0[4,:] = c * np.sin(χ) * np.sin(ϕ)
+            s0[5,:] = c * np.cos(χ)
+            # Initial position
+            s0[0,:] = beam_size_1*u
+            s0[1,:] = beam_size_2*t
+            s0[2,:] = -ne_extent
+        else: # Default to y
+            print("Default to y")
+            # Initial velocity
+            s0[4,:] = c * np.cos(χ)
+            s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
+            s0[5,:] = c * np.sin(χ) * np.sin(ϕ)        
+            # Initial position
+            s0[0,:] = beam_size_1*u
+            s0[1,:] = -ne_extent
+            s0[2,:] = beam_size_2*t
+    elif(beam_type == 'linear'):
+        # position, uniformly along a line - probing direction is defaulted z, solved in x,z plane
+        t  = 2*np.random.rand(Np)-1.0
+        # angle
+        χ = divergence*np.random.randn(Np) #polar angle of velocity
+
         # Initial velocity
-        s0[3,:] = c * np.cos(χ)
-        s0[4,:] = c * np.sin(χ) * np.cos(ϕ)
-        s0[5,:] = c * np.sin(χ) * np.sin(ϕ)
-        # Initial position
-        s0[0,:] = -ne_extent
-        s0[1,:] = beam_size*u*np.cos(t)
-        s0[2,:] = beam_size*u*np.sin(t)
-    elif(probing_direction == 'y'):
-        # Initial velocity
-        s0[4,:] = c * np.cos(χ)
-        s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
-        s0[5,:] = c * np.sin(χ) * np.sin(ϕ)
-        # Initial position
-        s0[0,:] = beam_size*u*np.cos(t)
-        s0[1,:] = -ne_extent
-        s0[2,:] = beam_size*u*np.sin(t)
-    elif(probing_direction == 'z'):
-        # Initial velocity
-        s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
-        s0[4,:] = c * np.sin(χ) * np.sin(ϕ)
+        s0[3,:] = c * np.sin(χ)
+        s0[4,:] = 0.0
         s0[5,:] = c * np.cos(χ)
         # Initial position
-        s0[0,:] = beam_size*u*np.cos(t)
-        s0[1,:] = beam_size*u*np.sin(t)
+        s0[0,:] = beam_size*t
+        s0[1,:] = 0.0
         s0[2,:] = -ne_extent
-    else: # Default to y
-        print("Default to y")
-        # Initial velocity
-        s0[4,:] = c * np.cos(χ)
-        s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
-        s0[5,:] = c * np.sin(χ) * np.sin(ϕ)        
-        # Initial position
-        s0[0,:] = beam_size*u*np.cos(t)
-        s0[1,:] = -ne_extent
-        s0[2,:] = beam_size*u*np.sin(t)
+    else:
+        print("beam_type unrecognised! Accepted args: circular, square, rectangular, linear")
 
     # Initialise amplitude, phase and polarisation
     s0[6,:] = 1.0
@@ -595,7 +754,7 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction = 'z'):
     """
     Np = ode_sol.shape[1] # number of photons
     ray_p = np.zeros((4,Np))
-    ray_J = np.zeros((2,Np),dtype=np.complex)
+    ray_J = np.zeros((2,Np),dtype=complex)
 
     x, y, z, vx, vy, vz = ode_sol[0], ode_sol[1], ode_sol[2], ode_sol[3], ode_sol[4], ode_sol[5]
 
@@ -642,3 +801,23 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction = 'z'):
     return ray_p,ray_J
 
 
+
+def interfere_ref_beam(rf, E, n_fringes, deg):
+        ''' input beam ray positions and electric field component, and desired angle of evenly spaced background fringes. 
+        Deg is angle in degrees from the vertical axis
+        returns:
+            'interfered with' E field
+        '''
+        if deg >= 45:
+            deg = - np.abs(deg - 90)
+
+            
+        rad = deg* np.pi /180 #deg to rad
+        y_weight = np.arctan(rad)#take x_weight is 1
+        x_weight = np.sqrt(1-y_weight**2)
+
+        ref_beam = np.exp(2*n_fringes/3 * 1.0j*(x_weight*rf[0,:] + y_weight * rf[2,:]))
+
+        E[1,:] += ref_beam # assume ref_beam is polarised in y
+
+        return E

@@ -321,6 +321,9 @@ def scalar3D_knyquist(r,lx, ly, lz, smooth = False):
     #
     return knyquist, wave_numbers, tke_spectrum
 
+
+
+
 def radial_1Dspectrum(r, lx, smooth = False):
     """
      Parameters:
@@ -400,7 +403,7 @@ def radial_2Dspectrum(r, lx, ly, smooth=False):
     k = np.sqrt(kx**2 + ky**2)
     
     # Make radial bins, evenly spaced in logspace for ease of plotting
-    k_bins = np.logspace(np.log10(k[k>0].min()), np.log10(k.max()), num=50)
+    k_bins = np.logspace(np.log10(k[k>0].min()), np.log10(k.max()), num=100)
     tke_spectrum = np.zeros(len(k_bins)-1)
     
     for i in range(len(k_bins)-1):
@@ -466,3 +469,10 @@ def radial_3Dspectrum(r, lx, ly, lz, smooth=False):
         tke_spectrum = movingaverage(tke_spectrum, 5)
     
     return knyquist, k_centers, tke_spectrum
+
+
+
+
+
+
+

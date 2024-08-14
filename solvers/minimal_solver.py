@@ -170,7 +170,7 @@ class ScalarDomain:
             n_e0 ([type], optional): mean density. Defaults to 2e23 m^-3.
         """
         self.XX, self.YY, self.ZZ = np.meshgrid(self.x,self.y,self.z, indexing='ij')
-        self.ne = n_e0*(1.0+s*self.XX/self.extent_x)
+        self.ne = n_e0*(1.0+s*self.XX)
         
     def test_linear_cos(self,s1=0.1,s2=0.1,n_e0=2e23,Ly=1):
         """Linearly growing sinusoidal perturbation
@@ -328,7 +328,7 @@ class ScalarDomain:
 
         start = time()
         dsdt_ODE = lambda t, y: dsdt(t, y, self)
-        sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t, method = method)
+        sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t, method = 'RK45')
         finish = time()
         print("Ray trace completed in:\t",finish-start,"s")
 
