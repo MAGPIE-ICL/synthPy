@@ -1,12 +1,11 @@
-"""METHODS TO COMPUTE POWER SPECTRUM FROM SCALAR FIELDS
-Author: Stefano Merlini
-Date: 25/06/24
 """
-
+Library of Methods to compute the power spectrum from scalar fields
+Authors: Stefano Merlini, Louis Evans, Jack Hare
+"""
 
 import numpy as np
 
-#  Method 1 - Calculate Power Spectrum 
+#  Method 1 - Calculate Power Spectrum - Jack Hare
 def scalar1D_fft(data, dx, k_bin_num=100):
     """Calculates and returns the 2D spectrum for a 2D gaussian field of scalars, assuming isotropy of the turbulence
         Example:
@@ -177,8 +176,7 @@ def scalar3D_fft(data, dx, k_bin_num=100):
         
     return k_bins_weighted, spect3D
 
-# Method 2 - Calculate Power Spectrum
-
+# Method 2 - Calculate Power Spectrum - Stefano Merlini
 #  ____  _  _   __    __  ____  _  _ 
 # / ___)( \/ ) /  \  /  \(_  _)/ )( \
 # \___ \/ \/ \(  O )(  O ) )(  ) __ (
@@ -318,9 +316,7 @@ def scalar3D_knyquist(r,lx, ly, lz, smooth = False):
     #
     return knyquist, wave_numbers, tke_spectrum
 
-
-
-
+# Method 3 - Calculate Power Spectrum - Louis Evans
 def radial_1Dspectrum(r, lx, smooth = False):
     """
      Parameters:
@@ -334,7 +330,8 @@ def radial_1Dspectrum(r, lx, smooth = False):
     smooth: boolean
         Active/Disactive smooth function for visualisation
     -----------------------------------------------------------------
-"""
+    """
+
     import numpy as np
     from numpy.fft import fft2, fftshift, fftn, fft
 
@@ -366,8 +363,6 @@ def radial_1Dspectrum(r, lx, smooth = False):
     
     return knyquist, k_centers, tke_spectrum
 
-
-
 def radial_2Dspectrum(r, lx, ly, smooth=False):
     """
      Parameters:
@@ -381,7 +376,7 @@ def radial_2Dspectrum(r, lx, ly, smooth=False):
     smooth: boolean
         Active/Disactive smooth function for visualisation
     -----------------------------------------------------------------
-"""
+    """
     import numpy as np
     from numpy.fft import fft2, fftshift, fftn, fft
     
@@ -416,8 +411,6 @@ def radial_2Dspectrum(r, lx, ly, smooth=False):
     
     return knyquist, k_centers, tke_spectrum
 
-
-
 def radial_3Dspectrum(r, lx, ly, lz, smooth=False):
     """
      Parameters:
@@ -431,7 +424,8 @@ def radial_3Dspectrum(r, lx, ly, lz, smooth=False):
     smooth: boolean
         Active/Disactive smooth function for visualisation
     -----------------------------------------------------------------
-"""
+    """
+    
     import numpy as np
     from numpy.fft import fft2, fftshift, fftn, fft
     
@@ -439,7 +433,6 @@ def radial_3Dspectrum(r, lx, ly, lz, smooth=False):
     
     rh = fftshift(fftn(r))
     
-
     tkeh = (np.abs(rh)**2) / (nx * ny * nz)**2  # Normalized power spectrum
     
     # Set up wavenumbers
@@ -466,10 +459,3 @@ def radial_3Dspectrum(r, lx, ly, lz, smooth=False):
         tke_spectrum = movingaverage(tke_spectrum, 5)
     
     return knyquist, k_centers, tke_spectrum
-
-
-
-
-
-
-
