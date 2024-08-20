@@ -1,25 +1,25 @@
-'''parallelised ray tracer for PVTI files to loop for a batch, e.g if you have lots of PVTI files in one directory.
+'''
+Parallelised ray tracer for PVTI files
 
+Author: Louis Evans
+Reviewer: Stefano Merlini
 
-run with the following job submission: 
+Run with the following job submission: 
+    #!/bin/sh
+    #PBS -l walltime=HH:MM:SS
+    #PBS -l select=1:ncpus=N:mpiprocs=N:mem=Mgb
+    #PBS -j oe
+    cd '/rds/general/user/le322/home/synthPy' #insert path
 
-#!/bin/sh
-#PBS -l walltime=HH:MM:SS
-#PBS -l select=1:ncpus=N:mpiprocs=N:mem=Mgb
-#PBS -j oe
-#PBS -J 1-37 -> PBS loops and returns an index for 1 - 37
-cd '/rds/general/user/le322/home/synthPy'
+    module load anaconda3/personal
 
-module load anaconda3/personal
+    source activate MAGPIE_venv #activate your venv
 
-source activate MAGPIE_venv #load venv
-
-
-python run_scripts/extentsBatch.py <Number of Photons> <path to pvti folder> <output_dir> ${PBS_ARRAY_INDEX}
+    python path/to/multiprocessing_trace.py <Number of Rays> <pvti/file/path> <output location>
 '''
 
 import sys
-sys.path.append('/rds/general/user/le322/home/synthPy/') #import path/to/synthpy
+sys.path.append('../synthPy/')      #import path/to/synthpy
 import numpy as np
 import pickle
 import multiprocessing as mp
@@ -28,6 +28,7 @@ from multiprocessing import Process
 import field_generator.gaussian1D as g1
 import field_generator.gaussian2D as g2
 import field_generator.gaussian3D as g3
+import utils.handle_filetypes as utilIO
 import solver.full_solver as s
 import solver.rtm_solver as rtm
 import matplotlib.pyplot as plt
@@ -40,30 +41,8 @@ from vtk.util import numpy_support as vtk_np
 class CustomManager(BaseManager):
     pass
 
-def pvti_readin(filename):
-    '''
-    Reads in data from pvti with filename, use this to read in electron number density data
-    '''
-    reader = vtk.vtkXMLPImageDataReader()
-    reader.SetFileName(filename)
-    reader.Update()
-    data = reader.GetOutput()
-    dim = data.GetDimensions()
-    spacing = np.array(data.GetSpacing())
-    v = vtk_np.vtk_to_numpy(data.GetCellData().GetArray(0))
-    n_comp = data.GetCellData().GetArray(0).GetNumberOfComponents()
-    vec = [int(i-1) for i in dim]
-    if(n_comp > 1):
-        vec.append(n_comp)
-    if(n_comp > 2):
-        img = v.reshape(vec, order="F")[0:dim[0]-1, 0:dim[1]-1, 0:dim[2]-1, :]
-    else:
-        img = v.reshape(vec, order="F")[0:dim[0]-1, 0:dim[1]-1, 0:dim[2]-1]
-    dim = img.shape
-    return img, dim, spacing
-
 def calculate_field(file_loc, manager, probing_direction):
-    ne, dim, spacing = pvti_readin(file_loc)
+    ne, dim, spacing = utilIO.pvti_readin(file_loc)
     extent_x = ((dim[0]*spacing[0])/2)
     extent_y = ((dim[1]*spacing[1])/2)
     extent_z = ((dim[2]*spacing[2])/2)
@@ -111,38 +90,32 @@ if __name__ == '__main__':
     m = CustomManager()
     m.start()
 
-    Np = int(float(sys.argv[1])) #get inputted variables
+    #get inputted variables 
+    Np = int(float(sys.argv[1]))
     file_loc = str(sys.argv[2])
     output_loc = str(sys.argv[3])
-    index = int(int(sys.argv[4]) - 1)
+    probe = 'z'
+    field, probing_extent = calculate_field(file_loc = file_loc, manager = m, probing_direction = probe)
+    cpu_count = mp.cpu_count()
 
-    extents = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.5, 1.7, 1.8, 1.9, 2.0,2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8,2.9,3.0,3.1,3.2,3.3,3.4,3.5,3.6,3.7,3.8,3.9,4.0]
-
-    extent = str(extents[index]) #this part takes the input index to get each element of the array
-
-    file_loc += extent
-    file_loc += '.pvti'
-
-    #beam properties 
-    divergence =0.05e-3
-    beam_size = 5e-3 #5mm beam readius
-    probing_direction = 'z'
-
-    print('current file location = ', file_loc)
-    field, probing_extent = calculate_field(file_loc = file_loc, manager = m, probing_direction = probing_direction)
-
-    Np_ray_split = int(5e5) #split the rays into more manageable chunks
+    Np_ray_split = int(1e4) #split up rays
     number_of_splits = Np // Np_ray_split
     remaining_rays = Np % Np_ray_split
-
+    #define beam parameters
+    divergence =0.05e-3
+    beam_size = 5e-3 # 5mm circular beam radius
     tasks = [(remaining_rays, beam_size, divergence, field, probing_extent)] if remaining_rays > 0 else []
-    cpu_count = mp.count_cpu()
+    
     for i in range(number_of_splits):
         tasks.append((Np_ray_split, beam_size, divergence, field, probing_extent))
+    
     print(len(tasks), ' tasks to complete, with ', cpu_count, ' cores')
+
     with mp.Pool(cpu_count) as pool:
         results = pool.map(system_solve, tasks)
+
     print('results obtained')
+
     sh_H = np.zeros_like(results[0][0])
     r_H = np.zeros_like(results[0][1])
 
@@ -152,9 +125,9 @@ if __name__ == '__main__':
     
     print('results summed')
 
-    with open(output_loc + f'{extent}_shadow.pkl', "wb") as filehandler:
+    with open(output_loc + 'shadow.pkl', "wb") as filehandler:
         pickle.dump(sh_H, filehandler)
-    with open(output_loc + f'{extent}_refract.pkl', "wb") as filehandler:
+    with open(output_loc + 'refract.pkl', "wb") as filehandler:
         pickle.dump(r_H, filehandler)
 
     print('files written to ', output_loc)

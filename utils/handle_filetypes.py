@@ -97,23 +97,17 @@ def pvti_readin(filename):
     data = reader.GetOutput()
     dim = data.GetDimensions()
     spacing = np.array(data.GetSpacing())
-
     v = vtk_np.vtk_to_numpy(data.GetCellData().GetArray(0))
     n_comp = data.GetCellData().GetArray(0).GetNumberOfComponents()
-
     vec = [int(i-1) for i in dim]
-
     if(n_comp > 1):
         vec.append(n_comp)
-
     if(n_comp > 2):
         img = v.reshape(vec,order="F")[0:dim[0]-1,0:dim[1]-1,0:dim[2]-1,:]
     else:
         img = v.reshape(vec,order="F")[0:dim[0]-1,0:dim[1]-1,0:dim[2]-1]
-
     dim = img.shape
-
-    return img,dim,spacing
+    return img, dim, spacing
 
 def hdf_readin(filename):
     '''

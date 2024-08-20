@@ -1,38 +1,38 @@
 '''
-Parallelisation (running mulptiple processes in parallel) greatly speeds up the ray tracing process and has been applied in two ways:
-MPI4py: 
-this library uses MPI (read the hpc wiki on MPI) for python library, and is run with the line: 
+    PARALLELISATION GUIDE (Running mutliple processes):
+    Author: Louis Evans
+    Reviewer: Stefano Merlini
 
-mpiexec -n python script.py
+    Two possible ways:
 
-When the terminal sees mpiexec, it gets n cpus to run the process in parallel. Therefore, we add steps that can only be done for the 0th 'root' process, these steps include initialising
-the domain, and saving the data at the end. (Necessary becuase we only want to do these things once, as oppose to have every process run it)
+    MPI4py: 
+    This library uses MPI (read the hpc wiki on MPI) for python library, and is run with the line:
+    mpiexec -n python script.py
 
-This method is quick, but uses lots of memory. Every process has its own memory store, and thus if the script takes x GB of RAM on one processor, it will take n*x GB in paralllel, this 
-issue is fixed by the next method, but takes slightly longer.
+    When the terminal sees mpiexec, it gets n cpus to run the process in parallel. Therefore, we add steps that can only be done for the 0th 'root' process, these steps include initialising
+    the domain, and saving the data at the end. (Necessary becuase we only want to do these things once, as oppose to have every process run it)
 
-multiprocessing:
-this library is native to python, and works a bit different to the prior method. It is run normally like:
+    This method is quick, but uses lots of memory. Every process has its own memory store, and thus if the script takes x GB of RAM on one processor, it will take n*x GB in paralllel, this 
+    issue is fixed by the next method, but takes slightly longer.
 
-python script.py
+    multiprocessing:
+    this library is native to python, and works a bit different to the prior method. It is run normally like:
 
-and is run on a master processor. This master processor sets up the problem by hosting a MemoryManager, which cleverly hosts a server, keeping the data stored at one address in RAM. 
-The master processor then creates a list of tasks, and a pool of worker processors, assigning one or more tasks to each worker. Each worker can then access the main bulk of the data 
-via the proxy server, without spawning copies of that data. However, because each worker is accessing a server to get to the stored object, a time delay is introduced. 
+    python script.py
 
-My advice: run a MPI4py script first, and if memory lacks, look into switching to the multiprocessing method
+    and is run on a master processor. This master processor sets up the problem by hosting a MemoryManager, which cleverly hosts a server, keeping the data stored at one address in RAM. 
+    The master processor then creates a list of tasks, and a pool of worker processors, assigning one or more tasks to each worker. Each worker can then access the main bulk of the data 
+    via the proxy server, without spawning copies of that data. However, because each worker is accessing a server to get to the stored object, a time delay is introduced. 
 
-Find an example of both below.
+    My advice: run a MPI4py script first, and if memory lacks, look into switching to the multiprocessing method
 
-- Louis
-
+    Find an example of both below.
+    Copy and Paste each example in a .py file script to run it.
 '''
 
-#------------------------------------------------------------------MPI4py-------------------------------------------------------------------------------#
+#-----------------------------------------------------MPI4py-------------------------------------------------------------------------------#
 import sys
-
-sys.path.insert(1, '/rds/general/user/le322/home/synthPy')
-
+sys.path.append('../synthPy/')      # import path/to/synthpy
 import numpy as np
 from mpi4py import MPI
 import pickle
@@ -41,7 +41,7 @@ import solver.full_solver as s
 import solver.rtm_solver as rtm
 import matplotlib.pyplot as plt
 import gc
-import utils.handle_filetypes as load
+import utils.handle_filetypes as utilIO
 
 ## Initialise the MPI
 comm = pkl5.Intracomm(MPI.COMM_WORLD)
@@ -58,7 +58,7 @@ extent_z = 5e-3
 
 if rank ==0: #rank 0 becuase we only want this calculation to happen once
 	# load vti file
-	ne, dim, spacing = load.pvti_readin(file_loc)
+	ne, dim, spacing = utilIO.pvti_readin(file_loc)
 	
 	ne_x = np.linspace(-extent_x,extent_x, dim[0])
 	ne_y = np.linspace(-extent_y,extent_y, dim[1])
@@ -76,19 +76,10 @@ if rank ==0: #rank 0 becuase we only want this calculation to happen once
 else:
 	field = None
 
-
 comm.barrier() #barrier makes everyone wait here, so other processes wait for the root process to do the initial calculation
 
 if rank == 0:
-    print('''    
-.______          ___   ____    ____    .___________..______          ___       ______  __  .__   __.   _______ 
-|   _  \        /   \  \   \  /   /    |           ||   _  \        /   \     /      ||  | |  \ |  |  /  _____|
-|  |_)  |      /  ^  \  \   \/   /     ---|  |----|  |_)  |      /  ^  \   |  ,----'|  | |   \|  | |  |  __  
-|      /      /  /_\  \  \_    _/          |  |     |      /      /  /_\  \  |  |     |  | |  .   | |  | |_ | 
-|  |\  \----./  _____  \   |  |            |  |     |  |\  \----./  _____  \ |  ----.|  | |  |\   | |  |__| | 
-| _| ._____/__/     \__\  |__|            |__|     | _| ._____/__/     \__\ \______||__| |__| \__|  \______| 
-                                                                                                               
-''')
+    print('''Ray-tracing...''')
 
 def system_solve(Np,beam_size,divergence, field, ne_extent): #define the function to run the ray trace, and synthetic diagnostics
 	## Initialise laser beam
@@ -109,8 +100,7 @@ def system_solve(Np,beam_size,divergence, field, ne_extent): #define the functio
 	sh=rtm.ShadowgraphyRays(rf)
 	sh.solve(displacement = 0)
 	sh.histogram(bin_scale = 1, clear_mem=True)
-
-	return sh,r
+	return sh, r
 
 beam_size = extent_x
 divergence = 0.05e-3
@@ -123,8 +113,6 @@ number_of_splits = Np//Np_ray_split
 remaining_rays   = Np%Np_ray_split
 
 sh,r = system_solve(remaining_rays,beam_size,divergence, field, extent_z)
-
-
 
 for i in range(number_of_splits):
     if(rank == 0):
@@ -153,10 +141,10 @@ if(rank == 0): #again specify rank, as we don't want to write more than neccesar
 	filehandler.close()
 	
 
-#------------------------------------------------------------------multiprocessing-------------------------------------------------------------------------------#
+#-------------------------------------------------multiprocessing-------------------------------------------------------------------------------#
 
 import sys
-sys.path.append('/rds/general/user/le322/home/synthPy/')
+sys.path.append('../synthPy/')      # import path/to/synthpy
 import numpy as np
 import pickle
 import multiprocessing as mp
@@ -165,17 +153,13 @@ from multiprocessing import Process
 import solver.full_solver as s
 import solver.rtm_solver as rtm
 import gc
-import utils.handle_filetypes as load
-
-
-
+import utils.handle_filetypes as utilIO
 
 class CustomManager(BaseManager): #this is done so we can modify the manager
     pass
 
-
 def calculate_field(file_loc, manager): #define a function to process the pvti file into a domain object
-    ne, dim, spacing = load.pvti_readin(file_loc)
+    ne, dim, spacing = utilIO.pvti_readin(file_loc)
     extent_x = ((dim[0]*spacing[0])/2)*1e-3
     extent_y = ((dim[1]*spacing[1])/2)*1e-3
     extent_z = ((dim[2]*spacing[2])/2)*1e-3
@@ -211,40 +195,23 @@ def system_solve(args): #define a function to give to the pool of workers
 
 if __name__ == '__main__':
     print('Initiating Manager......')
-
     CustomManager.register('ScalarDomain', s.ScalarDomain) #register the scalar domain objects as objects that can be hosted on the memory manager server
     m = CustomManager()
     m.start()
-
     file_loc = 'path/to/file.pvti'
-    
-
     field, extent_z, extent_x = calculate_field(file_loc = file_loc, manager = m)
 
-
     Np = 1e6
-
     output_loc = 'path/to/output'
-
     cpu_count = mp.cpu_count()
-
     Np_ray_split = int(5e5) #again, split rays, each split is assigned to a worker, so Np is the total number of photons traced
-
     number_of_splits = Np // Np_ray_split
-
     remaining_rays = Np % Np_ray_split
-
-    divergence =0.05e-3
-
+    divergence = 0.05e-3
     probing_extent = extent_z #change these values accordingly
-
     beam_size = extent_x
-
     tasks = [(remaining_rays, beam_size, divergence, field, extent_z)] if remaining_rays > 0 else [] #setup a list of task inputs
     
-    
-
-
     for i in range(number_of_splits):
         tasks.append((Np_ray_split, beam_size, 0.05e-3, field, extent_z))
     
