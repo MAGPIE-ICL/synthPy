@@ -21,7 +21,7 @@ Run with the following job submission:
 '''
 
 import sys
-sys.path.append('../synthPy')   #import path/to/synthpy
+sys.path.append('../../synthPy')   #import path/to/synthpy
 import numpy as np
 import pickle
 import multiprocessing as mp

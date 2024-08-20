@@ -32,7 +32,7 @@
 
 #-----------------------------------------------------MPI4py-------------------------------------------------------------------------------#
 import sys
-sys.path.append('../synthPy/')      # import path/to/synthpy
+sys.path.append('../../synthPy')      # import path/to/synthpy
 import numpy as np
 from mpi4py import MPI
 import pickle
@@ -144,7 +144,7 @@ if(rank == 0): #again specify rank, as we don't want to write more than neccesar
 #-------------------------------------------------multiprocessing-------------------------------------------------------------------------------#
 
 import sys
-sys.path.append('../synthPy/')      # import path/to/synthpy
+sys.path.append('../../synthPy/')      # import path/to/synthpy
 import numpy as np
 import pickle
 import multiprocessing as mp

@@ -16,7 +16,7 @@ Created: 14/05/2020
 
 # import library
 import sys
-sys.path.insert(0, '../synthPy')
+sys.path.insert(0, '../../synthPy')
 import numpy as np
 import field_generator.gaussian1D as gf1D
 import field_generator.gaussian2D as gf2D

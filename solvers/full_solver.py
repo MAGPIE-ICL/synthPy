@@ -1,4 +1,5 @@
-"""FULL PHYSICS SOLVER - 9 Vector description of rays - Include Phase and Polarisation
+"""
+FULL PHYSICS SOLVER - 9 Vector description of rays - Include Phase and Polarisation
 BASED ON: https://journals.aps.org/pre/abstract/10.1103/PhysRevE.61.895
 
 SOLVES: 
@@ -79,6 +80,7 @@ ax2.set_xlabel(r"$\theta$ (mrad)")
 ax2.set_ylabel(r"$\phi$ (mrad)")
 
 fig.tight_layout()
+
 """
 
 import numpy as np
