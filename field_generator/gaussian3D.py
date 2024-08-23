@@ -1,15 +1,9 @@
 """
-Author: Stefano Merlini
+Author: Stefano Merlini, Louis Evans
 Created: 14/05/2020
-Modified: 24/06/2024
 """
 
 import numpy as np
-
-#  ____      ____     ___   __   _  _  ____  ____  __   __   __ _     ___  __   ____ 
-# ( __ \ ___(    \   / __) / _\ / )( \/ ___)/ ___)(  ) / _\ (  ( \   / __)/  \ / ___)
-#  (__ ((___)) D (  ( (_ \/    \) \/ (\___ \\___ \ )( /    \/    /  ( (__(  O )\___ \
-# (____/    (____/   \___/\_/\_/\____/(____/(____/(__)\_/\_/\_)__)   \___)\__/ (____/
 
 class gaussian3D:
     def __init__(self, k_func):
@@ -150,16 +144,13 @@ class gaussian3D:
                     _r[i,j,k] = np.sum(bm)
 
         print("Done! 3-D Turbulence has been generated!")
-
         self.ne = _r
-
         return _r
 
     def fft(self, l_max, l_min, extent, res, factor):
         '''
         Generate a Gaussian random field with a fourier spectrum following k_func in the domain 2*pi/l_max to 2*pi/l_min, and 0 outside
 
-    
         Args:
             l_max: max length scale, usually = 2*extent due to physical boundary conditions
             l_min: min length scale, either resolution, or scale at which energy in = energy out (Re = 1)
@@ -212,11 +203,9 @@ class gaussian3D:
         
         self.ne = field
 
-        return field
-
+        return x, y, z, field
 
     def export_scalar_field(self, property: str = 'ne', fname: str = None):
-
         '''
         Export the current scalar electron density profile as a pvti file format, property added for future scalability to export temperature, B-field, etc.
 
@@ -226,8 +215,6 @@ class gaussian3D:
             fname: str, file path and name to save under. A VTI pointed to by a PVTI file are saved in this location. If left blank, the name will default to:
 
                     ./plasma_PVTI_DD_MM_YYYY_HR_MIN
-        
-        
         '''
         import pyvista as pv
 
@@ -289,15 +276,15 @@ class gaussian3D:
         spacing_y = (2*yc.max())/np.shape(yc)[0]
         spacing_z = (2*zc.max())/np.shape(zc)[0]
         content = f'''<?xml version="1.0"?>
-<VTKFile type="PImageData" version="0.1" byte_order="LittleEndian" header_type="UInt32" compressor="vtkZLibDataCompressor">
-    <PImageData WholeExtent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" GhostLevel="0" Origin="0 0 0" Spacing="{x_size} {y_size} {z_size}">
-         <PCellData Scalars="rnec">
-             <PDataArray type="Float64" Name="rnec">
-             </PDataArray>
-         </PCellData>
-         <Piece Extent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" Source="{relative_fname}.vti"/>
-    </PImageData>
-</VTKFile>'''
+        <VTKFile type="PImageData" version="0.1" byte_order="LittleEndian" header_type="UInt32" compressor="vtkZLibDataCompressor">
+            <PImageData WholeExtent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" GhostLevel="0" Origin="0 0 0" Spacing="{x_size} {y_size} {z_size}">
+                <PCellData Scalars="rnec">
+                    <PDataArray type="Float64" Name="rnec">
+                    </PDataArray>
+                </PCellData>
+                <Piece Extent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" Source="{relative_fname}.vti"/>
+            </PImageData>
+        </VTKFile>'''
         # write file
         with open(f'{fname}.pvti', 'w') as file:
             file.write(content)

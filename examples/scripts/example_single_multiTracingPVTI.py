@@ -1,23 +1,25 @@
-'''parallelised ray tracer for PVTI files
+'''
+Parallelised ray tracer for PVTI files
 
+Author: Louis Evans
+Reviewer: Stefano Merlini
 
-run with the following job submission: 
+Run with the following job submission: 
+    #!/bin/sh
+    #PBS -l walltime=HH:MM:SS
+    #PBS -l select=1:ncpus=N:mpiprocs=N:mem=Mgb
+    #PBS -j oe
+    cd '/rds/general/user/le322/home/synthPy' #insert path
 
-#!/bin/sh
-#PBS -l walltime=HH:MM:SS
-#PBS -l select=1:ncpus=N:mpiprocs=N:mem=Mgb
-#PBS -j oe
-cd '/rds/general/user/le322/home/synthPy' #insert path
+    module load anaconda3/personal
 
-module load anaconda3/personal
+    source activate MAGPIE_venv #activate your venv
 
-source activate MAGPIE_venv #activate your venv
-
-python path/to/multiprocessing_trace.py <Number of Rays> <pvti/file/path> <output location>
+    python path/to/multiprocessing_trace.py <Number of Rays> <pvti/file/path> <output location>
 '''
 
 import sys
-sys.path.append('/rds/general/user/le322/home/synthPy/') #import path/to/synthpy
+sys.path.append('../synthPy/')      #import path/to/synthpy
 import numpy as np
 import pickle
 import multiprocessing as mp
@@ -26,6 +28,7 @@ from multiprocessing import Process
 import field_generator.gaussian1D as g1
 import field_generator.gaussian2D as g2
 import field_generator.gaussian3D as g3
+import utils.handle_filetypes as utilIO
 import solver.full_solver as s
 import solver.rtm_solver as rtm
 import matplotlib.pyplot as plt
@@ -38,30 +41,8 @@ from vtk.util import numpy_support as vtk_np
 class CustomManager(BaseManager):
     pass
 
-def pvti_readin(filename):
-    '''
-    Reads in data from pvti with filename, use this to read in electron number density data
-    '''
-    reader = vtk.vtkXMLPImageDataReader()
-    reader.SetFileName(filename)
-    reader.Update()
-    data = reader.GetOutput()
-    dim = data.GetDimensions()
-    spacing = np.array(data.GetSpacing())
-    v = vtk_np.vtk_to_numpy(data.GetCellData().GetArray(0))
-    n_comp = data.GetCellData().GetArray(0).GetNumberOfComponents()
-    vec = [int(i-1) for i in dim]
-    if(n_comp > 1):
-        vec.append(n_comp)
-    if(n_comp > 2):
-        img = v.reshape(vec, order="F")[0:dim[0]-1, 0:dim[1]-1, 0:dim[2]-1, :]
-    else:
-        img = v.reshape(vec, order="F")[0:dim[0]-1, 0:dim[1]-1, 0:dim[2]-1]
-    dim = img.shape
-    return img, dim, spacing
-
 def calculate_field(file_loc, manager, probing_direction):
-    ne, dim, spacing = pvti_readin(file_loc)
+    ne, dim, spacing = utilIO.pvti_readin(file_loc)
     extent_x = ((dim[0]*spacing[0])/2)
     extent_y = ((dim[1]*spacing[1])/2)
     extent_z = ((dim[2]*spacing[2])/2)

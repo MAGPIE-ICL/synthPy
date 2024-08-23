@@ -1,13 +1,12 @@
-# Main program - Version 1
-# This is an example of how to use the library turboGen.py
-# and cmpspec.py
+# Example Field Generators - cos method
+# This is an example of how to use the library field_generator/gaussianND.py
+# and power_spectrum.py
 # GENERATING 1D-2D-3D GAUSSIAN STOCHASTIC FIELD WITH A GIVEN POWER SPECTRUM AS INPUT
 
 """
 Author: Stefano Merlini
 Created: 14/05/2020
 """
-
 
 #  ____  _  _   __   _  _  ____  __    ____ 
 # (  __)( \/ ) / _\ ( \/ )(  _ \(  )  (  __)
@@ -16,12 +15,15 @@ Created: 14/05/2020
 
 
 # import library
-
+import sys
+sys.path.insert(0, '../../synthPy')
 import numpy as np
-import turboGen as tg
+import field_generator.gaussian1D as gf1D
+import field_generator.gaussian2D as gf2D
+import field_generator.gaussian3D as gf3D
 import time
 import matplotlib.pyplot as plt
-import cmpspec
+import utils.power_spectrum as pws
 import matplotlib.cm
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -32,11 +34,9 @@ from mpl_toolkits.mplot3d import Axes3D
 # (____/(__)  (____)\___) (__) (__\_)\____/\_)(_/ 
 # this is the standard kolmogorov spectrum -5/3
 #
-class k41:
-    def evaluate(self, k):
-        espec = pow(k,-5.0/3.0)
-        return espec
 
+def k41(k):
+    return k**(-5.0/3.0)
 
 #   __      ____    ____  __  ____  __    ____ 
 #  /  \ ___(    \  (  __)(  )(  __)(  )  (    \
@@ -53,10 +53,8 @@ nmodes = 100
 # right now only kolmogorov -5/3
 inputspec = 'k41'
 # PATH folder
-pathfolder = './Output'
+pathfolder = './examples/Output'
 filename1 = inputspec + '_' + str(nx) + '_' + str(nmodes) + '_modes'
-# CALL CLASS SPECTRUM
-whichspect = k41().evaluate
 # Defining the smallest wavenumber represented by this spectrum
 wn1 = 2.0*np.pi/lx
 # Summary of the user input
@@ -73,23 +71,19 @@ print("Fourier accuracy (modes): ", nmodes)
 dx = lx/nx
 t0 = time.time() # initial time
 # --------------------------------------------------
-# Run the function TurboGenerator
+# Run the function Gaussian1D
 # --------------------------------------------------
-r_x = tg.gaussian1Dcos(lx, nx, nmodes, wn1, whichspect)
-#
+field = gf1D.gaussian1D(k41)
+r_x = field.cos(lx, nx, nmodes, wn1)
 t1 = time.time() # final time
 computing_time = t1 - t0
 #
 print("It took me ", computing_time, "to generate the 1D turbulence.")
 # COMPUTE THE POWER SPECTRUM OF THE 1-D FIELD
 # verify that the generated velocities fit the spectrum
-knyquist1D, wavenumbers1D, tkespec1D = cmpspec.compute1Dspectrum(r_x, lx, False)
+knyquist1D, wavenumbers1D, tkespec1D = pws.radial_1Dspectrum(r_x, lx, False)
 # save the generated spectrum to a text file for later post processing
 np.savetxt(pathfolder + '/1D_tkespec_' + filename1 + '.txt', np.transpose([wavenumbers1D, tkespec1D]))
-
-
-
-
 
 
 #  ____      ____    ____  __  ____  __    ____ 
@@ -109,10 +103,8 @@ nmodes = 100
 # right now only kolmogorov -5/3
 inputspec = 'k41'
 # PATH folder
-pathfolder = './Output'
+pathfolder = './examples/Output'
 filename2 = inputspec + '_' + str(nx) + '_' + str(ny) + '_' + str(nmodes) + '_modes'
-# CALL CLASS SPECTRUM
-whichspect = k41().evaluate
 # Defining the smallest wavenumber represented by this spectrum
 wn1 = min(2.0*np.pi/lx, 2.0*np.pi/ly)
 # Summary of the user input
@@ -132,21 +124,16 @@ t0 = time.time() # initial time
 # --------------------------------------------------
 # Run the function TurboGenerator
 # --------------------------------------------------
-r_xy = tg.gaussian2Dcos(lx, ly, nx, ny, nmodes, wn1, whichspect)
+field = gf2D.gaussian2D(k41)
+r_xy = field.cos(lx, ly, nx, ny, nmodes, wn1)
 t1 = time.time() # final time
 computing_time = t1 - t0
 print("It took me ", computing_time, "to generate the 2D turbulence.")
 # COMPUTE THE POWER SPECTRUM OF THE 2-D FIELD
 # verify that the generated velocities fit the spectrum
-knyquist2D, wavenumbers2D, tkespec2D = cmpspec.compute2Dspectrum(r_xy, lx, ly, False)
+knyquist2D, wavenumbers2D, tkespec2D = pws.radial_2Dspectrum(r_xy, lx, ly, False)
 # save the generated spectrum to a text file for later post processing
 np.savetxt(pathfolder + '/2D_tkespec_' + filename2 + '.txt', np.transpose([wavenumbers2D, tkespec2D]))
-
-
-
-
-
-
 
 
 #  ____      ____    ____  __  ____  __    ____ 
@@ -168,10 +155,8 @@ nmodes = 100
 # right now only kolmogorov -5/3
 inputspec = 'k41'
 # PATH folder
-pathfolder = './Output'
+pathfolder = './examples/Output'
 filename3 = inputspec + '_' + str(nx) + '_' + str(ny) + '_' + str(nz) + '_' + str(nmodes) + '_modes'
-# CALL CLASS SPECTRUM
-whichspect = k41().evaluate
 # Defining the smallest wavenumber represented by this spectrum
 wn1 = min(2.0*np.pi/lx, 2.0*np.pi/ly)
 # Summary of the user input
@@ -192,13 +177,14 @@ t0 = time.time() # initial time
 # --------------------------------------------------
 # Run the function TurboGenerator
 # --------------------------------------------------
-r_xyz = tg.gaussian3Dcos(lx, ly, lz, nx, ny, nz, nmodes, wn1, whichspect)
+field = gf3D.gaussian3D(k41)
+r_xyz = field.cos(lx, ly, lz, nx, ny, nz, nmodes, wn1)
 t1 = time.time() # final time
 computing_time = t1 - t0
 print("It took me ", computing_time, "to generate the 3D turbulence.")
 # COMPUTE THE POWER SPECTRUM OF THE 2-D FIELD
 # verify that the generated velocities fit the spectrum
-knyquist3D, wavenumbers3D, tkespec3D = cmpspec.compute3Dspectrum(r_xyz, lx, ly, lz, False)
+knyquist3D, wavenumbers3D, tkespec3D = pws.radial_3Dspectrum(r_xyz, lx, ly, lz, False)
 # save the generated spectrum to a text file for later post processing
 np.savetxt(pathfolder + '/3D_tkespec_' + filename3 + '.txt', np.transpose([wavenumbers3D, tkespec3D]))
 
@@ -322,9 +308,6 @@ plt.grid()
 plt.legend()
 fig.savefig(pathfolder + '/3D_tkespec_' + filename3 + '.pdf')
 plt.show()
-
-
-
 
 
 
