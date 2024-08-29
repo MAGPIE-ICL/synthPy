@@ -1,8 +1,3 @@
-# This is the ray transfer metrix routine for optics
-# this is effectively the diagnostics module where shadow, schlieren and refractometry images are performed
-# if we want to include also interferometry this is the right place
-# REQUIRES CHANGING NAMES AND EXAMPLES
-
 import sympy as sym
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,7 +5,7 @@ import matplotlib.pyplot as plt
 '''OPTICS - RAY TRANSFER METRIX METHOD
 
 BASED VERSION CODED BY: Aidan CRILLY / Jack HARE
-MODIFIED/UPDATED BY: Stefano MERLINI
+MODIFIED/UPDATED BY: Stefano MERLINI / Louis Evans
 
 Example:
 
@@ -168,7 +163,6 @@ def distance(d):
     L[2:,2:]=d
     return L
 
-
 def ray(x, θ, y, ϕ):
     '''
     4x1 matrix representing a ray. Spatial units must be consistent, angular units in radians
@@ -269,6 +263,7 @@ class InterferometryOptics:
     L1=sym.lambdify([L], f1*d1, "numpy")
     L2=sym.lambdify([L], f2*d2, "numpy")
     X3=sym.lambdify([L], d1, "numpy")
+
 class Rays:
     """
     Inheritable class for ray diagnostics.

@@ -7,7 +7,7 @@ $ \frac{d\vec{v}}{dt} = -\nabla \left( \frac{c^2}{2} \frac{n_e}{n_c} \right) $
 $ \frac{d\vec{x}}{dt} = \vec{v} $
 
 BASED VERSION CODED BY: Aidan CRILLY / Jack HARE
-MODIFIED BY: Stefano MERLINI
+MODIFIED BY: Stefano MERLINI, Louis Evans
 
 EXAMPLES:
 #############################
@@ -329,7 +329,6 @@ class ScalarDomain:
     # Phase shift introduced by refractive index
     def phase(self,x):
         if(self.phaseshift):
-
             self.refractive_index_interp = RegularGridInterpolator((self.x, self.y, self.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
             return self.omega*(self.refractive_index_interp(x.T)-1.0)
         else:
@@ -388,15 +387,12 @@ class ScalarDomain:
     def solve_at_depth(self, s0, z):
         '''
         Solve intial rays up until a given depth, z, assuming self.extent variable is the extent in propagation direction
-
-
         '''
-    # Need to make sure all rays have left volume
-    # Conservative estimate of diagonal across volume
-    # Then can backproject to surface of volume
+        # Need to make sure all rays have left volume
+        # Conservative estimate of diagonal across volume
+        # Then can backproject to surface of volume
         length = self.extent + z
         t  = np.linspace(0.0,length/c,2)
-
         s0 = s0.flatten() #odeint insists
 
         start = time()
@@ -426,23 +422,15 @@ class ScalarDomain:
         self.sf = None
         self.rf = None
     
-
     def export_scalar_field(self, property: str = 'ne', fname: str = None):
-
         '''
         Export the current scalar electron density profile as a pvti file format, property added for future scalability to export temperature, B-field, etc.
-
         Args:
             property: str, 'ne': export the electron density (default)
-            
             fname: str, file path and name to save under. A VTI pointed to by a PVTI file are saved in this location. If left blank, the name will default to:
-
                     ./plasma_PVTI_DD_MM_YYYY_HR_MIN
-        
-        
         '''
         import pyvista as pv
-
     
         if fname is None:
             import datetime as dt
@@ -452,9 +440,7 @@ class ScalarDomain:
             min = dt.datetime.now().minute
             hour = dt.datetime.now().hour
 
-
             fname = f'./plasma_PVTI_{day}_{month}_{year}_{hour}_{min}' #default fname to the current date and time 
-
 
         if property == 'ne':
 
@@ -493,23 +479,19 @@ class ScalarDomain:
         spacing_y = (2*np.max(self.y))/np.shape(self.y)[0]
         spacing_z = (2*np.max(self.z))/np.shape(self.z)[0]
         content = f'''<?xml version="1.0"?>
-<VTKFile type="PImageData" version="0.1" byte_order="LittleEndian" header_type="UInt32" compressor="vtkZLibDataCompressor">
-    <PImageData WholeExtent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" GhostLevel="0" Origin="0 0 0" Spacing="{spacing_x} {spacing_y} {spacing_z}">
-         <PCellData Scalars="rnec">
-             <PDataArray type="Float64" Name="rnec">
-             </PDataArray>
-         </PCellData>
-         <Piece Extent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" Source="{relative_fname}.vti"/>
-    </PImageData>
-</VTKFile>'''
-
-
+                        <VTKFile type="PImageData" version="0.1" byte_order="LittleEndian" header_type="UInt32" compressor="vtkZLibDataCompressor">
+                            <PImageData WholeExtent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" GhostLevel="0" Origin="0 0 0" Spacing="{spacing_x} {spacing_y} {spacing_z}">
+                                <PCellData Scalars="rnec">
+                                    <PDataArray type="Float64" Name="rnec">
+                                    </PDataArray>
+                                </PCellData>
+                                <Piece Extent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" Source="{relative_fname}.vti"/>
+                            </PImageData>
+                        </VTKFile>'''
     
         # write file
-
         with open(f'{fname}.pvti', 'w') as file:
             file.write(content)
-        
         print(f'Scalar Domain electron density succesfully saved under {fname}.pvti !')
     
     def save_output_rays(self, fn = None):
@@ -527,11 +509,6 @@ class ScalarDomain:
             fn = '{}.npy'.format(fn)
         with open(fn,'wb') as f:
             np.save(f, self.rf)
-
-
-
-
-
 
     
 # ODEs of photon paths
@@ -745,12 +722,10 @@ def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z', bea
 def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction = 'z'):
     """Takes the output from the 9D solver and returns 6D rays for ray-transfer matrix techniques.
     Effectively finds how far the ray is from the end of the volume, returns it to the end of the volume.
-
     Args:
         ode_sol (6xN float): N rays in (x,y,z,vx,vy,vz) format, m and m/s and amplitude, phase and polarisation
         ne_extent (float): edge length of cube, m
         probing_direction (str): x, y or z.
-
     Returns:
         [type]: [description]
     """
@@ -801,8 +776,6 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction = 'z'):
     # ray_p [x,phi,y,theta], ray_J [E_x,E_y]
 
     return ray_p,ray_J
-
-
 
 def interfere_ref_beam(rf, E, n_fringes, deg):
         ''' input beam ray positions and electric field component, and desired angle of evenly spaced background fringes. 
