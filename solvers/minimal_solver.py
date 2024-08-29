@@ -1,9 +1,3 @@
-# This is the minimal solver taken reduce from the full solver which computes the ray tracer algorithm
-# for the simple 6 component description of the ray vectors
-# NOT USED in any other classes.
-# This will likely become a minimal solver with just refraction.
-# REQUIRES AN EXAMPLE AND CLEANING UP
-
 """MINIMAL PHYSICS SOLVER - 6 Vector description of rays
 BASED ON: https://journals.aps.org/pre/abstract/10.1103/PhysRevE.61.895
 
@@ -12,7 +6,7 @@ $ \frac{d\vec{v}}{dt} = -\nabla \left( \frac{c^2}{2} \frac{n_e}{n_c} \right) $
 $ \frac{d\vec{x}}{dt} = \vec{v} $
 
 BASED VERSION CODED BY: Aidan CRILLY / Jack HARE
-MODIFIED BY: Stefano MERLINI
+MODIFIED BY: Stefano MERLINI / Louis Evans
 
 EXAMPLES:
 #############################
