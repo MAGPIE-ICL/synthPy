@@ -365,7 +365,7 @@ class ScalarDomain:
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
 
-        t  = np.linspace(0.0, np.sqrt(8.0)*self.extent/c,2)
+        t  = np.linspace(0.0,np.sqrt(8.0)*self.extent/c,2)
 
         s0 = s0.flatten() #odeint insists
 

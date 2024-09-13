@@ -309,14 +309,16 @@ class ScalarDomain:
             s0[0,:] = beam_size*u*np.cos(t)
             s0[1,:] = beam_size*u*np.sin(t)
             s0[2,:] = -self.extent
+            print(f"initial position: {str(s0[2,:])}")
         self.s0 = s0
+
 
     def solve(self, method = 'RK45'):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
 
-        t  = np.linspace(0.0,np.sqrt(8.0)*self.extent/c,2)
+        t  = np.linspace(0.0, np.sqrt(self.extent_x**2 + self.extent_y**2 *self.extent_z**2)/c,2)
 
         s0 = self.s0.flatten() #odeint insists
 
@@ -372,6 +374,10 @@ class ScalarDomain:
         # XY plane
         elif(self.probing_direction == 'z'):
             t_bp = (z-self.extent)/vz
+            print(f"final z position: {str(z)}")
+            print(f"time backprojection: {str(t_bp)}")
+            print(f"propagation extent: {str(self.extent)}")
+            print(f"final plane: {str(z-self.extent)}")
             # Positions on plane
             ray_p[0] = x-vx*t_bp
             ray_p[2] = y-vy*t_bp
@@ -435,7 +441,6 @@ class ScalarDomain:
             day = dt.datetime.now().day
             min = dt.datetime.now().minute
             hour = dt.datetime.now().hour
-
 
             fname = f'./plasma_PVTI_{day}_{month}_{year}_{hour}_{min}' #default fname to the current date and time 
 
