@@ -257,11 +257,11 @@ class Refractometry(Rays):
 
     def solve(self):
         ## Imaging the spatial axis - M = 2
-        r1 = distance(self.r0, self.L - self.focal_plane) #displace rays to lens 1. Accounts for object with depth
+        r1 = distance(self.r0, 3*self.L/4 - self.focal_plane) #displace rays to lens 1. Accounts for object with depth
         r2 = circular_aperture(r1, self.R)      # cut off
         r3 = sym_lens(r2, self.L/2)             # lens 1 - spherical
         r4 = distance(r3, 3*self.L/2)           # displace rays to lens 2 - hybrid
         r5 = circular_aperture(r4, self.R)      # cut off
         r6 = lens(r5, self.L/3, self.L/2)       # lens 2 - hybrid lens
-        r7 = distance(r6, self.L)               # displace rays to detector
+        r7 = distance(r6, self.L)              # displace rays to detector
         self.rf = r7
