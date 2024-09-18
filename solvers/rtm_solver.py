@@ -129,7 +129,7 @@ class Rays:
     """
     Inheritable class for ray diagnostics.
     """
-    def __init__(self, r0, focal_plane = 0, L=400, R=25, Lx=18, Ly=13.5):
+    def __init__(self, r0, E = None, focal_plane = 0, L=400, R=25, Lx=18, Ly=13.5):
         """Initialise ray diagnostic.
 
         Args:
@@ -140,7 +140,7 @@ class Rays:
             Lx (int, optional): Detector size in x. Defaults to 18.
             Ly (float, optional): Detector size in y. Defaults to 13.5.
         """        
-        self.focal_plane, self.L, self.R, self.Lx, self.Ly = focal_plane, L, R, Lx, Ly
+        self.E, self.focal_plane, self.L, self.R, self.Lx, self.Ly = E, focal_plane, L, R, Lx, Ly
         self.r0 = m_to_mm(r0)
 
     def histogram(self, bin_scale=10, pix_x=3448, pix_y=2574, clear_mem=False):
@@ -185,7 +185,7 @@ class Shadowgraphy(Rays):
     Each optic has a radius R, which is used to reject rays outside the numerical aperture of the optical system.
     """
     def single_lens_solve(self):
-        ## single lens - M = 2
+        ## single lens - M = Variable (around ~2) (based on Detector position. Real experimental setup)
         r1 = distance(self.r0, 3*self.L/4 - self.focal_plane) #displace rays to lens. Accounts for object with depth
         r2 = circular_aperture(r1, self.R)      # cut off
         r3 = sym_lens(r2, self.L/2)             # lens 1
@@ -202,7 +202,7 @@ class Shadowgraphy(Rays):
         r6 = sym_lens(r5, self.L/2)           # lens 2
         r7 = distance(r6, self.L)             # displace rays to detector
         self.rf = r7
-        
+    
 class Schlieren(Rays):
     """
     Example dark field schlieren diagnostic. Inherits from Rays, has custom solve method.
@@ -255,13 +255,173 @@ class Refractometry(Rays):
     with focal length f1 and f2.
     """
 
-    def solve(self):
+    def incoherent_solve(self):
         ## Imaging the spatial axis - M = 2
         r1 = distance(self.r0, 3*self.L/4 - self.focal_plane) #displace rays to lens 1. Accounts for object with depth
         r2 = circular_aperture(r1, self.R)      # cut off
         r3 = sym_lens(r2, self.L/2)             # lens 1 - spherical
         r4 = distance(r3, 3*self.L/2)           # displace rays to lens 2 - hybrid
+        r5 = rect_aperture(r4, 15, 30)          # rectangular lens cut-off
+        r6 = circular_aperture(r5, self.R)      # cut off
+        r7 = lens(r6, self.L/3, self.L/2)       # lens 2 - hybrid lens
+        r8 = distance(r7, self.L)               # displace rays to detector
+        self.rf = r8
+
+    def coherent_solve(self, wl = 1064e-9):
+        ## Imaging the spatial axis - M = 2 - Coherent Implementation of the Refractometer
+        r1 = distance(self.r0, 3*self.L/4 - self.focal_plane)
+        # propagate E field
+        dx = r1[0,:] - self.r0[0,:]
+        dy = r1[2,:] - self.r0[2,:]
+        lwl = wl
+        k = 2 * np.pi / lwl
+        E0 = self.E*np.exp(1.0j * k * (np.sqrt(dx**2 + dy**2)))
+        del dx
+        del dy
+        
+        r2 = circular_aperture(r1, self.R)      # cut off
+        r3 = sym_lens(r2, self.L/2)             # lens 1 - spherical
+        dx = r3[0,:] - r2[0,:]
+        dy = r3[2,:] - r2[2,:]
+        k = 2* np.pi / lwl
+        E1 = E0*np.exp(1.0j * k * (np.sqrt(dx**2 + dy**2)))
+        del dx
+        del dy
+        
+        r4 = distance(r3, 3*self.L/2)           # displace rays to lens 2 - hybrid
         r5 = circular_aperture(r4, self.R)      # cut off
+        dx = r5[0,:] - r4[0,:]
+        dy = r5[2,:] - r4[2,:]
+        k = 2* np.pi / lwl
+        E2 = E1*np.exp(1.0j * k * (np.sqrt(dx**2 + dy**2)))
+        del dx
+        del dy
+
         r6 = lens(r5, self.L/3, self.L/2)       # lens 2 - hybrid lens
-        r7 = distance(r6, self.L)              # displace rays to detector
+        dx = r6[0,:] - r5[0,:]
+        dy = r6[2,:] - r5[2,:]
+        k = 2* np.pi / lwl
+        E3 = E2*np.exp(1.0j * k * (np.sqrt(dx**2 + dy**2)))
+
+        r7 = distance(r6, self.L)               # displace rays to detector
+        #r8=rect_aperture(self.Lx/2,self.Ly/2,r7) # detector cutoff
+        dx = r7[0,:] - r6[0,:]
+        dy = r7[2,:] - r6[2,:]
+        k = 2* np.pi / lwl
+        E4 = E3*np.exp(1.0j * k * (np.sqrt(dx**2 + dy**2)))
+        self.rE = E4
         self.rf = r7
+    
+    def refractogram(self, bin_scale=1, pix_x=3448, pix_y=2574, clear_mem=False):
+        """Bin data into a histogram. Defaults are for a KAF-8300.
+        Outputs are H, the histogram, and xedges and yedges, the bin edges.
+
+        Args:
+            bin_scale (int, optional): bin size, same in x and y. Defaults to 1.
+            pix_x (int, optional): number of x pixels in detector plane. Defaults to 3448.
+            pix_y (int, optional): number of y pixels in detector plane. Defaults to 2574.
+        """        
+        x=self.rf[0,:]
+        y=self.rf[2,:]
+
+        x_bins = np.linspace(-self.Lx//2,self.Lx//2, pix_x // bin_scale)
+        y_bins = np.linspace(-self.Ly//2, self.Ly//2 , pix_y // bin_scale)
+        
+        amplitude_x = np.zeros((len(y_bins)-1, len(x_bins)-1), dtype=complex)
+        amplitude_y = np.zeros((len(y_bins)-1, len(x_bins)-1), dtype=complex)
+
+        x_indices = np.digitize(self.rf[0,:], x_bins) - 1
+        y_indices = np.digitize(self.rf[2,:], y_bins) - 1
+
+        for i in range(self.rf.shape[1]):
+            if 0 <= x_indices[i] < amplitude_x.shape[1] and 0 <= y_indices[i] < amplitude_x.shape[0]:
+                amplitude_x[y_indices[i], x_indices[i]] += self.rE[0, i]
+                amplitude_y[y_indices[i], x_indices[i]] += self.rE[1, i]
+
+        amplitude = np.sqrt(np.real(amplitude_x)**2 + np.real(amplitude_y)**2)
+        # amplitude_normalised = (amplitude - amplitude.min()) / (amplitude.max() - amplitude.min()) # this line needs work and is currently causing problems
+        self.H = amplitude
+
+
+class Interferometry(Rays):
+    '''
+    Simple class to keep all the ray properties together
+    '''           
+    def two_lens_solve(self, wl = 532e-9):
+        ## 2 lens telescope, M = 1
+        r1 = distance(self.r0, self.L - self.focal_plane) #displace rays to lens. Accounts for object with depth
+        # propagate E field
+        dx = r1[0,:] - self.r0[0,:]
+        dy = r1[2,:] - self.r0[2,:]
+        lwl = wl
+        k = 2* np.pi / lwl
+        E0 = self.E*np.exp(1.0j * k * (np.sqrt(dx**2 + dy**2)))
+        del dx
+        del dy
+
+        r2 = circular_aperture(r1, self.R)    # cut off
+        r3 = sym_lens(r2, self.L/2)           # lens 1
+        dx = r3[0,:] - r2[0,:]
+        dy = r3[2,:] - r2[2,:]
+        k = 2* np.pi / lwl
+        E1 = E0*np.exp(1.0j * k * (np.sqrt(dx**2 + dy**2)))
+        del dx
+        del dy
+
+        r4 = distance(r3, self.L*2)           # displace rays to lens 2.
+        dx = r4[0,:] - r3[0,:]
+        dy = r4[2,:] - r3[2,:]
+        k = 2* np.pi / lwl
+        E2 = E1*np.exp(1.0j * k * (np.sqrt(dx**2 + dy**2)))
+        del dx
+        del dy
+
+        r5 = circular_aperture(r4, self.R)    # cut off
+        r6 = sym_lens(r5, self.L/2)           # lens 2
+        dx = r6[0,:] - r5[0,:]
+        dy = r6[2,:] - r5[2,:]
+        k = 2* np.pi / lwl
+        E3 = E2*np.exp(1.0j * k * (np.sqrt(dx**2 + dy**2)))
+        del dx
+        del dy
+        
+        r7 = distance(r6, self.L)             # displace rays to detector
+        dx = r7[0,:] - r6[0,:]
+        dy = r7[2,:] - r6[2,:]
+        k = 2* np.pi / lwl
+        E4 = E3*np.exp(1.0j * k * (np.sqrt(dx**2 + dy**2)))
+        del dx
+        del dy
+        self.rE = E4
+        self.rf = r7
+    
+    def interferogram(self, bin_scale=1, pix_x=3448, pix_y=2574, clear_mem=False):
+        """Bin data into a histogram. Defaults are for a KAF-8300.
+        Outputs are H, the histogram, and xedges and yedges, the bin edges.
+
+        Args:
+            bin_scale (int, optional): bin size, same in x and y. Defaults to 1.
+            pix_x (int, optional): number of x pixels in detector plane. Defaults to 3448.
+            pix_y (int, optional): number of y pixels in detector plane. Defaults to 2574.
+        """        
+        x=self.rf[0,:]
+        y=self.rf[2,:]
+
+        x_bins = np.linspace(-self.Lx//2,self.Lx//2, pix_x // bin_scale)
+        y_bins = np.linspace(-self.Ly//2, self.Ly //2 , pix_y // bin_scale)
+        
+        amplitude_x = np.zeros((len(y_bins)-1, len(x_bins)-1), dtype=complex)
+        amplitude_y = np.zeros((len(y_bins)-1, len(x_bins)-1), dtype=complex)
+
+        x_indices = np.digitize(self.rf[0,:], x_bins) - 1
+        y_indices = np.digitize(self.rf[2,:], y_bins) - 1
+
+        for i in range(self.rf.shape[1]):
+            if 0 <= x_indices[i] < amplitude_x.shape[1] and 0 <= y_indices[i] < amplitude_x.shape[0]:
+                amplitude_x[y_indices[i], x_indices[i]] += self.rE[0, i]
+                amplitude_y[y_indices[i], x_indices[i]] += self.rE[1, i]
+
+        amplitude = np.sqrt(np.real(amplitude_x)**2 + np.real(amplitude_y)**2)
+        
+        # amplitude_normalised = (amplitude - amplitude.min()) / (amplitude.max() - amplitude.min()) # this line needs work and is currently causing problems
+        self.H = amplitude

@@ -72,7 +72,7 @@ def export_pvti(arr: np.ndarray, fname: str = None, extent_x = None, extent_y = 
                     <VTKFile type="PImageData" version="0.1" byte_order="LittleEndian" header_type="UInt32" compressor="vtkZLibDataCompressor">
                     <PImageData WholeExtent="0 {np.shape(arr)[0]} 0 {np.shape(arr)[1]} 0 {np.shape(arr)[2]}" GhostLevel="0" Origin="0 0 0" Spacing="{x_size} {y_size} {z_size}">
                             <PCellData Scalars="rnec">
-                                <PDataArray type="Float64" Name="rnec">
+                                <PDataArray type="Float32" Name="rnec">
                                 </PDataArray>
                             </PCellData>
                             <Piece Extent="0 {np.shape(arr)[0]} 0 {np.shape(arr)[1]} 0 {np.shape(arr)[2]}" Source="{relative_fname}.vti"/>
@@ -130,7 +130,7 @@ def hdf_readin(filename):
         units="code_mass/code_length**3",
         force_override=False
     )
-
+    
     level = ds.index.max_level
     dims = ds.domain_dimensions * ds.refine_by**level
     cube = ds.covering_grid(level, left_edge=ds.domain_left_edge, dims=dims)

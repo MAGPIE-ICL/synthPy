@@ -482,7 +482,7 @@ class ScalarDomain:
                         <VTKFile type="PImageData" version="0.1" byte_order="LittleEndian" header_type="UInt32" compressor="vtkZLibDataCompressor">
                             <PImageData WholeExtent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" GhostLevel="0" Origin="0 0 0" Spacing="{spacing_x} {spacing_y} {spacing_z}">
                                 <PCellData Scalars="rnec">
-                                    <PDataArray type="Float64" Name="rnec">
+                                    <PDataArray type="Float32" Name="rnec">
                                     </PDataArray>
                                 </PCellData>
                                 <Piece Extent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" Source="{relative_fname}.vti"/>
@@ -507,8 +507,13 @@ class ScalarDomain:
             fn = '{} rays.npy'.format(dt_string)
         else:
             fn = '{}.npy'.format(fn)
-        with open(fn,'wb') as f:
-            np.save(f, self.rf)
+        
+        if self.Jf is not None:
+            with open(fn, 'wb') as f:
+                np.savez(f, pos = self.rf, E = self.Jf)
+        else:
+            with open(fn,'wb') as f:
+                np.save(f, self.rf)
 
     
 # ODEs of photon paths
@@ -794,5 +799,4 @@ def interfere_ref_beam(rf, E, n_fringes, deg):
         ref_beam = np.exp(2*n_fringes/3 * 1.0j*(x_weight*rf[0,:] + y_weight * rf[2,:]))
 
         E[1,:] += ref_beam # assume ref_beam is polarised in y
-
         return E
