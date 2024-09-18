@@ -482,7 +482,7 @@ class ScalarDomain:
                         <VTKFile type="PImageData" version="0.1" byte_order="LittleEndian" header_type="UInt32" compressor="vtkZLibDataCompressor">
                             <PImageData WholeExtent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" GhostLevel="0" Origin="0 0 0" Spacing="{spacing_x} {spacing_y} {spacing_z}">
                                 <PCellData Scalars="rnec">
-                                    <PDataArray type="Float32" Name="rnec">
+                                    <PDataArray type="Float64" Name="rnec">
                                     </PDataArray>
                                 </PCellData>
                                 <Piece Extent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" Source="{relative_fname}.vti"/>
