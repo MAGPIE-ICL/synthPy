@@ -278,31 +278,6 @@ class ScalarDomain:
         # Phase shift
         if(self.phaseshift):
             self.refractive_index_interp = RegularGridInterpolator((self.x, self.y, self.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
-
-    def plot_midline_gradients(self,ax,probing_direction):
-        """I actually don't know what this does. Presumably plots the gradients half way through the box? Cool.
-
-        Args:
-            ax ([type]): [description]
-            probing_direction ([type]): [description]
-        """
-        N_V = self.x.shape[0]//2
-        if(probing_direction == 'x'):
-            ax.plot(self.y,self.dndx[:,N_V,N_V])
-            ax.plot(self.y,self.dndy[:,N_V,N_V])
-            ax.plot(self.y,self.dndz[:,N_V,N_V])
-        elif(probing_direction == 'y'):
-            ax.plot(self.y,self.dndx[N_V,:,N_V])
-            ax.plot(self.y,self.dndy[N_V,:,N_V])
-            ax.plot(self.y,self.dndz[N_V,:,N_V])
-        elif(probing_direction == 'z'):
-            ax.plot(self.y,self.dndx[N_V,N_V,:])
-            ax.plot(self.y,self.dndy[N_V,N_V,:])
-            ax.plot(self.y,self.dndz[N_V,N_V,:])
-        else: # Default to y
-            ax.plot(self.y,self.dndx[N_V,:,N_V])
-            ax.plot(self.y,self.dndy[N_V,:,N_V])
-            ax.plot(self.y,self.dndz[N_V,:,N_V])
     
     def dndr(self,x):
         """returns the gradient at the locations x
@@ -494,7 +469,7 @@ class ScalarDomain:
             file.write(content)
         print(f'Scalar Domain electron density succesfully saved under {fname}.pvti !')
     
-    def save_output_rays(self, fn = None):
+    def save_rays_pos(self, fn = None):
         """
         Saves the output rays as a binary numpy format for minimal size.
         Auto-names the file using the current date and time.

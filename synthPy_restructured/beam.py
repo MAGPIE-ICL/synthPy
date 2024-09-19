@@ -195,6 +195,7 @@ class Beam:
         s0[7,:] = 0.0
         s0[8,:] = 0.0
         self.s0 = s0
+        self.rf = s0
 
     def save_rays_pos(self, fn = None):
         """
@@ -211,24 +212,3 @@ class Beam:
             fn = '{}.npy'.format(fn)
         with open(fn,'wb') as f:
             np.save(f, self.rf)
-
-    def interfere_ref_beam(self, E, n_fringes, deg):
-            ''' input beam ray positions and electric field component, and desired angle of evenly spaced background fringes. 
-            Deg is angle in degrees from the vertical axis
-            returns:
-                'interfered with' E field
-            '''
-            rf = self.rf
-            if deg >= 45:
-                deg = - np.abs(deg - 90)
-
-                
-            rad = deg* np.pi /180 #deg to rad
-            y_weight = np.arctan(rad)#take x_weight is 1
-            x_weight = np.sqrt(1-y_weight**2)
-
-            ref_beam = np.exp(2*n_fringes/3 * 1.0j*(x_weight*rf[0,:] + y_weight * rf[2,:]))
-
-            E[1,:] += ref_beam # assume ref_beam is polarised in y
-
-            return E

@@ -146,7 +146,7 @@ class Propagator:
 
         return pol
 
-    def solve(self, return_E = False):
+    def solve(self):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
@@ -163,13 +163,10 @@ class Propagator:
         self.duration = finish - start
 
         Np = s0.size//9
-        self.Beam.sf = sol.y[:,-1].reshape(9,Np)
+        self.Beam.rf = sol.y[:,-1].reshape(9,Np)
 
-        self.Beam.rf,self.Beam.Jf = ray_to_Jonesvector(self.Beam.sf, self.extent, probing_direction = self.Beam.probing_direction)
-        if return_E:
-            return self.Beam.rf, self.Beam.Jf
-        else:
-            return self.Beam.rf
+        self.Beam.rf, self.Beam.Jf = ray_to_Jonesvector(self.Beam.rf, self.extent, probing_direction = self.Beam.probing_direction)
+        
     
     def solve_at_depth(self, z):
         '''
@@ -193,7 +190,6 @@ class Propagator:
 
         self.Beam.rf, self.Beam.Jf = ray_to_Jonesvector(self.Beam.sf, self.extent, probing_direction = self.Beam.probing_direction)
         del self.Beam.Jf
-        return self.Beam.rf
 
     def clear_memory(self):
         """
@@ -209,6 +205,7 @@ class Propagator:
         self.ne_nc = None
         self.Beam.sf = None
         self.Beam.rf = None
+
 
 # ODEs of photon paths, standalone function to support the solve()
 def dsdt(t, s, Propagator):
