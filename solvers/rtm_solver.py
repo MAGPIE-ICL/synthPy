@@ -334,11 +334,19 @@ class Refractometry(Rays):
         y_indices = np.digitize(self.rf[2,:], y_bins) - 1
 
         for i in range(self.rf.shape[1]):
+            # if 0 <= x_indices[i] < amplitude_x.shape[1] and 0 <= y_indices[i] < amplitude_x.shape[0]:
+            #     amplitude_x[y_indices[i], x_indices[i]] += self.rE[0, i]
+            #     amplitude_y[y_indices[i], x_indices[i]] += self.rE[1, i]
+            
             if 0 <= x_indices[i] < amplitude_x.shape[1] and 0 <= y_indices[i] < amplitude_x.shape[0]:
-                amplitude_x[y_indices[i], x_indices[i]] += self.rE[0, i]
-                amplitude_y[y_indices[i], x_indices[i]] += self.rE[1, i]
-
+                # Add small random phase perturbations to simulate speckle
+                random_phase = 0.8 * np.random.randn()
+                amplitude_x[y_indices[i], x_indices[i]] += self.rE[0, i] * np.exp(1.0j * random_phase)
+                amplitude_y[y_indices[i], x_indices[i]] += self.rE[1, i] * np.exp(1.0j * random_phase)
+                # amplitude_field[y_indices[i], x_indices[i]] += self.rE[i] * np.exp(1.0j * random_phase)
+        
         amplitude = np.sqrt(np.real(amplitude_x)**2 + np.real(amplitude_y)**2)
+        intensity = np.abs(amplitude)**2
         # amplitude_normalised = (amplitude - amplitude.min()) / (amplitude.max() - amplitude.min()) # this line needs work and is currently causing problems
         self.H = amplitude
 

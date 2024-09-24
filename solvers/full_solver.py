@@ -391,7 +391,7 @@ class ScalarDomain:
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
-        length = self.extent + z
+        length = z
         t  = np.linspace(0.0,length/c,2)
         s0 = s0.flatten() #odeint insists
 
