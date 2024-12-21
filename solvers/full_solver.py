@@ -407,6 +407,54 @@ class ScalarDomain:
         self.rf,self.Jf = ray_to_Jonesvector(self.sf, z, probing_direction = self.probing_direction)
         return self.rf
 
+    def solve_test_ray(self, s0, tracker_indices, z0, return_E = False, dump_ray_path=True, output_filename="ray_path.txt"):
+        # FUNCTION TO DUMP POSITION OF A SINGLE RAY
+        length = z0
+        num_timesteps = 100
+        t  = np.linspace(0.0, length/c, num_timesteps)
+        s0 = s0.flatten() #odeint insists
+        Np = s0.size//9
+
+        start = time()
+        dsdt_ODE = lambda t, y: dsdt(t, y, self)
+        sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t)
+        finish = time()
+        print("Ray trace completed in:\t",finish-start,"s")
+
+        # Extract tracker trajectories
+        tracker_trajectories = {idx: [] for idx in tracker_indices}
+        sol_reshaped = sol.y.reshape(9, Np, num_timesteps)
+
+        with open(output_filename, "w") as f:
+            f.write("# Output file for tracking rays\n")
+            f.write("# time        - Time at each step (s)\n")
+            f.write("# x           - x-position of the ray (m)\n")
+            f.write("# theta       - theta angle of the ray (m)\n")
+            f.write("# y           - y-position of the ray (m)\n")
+            f.write("# phi         - phi angle of the ray (m)\n")
+            f.write("# z           - z-position of the ray (m)\n")
+            f.write("# time\tx\ttheta\ty\tphi\tz\n")
+
+        with open(output_filename, "a") as f:
+            for idx in tracker_indices:
+                f.write(f"# Trajectory for Tracker {idx}\n")
+                for ti, yi in zip(sol.t, sol_reshaped.transpose(2, 1, 0)):
+                    photon_state = yi[idx]  # Extract state vector for each photon
+                    ray_p, ray_J = ray_to_Jonesvector(np.array([photon_state]).T, photon_state[2], probing_direction=self.probing_direction)
+                    # Extract trajectory data
+                    x, theta, y, phi = ray_p[:, 0]
+                    z = photon_state[2]  # Directly extract z-position
+                    f.write(f"{ti:.6e}\t{x:.6e}\t{theta:.6e}\t{y:.6e}\t{phi:.6e}\t{z:.6e}\n")
+                    tracker_trajectories[idx].append(photon_state)
+
+        self.sf = sol.y[:,-1].reshape(9,Np)
+
+        self.rf,self.Jf = ray_to_Jonesvector(self.sf, z0, probing_direction = self.probing_direction)
+        if return_E:
+            return self.rf, self.Jf
+        else:
+            return self.rf
+
     def clear_memory(self):
         """
         Clears variables not needed by solve method, saving memory
@@ -547,7 +595,7 @@ def dsdt(t, s, ScalarDomain):
     return sprime.flatten()
 
 # Initialise beam
-def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z', beam_type = 'circular'):
+def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z', beam_type = 'circular',  N_trackers=0):
     """[summary]
 
     Args:
@@ -714,14 +762,96 @@ def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z', bea
         s0[0,:] = beam_size*t
         s0[1,:] = 0.0
         s0[2,:] = -ne_extent
+    elif(beam_type == 'rect_trackers'):
+
+        # Randomly choose N_trackers indices to mark as tracking particles
+        # tracker_indices = np.random.choice(Np, N_trackers, replace=False)
+        # position, uniformly within a square
+        t  = 2*np.random.rand(Np)-1.0
+        u  = 2*np.random.rand(Np)-1.0
+        # angle
+        ϕ = np.pi*np.random.rand(Np) #azimuthal angle of velocity
+        χ = divergence*np.random.randn(Np) #polar angle of velocity
+
+        beam_size_1 = beam_size[0] #m
+        beam_size_2 = beam_size[1] #m
+
+        if(probing_direction == 'x'):
+            # Initial velocity
+            s0[3,:] = c * np.cos(χ)
+            s0[4,:] = c * np.sin(χ) * np.cos(ϕ)
+            s0[5,:] = c * np.sin(χ) * np.sin(ϕ)
+            # Initial position
+            s0[0,:] = -ne_extent
+            s0[1,:] = beam_size_1*u
+            s0[2,:] = beam_size_2*t
+        elif(probing_direction == 'y'):
+            # Initial velocity
+            s0[4,:] = c * np.cos(χ)
+            s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
+            s0[5,:] = c * np.sin(χ) * np.sin(ϕ)
+            # Initial position
+            s0[0,:] = beam_size_1*u
+            s0[1,:] = -ne_extent
+            s0[2,:] = beam_size_2*t
+        elif(probing_direction == 'z'):
+            # Initial velocity
+            s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
+            s0[4,:] = c * np.sin(χ) * np.sin(ϕ)
+            s0[5,:] = c * np.cos(χ)
+            # Initial position
+            s0[0,:] = beam_size_1*u
+            s0[1,:] = beam_size_2*t
+            s0[2,:] = -ne_extent
+        else: # Default to y
+            print("Default to y")
+            # Initial velocity
+            s0[4,:] = c * np.cos(χ)
+            s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
+            s0[5,:] = c * np.sin(χ) * np.sin(ϕ)        
+            # Initial position
+            s0[0,:] = beam_size_1*u
+            s0[1,:] = -ne_extent
+            s0[2,:] = beam_size_2*t
     else:
         print("beam_type unrecognised! Accepted args: circular, square, rectangular, linear")
 
     # Initialise amplitude, phase and polarisation
     s0[6,:] = 1.0
     s0[7,:] = 0.0
-    s0[8,:] = 0.0
-    return s0
+
+    if beam_type == 'rect_trackers':
+        # Define region in real space for the selection
+        x_min, x_max = -1e-3, 1e-3  # Range for x
+        y_min, y_max = -1e-3, 1e-3  # Range for y
+        z_min = -ne_extent
+
+        # Extract initial positions
+        x_positions = s0[0, :]  # x-coordinates of the rays
+        y_positions = s0[1, :]  # y-coordinates of the rays
+        z_positions = s0[2, :]  # z-coordinates of the rays
+
+        # Find rays within the region
+        in_region = (
+            (x_positions >= x_min) & (x_positions <= x_max) &
+            (y_positions >= y_min) & (y_positions <= y_max) &
+            (z_positions == z_min)
+        )
+
+        region_indices = np.where(in_region)[0]
+
+        # Check if enough rays are in the region
+        if len(region_indices) < N_trackers:
+            raise ValueError("Not enough rays found in the specified region to allocate all trackers.")
+
+        # Randomly select N_trackers from the region
+        tracker_indices = np.random.choice(region_indices, N_trackers, replace=False)
+        # Mark tracking particles by setting their polarisation to 1
+        s0[8, tracker_indices] = 1.0
+        return s0, tracker_indices
+    else:
+        s0[8,:] = 0.0
+        return s0
 
 # Need to backproject to ne volume, then find angles
 def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction = 'z'):

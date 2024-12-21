@@ -203,6 +203,14 @@ class Shadowgraphy(Rays):
         r7 = distance(r6, self.L)             # displace rays to detector
         self.rf = r7
     
+    def single_exp_solve(self, detL = 400):
+        ## single lens - M = Variable (around ~2) (based on Detector position. Real experimental setup)
+        r1 = distance(self.r0, self.L) #displace rays to lens. Accounts for object with depth
+        r2 = circular_aperture(r1, self.R)      # cut off
+        r3 = sym_lens(r2, self.L/2)             # lens 1
+        r4 = distance(r3, detL)           # detector
+        self.rf=r4
+
 class Schlieren(Rays):
     """
     Example dark field schlieren diagnostic. Inherits from Rays, has custom solve method.
