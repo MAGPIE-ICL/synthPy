@@ -1,6 +1,6 @@
 import numpy as np
 
-def read(file_path):
+def read(file_path, flag_show = False):
     """
     Reads the integral quantities from the specified file into a structured numpy array.
 
@@ -20,14 +20,16 @@ def read(file_path):
         with open(file_path, 'r') as f:
                     header_line = f.readline().strip().split()
                     column_names = [header.replace('#', '').split('[')[0].strip() for header in header_line if header]
-                    print(column_names)
+                    if flag_show:
+                        print(column_names)
                     
         # Load the data, skipping all lines starting with #
         data = np.genfromtxt(file_path, names=column_names, dtype=None, encoding="utf-8")
 
         # Display the first few rows to confirm the data is read correctly
-        print("Data successfully loaded. Here are the first few rows:")
-        print(data[:5])  # Print first 5 rows for inspection
+        if flag_show:
+            print("Data successfully loaded. Here are the first few rows:")
+            print(data[:5])  # Print first 5 rows for inspection
         
         return data
 
