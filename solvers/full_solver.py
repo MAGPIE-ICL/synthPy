@@ -115,8 +115,8 @@ class ScalarDomain:
             z (float array): z coordinates, m
             extent (float): physical size, m
         """
-        self.z,self.y,self.x = np.float32(z), np.float32(y), np.float32(x)
-        self.XX, self.YY, self.ZZ = np.meshgrid(x,y,z, indexing='ij', copy = False)
+        self.x, self.y, self.z = np.float32(x), np.float32(y), np.float32(z)
+        self.XX, self.YY, self.ZZ = np.meshgrid(x, y, z, indexing='ij', copy = False)
         self.extent = extent
         self.probing_direction = probing_direction
         # Logical switches
@@ -559,8 +559,11 @@ def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z', bea
     if(beam_type == 'circular'):
         # position, uniformly within a circle
         t  = 2*np.pi*np.random.rand(Np) #polar angle of position
-        u  = np.random.rand(Np)+np.random.rand(Np) # radial coordinate of position
-        u[u > 1] = 2-u[u > 1]
+
+        #u  = np.random.rand(Np)+np.random.rand(Np) # radial coordinate of position
+        #u[u > 1] = 2-u[u > 1]
+        u = np.random.rand(Np)
+
         # angle
         ϕ = np.pi*np.random.rand(Np) #azimuthal angle of velocity
         χ = divergence*np.random.randn(Np) #polar angle of velocity
