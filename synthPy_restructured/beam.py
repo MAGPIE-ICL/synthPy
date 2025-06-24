@@ -14,6 +14,7 @@ class Beam:
         Returns:
             s0, 9 x N float: N rays with (x, y, z, vx, vy, vz) in m, m/s and amplitude, phase and polarisation (a, p, r) 
         """
+
         self.Np = Np
         self.beam_size = beam_size
         self.divergence = divergence
@@ -21,11 +22,11 @@ class Beam:
         self.beam_type = beam_type
         self.wavelength = wavelength
 
-
     def init_beam(self, ne_extent):
         """
         function designed to be called by the propagtor class during propagator init to complete the construction of the beam using parameters about the scalar domain
         """
+
         # take all variables from object properties
         Np = self.Np
         beam_size = self.beam_size
@@ -37,8 +38,8 @@ class Beam:
         if(beam_type == 'circular'):
             # position, uniformly within a circle
             t  = 2*np.pi*np.random.rand(Np) #polar angle of position
-            u  = np.random.rand(Np)+np.random.rand(Np) # radial coordinate of position
-            u[u > 1] = 2-u[u > 1]
+            u  = np.random.rand(Np) # radial coordinate of position
+
             # angle
             ϕ = np.pi*np.random.rand(Np) #azimuthal angle of velocity
             χ = divergence*np.random.randn(Np) #polar angle of velocity
@@ -52,15 +53,6 @@ class Beam:
                 s0[0,:] = -ne_extent
                 s0[1,:] = beam_size*u*np.cos(t)
                 s0[2,:] = beam_size*u*np.sin(t)
-            elif(probing_direction == 'y'):
-                # Initial velocity
-                s0[4,:] = c * np.cos(χ)
-                s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
-                s0[5,:] = c * np.sin(χ) * np.sin(ϕ)
-                # Initial position
-                s0[0,:] = beam_size*u*np.cos(t)
-                s0[1,:] = -ne_extent
-                s0[2,:] = beam_size*u*np.sin(t)
             elif(probing_direction == 'z'):
                 # Initial velocity
                 s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
@@ -71,7 +63,7 @@ class Beam:
                 s0[1,:] = beam_size*u*np.sin(t)
                 s0[2,:] = -ne_extent
             else: # Default to y
-                print("Default to y")
+                #print("Default to y")
                 # Initial velocity
                 s0[4,:] = c * np.cos(χ)
                 s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
@@ -80,10 +72,12 @@ class Beam:
                 s0[0,:] = beam_size*u*np.cos(t)
                 s0[1,:] = -ne_extent
                 s0[2,:] = beam_size*u*np.sin(t)
+
         elif(beam_type == 'square'):
             # position, uniformly within a square
             t  = 2*np.random.rand(Np)-1.0
             u  = 2*np.random.rand(Np)-1.0
+
             # angle
             ϕ = np.pi*np.random.rand(Np) #azimuthal angle of velocity
             χ = divergence*np.random.randn(Np) #polar angle of velocity
@@ -97,15 +91,6 @@ class Beam:
                 s0[0,:] = -ne_extent
                 s0[1,:] = beam_size*u
                 s0[2,:] = beam_size*t
-            elif(probing_direction == 'y'):
-                # Initial velocity
-                s0[4,:] = c * np.cos(χ)
-                s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
-                s0[5,:] = c * np.sin(χ) * np.sin(ϕ)
-                # Initial position
-                s0[0,:] = beam_size*u
-                s0[1,:] = -ne_extent
-                s0[2,:] = beam_size*t
             elif(probing_direction == 'z'):
                 # Initial velocity
                 s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
@@ -116,19 +101,21 @@ class Beam:
                 s0[1,:] = beam_size*t
                 s0[2,:] = -ne_extent
             else: # Default to y
-                print("Default to y")
+                #print("Default to y")
                 # Initial velocity
                 s0[4,:] = c * np.cos(χ)
                 s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
-                s0[5,:] = c * np.sin(χ) * np.sin(ϕ)        
+                s0[5,:] = c * np.sin(χ) * np.sin(ϕ)
                 # Initial position
                 s0[0,:] = beam_size*u
                 s0[1,:] = -ne_extent
                 s0[2,:] = beam_size*t
+
         elif(beam_type == 'rectangular'):
             # position, uniformly within a square
-            t  = 2*np.random.rand(Np)-1.0
-            u  = 2*np.random.rand(Np)-1.0
+            t  = 2*np.random.rand(Np) - 1.0
+            u  = 2*np.random.rand(Np) - 1.0
+
             # angle
             ϕ = np.pi*np.random.rand(Np) #azimuthal angle of velocity
             χ = divergence*np.random.randn(Np) #polar angle of velocity
@@ -145,15 +132,6 @@ class Beam:
                 s0[0,:] = -ne_extent
                 s0[1,:] = beam_size_1*u
                 s0[2,:] = beam_size_2*t
-            elif(probing_direction == 'y'):
-                # Initial velocity
-                s0[4,:] = c * np.cos(χ)
-                s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
-                s0[5,:] = c * np.sin(χ) * np.sin(ϕ)
-                # Initial position
-                s0[0,:] = beam_size_1*u
-                s0[1,:] = -ne_extent
-                s0[2,:] = beam_size_2*t
             elif(probing_direction == 'z'):
                 # Initial velocity
                 s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
@@ -168,11 +146,12 @@ class Beam:
                 # Initial velocity
                 s0[4,:] = c * np.cos(χ)
                 s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
-                s0[5,:] = c * np.sin(χ) * np.sin(ϕ)        
+                s0[5,:] = c * np.sin(χ) * np.sin(ϕ)
                 # Initial position
                 s0[0,:] = beam_size_1*u
                 s0[1,:] = -ne_extent
                 s0[2,:] = beam_size_2*t
+
         elif(beam_type == 'linear'):
             # position, uniformly along a line - probing direction is defaulted z, solved in x,z plane
             t  = 2*np.random.rand(Np)-1.0
@@ -194,6 +173,7 @@ class Beam:
         s0[6,:] = 1.0
         s0[7,:] = 0.0
         s0[8,:] = 0.0
+
         self.s0 = s0
         self.rf = s0
 
@@ -202,7 +182,9 @@ class Beam:
         Saves the output rays as a binary numpy format for minimal size.
         Auto-names the file using the current date and time.
         """
+
         from datetime import datetime
+
         now = datetime.now()
         dt_string = now.strftime("%Y-%m-%d_%H-%M-%S")
 

@@ -81,28 +81,33 @@ def circular_aperture(r, R, E = None):
     '''
     Rejects rays outside radius R
     '''
+
     filt = r[0,:]**2+r[2,:]**2 > R**2
     r[:,filt]=None
 
     if E is not None:
         E = np.array(E, dtype= object)
         E[np.array(r) == None] = None
+
     return r
 
 
 
 def circular_stop(r, R):
     '''
-    Rjects rays inside a radius R
+    Rejects rays inside a radius R
     '''
+
     filt = r[0,:]**2+r[2,:]**2 < R**2
     r[:,filt]=None
+
     return r
 
 def annular_stop(r, R1, R2):
     '''
     Rejects rays which fall between R1 and R2
     '''
+
     filt1 = (r[0,:]**2+r[2,:]**2 > R1**2)
     filt2 = (r[0,:]**2+r[2,:]**2 < R2**2)
     filt = (filt1 & filt2)
@@ -113,10 +118,12 @@ def rect_aperture(r, Lx, Ly):
     '''
     Rejects rays outside a rectangular aperture, total size 2*Lx x 2*Ly
     '''
+
     filt1 = (r[0,:]**2 > Lx**2)
     filt2 = (r[2,:]**2 > Ly**2)
     filt=filt1*filt2
     r[:,filt]=None
+
     return r
 
 def knife_edge(r, offset, axis, direction):
@@ -124,6 +131,7 @@ def knife_edge(r, offset, axis, direction):
     Filters rays using a knife edge.
     Default is a knife edge in y, can also do a knife edge in x.
     '''
+
     if axis == 'y':
         a=2
     if axis == 'x':
@@ -135,6 +143,7 @@ def knife_edge(r, offset, axis, direction):
     if direction == 0:
         print('Direction must be <0 or >0')
     r[:,filt]=None
+
     return r
 
 
@@ -142,6 +151,7 @@ class Diagnostic:
     """
     Inheritable class for ray diagnostics.
     """
+
     def __init__(self, Beam, focal_plane = 0, L=400, R=25, Lx=18, Ly=13.5):
         """Initialise ray diagnostic.
 
@@ -152,7 +162,8 @@ class Diagnostic:
             R (int, optional): Radius of lenses. Defaults to 25.
             Lx (int, optional): Detector size in x. Defaults to 18.
             Ly (float, optional): Detector size in y. Defaults to 13.5.
-        """        
+        """     
+   
         self.Beam, self.focal_plane, self.L, self.R, self.Lx, self.Ly = Beam, focal_plane, L, R, Lx, Ly
         self.r0 = self.Beam.rf
         self.r0 = m_to_mm(r0)
@@ -174,7 +185,8 @@ class Diagnostic:
             bin_scale (int, optional): bin size, same in x and y. Defaults to 1.
             pix_x (int, optional): number of x pixels in detector plane. Defaults to 3448.
             pix_y (int, optional): number of y pixels in detector plane. Defaults to 2574.
-        """        
+        """   
+     
         x=self.Beam.rf[0,:]
         y=self.Beam.rf[2,:]
 
@@ -195,7 +207,6 @@ class Diagnostic:
                 extent=[self.xedges[0], self.xedges[-1], self.yedges[0], self.yedges[-1]])
     
     # def clear_mem():
-
         
 class Shadowgraphy(Diagnostic):
     """
@@ -203,6 +214,7 @@ class Shadowgraphy(Diagnostic):
     Implements a two lens telescope with M = 1 and a single lens system with M = 2. Both lenses have a f = L/2 focal length, where L is a length scale specified when the class is initialized.
     Each optic has a radius R, which is used to reject rays outside the numerical aperture of the optical system.
     """
+
     def single_lens_solve(self):
         ## single lens - M = Variable (around ~2) (based on Detector position. Real experimental setup)
         r1 = distance(self.r0, 3*self.L/4 - self.focal_plane) #displace rays to lens. Accounts for object with depth
@@ -229,6 +241,7 @@ class Schlieren(Diagnostic):
     Each optic has a radius R, which is used to reject rays outside the numerical aperture of the optical system.
     There is a circular stop placed at the focal point afte rthe first lens which rejects rays which hit the focal planes at distance less than R [mm] from the optical axis.
     """
+
     def DF_solve(self, R = 1):
         ## 2 lens telescope, M = 1
         r1=distance(self.r0, self.L - self.focal_plane) #displace rays to lens. Accounts for object with depth
@@ -251,6 +264,7 @@ class Schlieren(Diagnostic):
     Each optic has a radius R, which is used to reject rays outside the numerical aperture of the optical system.
     There is a circular stop placed at the focal point afte rthe first lens which accepts only rays which hit the focal planes at distance less than R [mm] from the optical axis.
     """
+
     def LF_solve(self, R = 1):
         ## 2 lens telescope, M = 1
         r1=distance(self.r0, self.L - self.focal_plane) #displace rays to lens. Accounts for object with depth
@@ -312,7 +326,8 @@ class Refractometry(Diagnostic):
             bin_scale (int, optional): bin size, same in x and y. Defaults to 1.
             pix_x (int, optional): number of x pixels in detector plane. Defaults to 3448.
             pix_y (int, optional): number of y pixels in detector plane. Defaults to 2574.
-        """        
+        """
+  
         x=self.rf[0,:]
         y=self.rf[2,:]
 
@@ -339,12 +354,14 @@ class Interferometry(Diagnostic):
     '''
     Simple class to keep all the ray properties together
     '''
+
     def interfere_ref_beam(self, n_fringes, deg):
             ''' input beam ray positions and electric field component, and desired angle of evenly spaced background fringes. 
             Deg is angle in degrees from the vertical axis
             returns:
                 'interfered with' E field
             '''
+
             rf = self.rf
             if deg >= 45:
                 deg = - np.abs(deg - 90)
@@ -403,8 +420,7 @@ class Interferometry(Diagnostic):
         # amplitude_normalised = (amplitude - amplitude.min()) / (amplitude.max() - amplitude.min()) # this line needs work and is currently causing problems
         self.bkg_signal = amplitude
 
-        self.Beam.Jf = E #restore E field
-        
+        self.Beam.Jf = E #restore E field 
 
     def two_lens_solve(self):
         # assuming reference is recombined with the probe beam at the exit of the domain (should be changed)
@@ -435,7 +451,8 @@ class Interferometry(Diagnostic):
             bin_scale (int, optional): bin size, same in x and y. Defaults to 1.
             pix_x (int, optional): number of x pixels in detector plane. Defaults to 3448.
             pix_y (int, optional): number of y pixels in detector plane. Defaults to 2574.
-        """        
+        """
+    
         x=self.rf[0,:]
         y=self.rf[2,:]
 
@@ -469,6 +486,7 @@ def ray_to_Jonesvector(Beam,s0):
     Returns:
         [type]: [description]
     """
+
     Np = Beam.Np
     ray_p = np.zeros((4,Np))
     ray_J = np.zeros((2,Np),dtype=complex)

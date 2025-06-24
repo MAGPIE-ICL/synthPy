@@ -23,6 +23,7 @@ class ScalarDomain:
             z (float array): z coordinates, m
             extent (float): physical size, m
         """
+
         self.dim = dim
         if isinstance(lengths, (float, int)):
             self.x_length, self.y_length, self.z_length = lengths, lengths, lengths
@@ -56,6 +57,7 @@ class ScalarDomain:
         """
         Null test, an empty cube
         """
+
         self.ne = np.zeros_like(self.XX)
     
     def test_slab(self, s=1, n_e0=2e23):
@@ -68,6 +70,7 @@ class ScalarDomain:
             s (int, optional): scale factor. Defaults to 1.
             n_e0 ([type], optional): mean density. Defaults to 2e23 m^-3.
         """
+
         self.ne = n_e0*(1.0+s*self.XX/self.x_length)
     
     def test_linear_cos(self,s1=0.1,s2=0.1,n_e0=2e23,Ly=1):
@@ -79,6 +82,7 @@ class ScalarDomain:
             n_e0 ([type], optional): mean electron density. Defaults to 2e23 m^-3.
             Ly (int, optional): spatial scale of sinusoidal perturbation. Defaults to 1.
         """
+
         self.ne = n_e0*(1.0+s1*self.XX/self.x_length)*(1+s2*np.cos(2*np.pi*self.YY/Ly))
     
     def test_exponential_cos(self,n_e0=1e24,Ly=1e-3, s=2e-3):
@@ -89,6 +93,7 @@ class ScalarDomain:
             Ly (int, optional): spatial scale of sinusoidal perturbation. Defaults to 1e-3 m.
             s ([type], optional): scale of exponential growth. Defaults to 2e-3 m.
         """
+
         self.ne = n_e0*10**(self.XX/s)*(1+np.cos(2*np.pi*self.YY/Ly))
         
     def external_ne(self, ne):
@@ -97,6 +102,7 @@ class ScalarDomain:
         Args:
             ne ([type]): MxMxM grid of density in m^-3
         """
+
         self.ne = ne
 
     def external_B(self, B):
@@ -105,6 +111,7 @@ class ScalarDomain:
         Args:
             B ([type]): MxMxMx3 grid of B field in T
         """
+
         self.B = B
 
     def external_Te(self, Te, Te_min = 1.0):
@@ -113,6 +120,7 @@ class ScalarDomain:
         Args:
             Te ([type]): MxMxM grid of electron temperature in eV
         """
+
         self.Te = np.maximum(Te_min,Te)
 
     def external_Z(self, Z):
@@ -121,6 +129,7 @@ class ScalarDomain:
         Args:
             Z ([type]): MxMxM grid of ionisation
         """
+
         self.Z = Z
         
     def test_B(self, Bmax=1.0):
@@ -130,6 +139,7 @@ class ScalarDomain:
         Args:
             Bmax ([type], optional): maximum B field, default 1.0 T
         """
+
         self.B          = np.zeros(np.append(np.array(self.XX.shape),3))
         self.B[:,:,:,2] = Bmax*self.XX/self.x_length
 
@@ -141,6 +151,7 @@ class ScalarDomain:
             fname: str, file path and name to save under. A VTI pointed to by a PVTI file are saved in this location. If left blank, the name will default to:
                     ./plasma_PVTI_DD_MM_YYYY_HR_MIN
         '''
+
         import pyvista as pv
     
         if fname is None:
@@ -203,4 +214,5 @@ class ScalarDomain:
         # write file
         with open(f'{fname}.pvti', 'w') as file:
             file.write(content)
+
         print(f'Scalar Domain electron density succesfully saved under {fname}.pvti !')

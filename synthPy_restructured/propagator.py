@@ -12,7 +12,8 @@ class Propagator:
         index = np.where(axes == Beam.probing_direction)[0][0]
         self.integration_length = ScalarDomain.lengths[index]
         self.extent = integration_length/2
-        Beam.init_beam(ne_extent)
+
+        Beam.init_beam(ne_extent)       #is this a second call instance for init_beam()?
 
 # The following functions are methods to be called by the solve()
     def calc_dndr(self):
@@ -21,6 +22,7 @@ class Propagator:
         Args:
             lwl (float, optional): laser wavelength. Defaults to 1053e-9 m.
         """
+
         lwl = self.Beam.wavelength
 
         self.omega = 2*np.pi*(c/lwl)
@@ -41,16 +43,21 @@ class Propagator:
         self.dndy_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndy, bounds_error = False, fill_value = 0.0)
         self.dndz_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndz, bounds_error = False, fill_value = 0.0)
 
+
+    def omega_pe(ne):
+        '''Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28'''
+
+        return 5.64e4*np.sqrt(ne)
+
     # NRL formulary inverse brems - cheers Jack Halliday for coding in Python
     # Converted to rate coefficient by multiplying by group velocity in plasma
     def kappa(self):
         # Useful subroutines
-        def omega_pe(ne):
-            '''Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28'''
-            return 5.64e4*np.sqrt(ne)
         def v_the(Te):
             '''Calculate electron thermal speed. Provide Te in eV. Retrurns result in m/s'''
+
             return 4.19e5*np.sqrt(Te)
+
         def V(ne, Te, Z, omega):
             o_pe  = omega_pe(ne)
             o_max = np.copy(o_pe)
@@ -58,19 +65,21 @@ class Propagator:
             L_classical = Z*sc.e/Te
             L_quantum = 2.760428269727312e-10/np.sqrt(Te) # sc.hbar/np.sqrt(sc.m_e*sc.e*Te)
             L_max = np.maximum(L_classical, L_quantum)
+
             return o_max*L_max
+
         def coloumbLog(ne, Te, Z, omega):
             return np.maximum(2.0,np.log(v_the(Te)/V(ne, Te, Z, omega)))
+
         ne_cc = self.ScalarDomain.ne*1e-6
         o_pe  = omega_pe(ne_cc)
         CL    = coloumbLog(ne_cc, self.ScalarDomain.Te, self.ScalarDomain.Z, self.omega)
+
         return 3.1e-5*self.ScalarDomain.Z*c*np.power(ne_cc/self.omega,2)*CL*np.power(self.ScalarDomain.Te, -1.5) # 1/s
 
     # Plasma refractive index
     def n_refrac(self):
-        def omega_pe(ne):
-            '''Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28'''
-            return 5.64e4*np.sqrt(ne)
+
         ne_cc = self.ScalarDomain.ne*1e-6
         o_pe  = omega_pe(ne_cc)
         return np.sqrt(1.0-(o_pe/self.omega)**2)
@@ -99,10 +108,12 @@ class Propagator:
         Returns:
             3 x N float: N [dx,dy,dz] electron density gradients
         """
+
         grad = np.zeros_like(x)
         grad[0,:] = self.dndx_interp(x.T)
         grad[1,:] = self.dndy_interp(x.T)
         grad[2,:] = self.dndz_interp(x.T)
+
         return grad
 
     # Attenuation due to inverse bremsstrahlung
@@ -124,8 +135,7 @@ class Propagator:
         return self.ne_interp(x.T)
 
     def get_B(self,x):
-        B = np.array([self.Bx_interp(x.T),self.By_interp(x.T),self.Bz_interp(x.T)])
-        return B
+        return np.array([self.Bx_interp(x.T),self.By_interp(x.T),self.Bz_interp(x.T)])
 
     def neB(self,x,v):
         """returns the VerdetConst ne B.v
@@ -137,6 +147,7 @@ class Propagator:
         Returns:
             N float: N values of ne B.v
         """
+
         if(self.ScalarDomain.B_on):
             ne_N = self.get_ne(x)
             Bv_N = np.sum(self.get_B(x)*v,axis=0)
@@ -206,7 +217,6 @@ class Propagator:
         self.Beam.sf = None
         self.Beam.rf = None
 
-
 # ODEs of photon paths, standalone function to support the solve()
 def dsdt(t, s, Propagator):
     """Returns an array with the gradients and velocity per ray for ode_int
@@ -219,6 +229,7 @@ def dsdt(t, s, Propagator):
     Returns:
         9N float array: flattened array for ode_int
     """
+
     Np     = s.size//9
     s      = s.reshape(9,Np)
     sprime = np.zeros_like(s)
@@ -235,6 +246,7 @@ def dsdt(t, s, Propagator):
     sprime[6,:]   = Propagator.atten(x)*a
     sprime[7,:]   = Propagator.phase(x)
     sprime[8,:]   = Propagator.neB(x,v)
+
     return sprime.flatten()
 
 # Need to backproject to ne volume, then find angles
@@ -248,6 +260,7 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction):
     Returns:
         [type]: [description]
     """
+
     Np = ode_sol.shape[1] # number of photons
     ray_p = np.zeros((4,Np))
     ray_J = np.zeros((2,Np),dtype=complex)
@@ -295,4 +308,3 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction):
     # ray_p [x,phi,y,theta], ray_J [E_x,E_y]
 
     return ray_p,ray_J
-
