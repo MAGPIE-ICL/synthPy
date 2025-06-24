@@ -1,4 +1,4 @@
 .vs
 .DS_Store
-solvers/_pycache_
-utils/_pycache_
+./solvers/__pycache__
+./utils/__pycache__
