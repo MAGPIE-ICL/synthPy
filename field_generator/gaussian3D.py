@@ -203,7 +203,7 @@ class gaussian3D:
         
         self.ne = field
 
-        return x, y, z, field
+        return field
 
     def export_scalar_field(self, property: str = 'ne', fname: str = None):
         '''
