@@ -1,4 +1,11 @@
 .vs
 .DS_Store
+
 ./solvers/__pycache__
+./solvers/__pycache__/full_solver.cpython-313.pyc
+./solvers/__pycache__/rtm_solver.cpython-313.pyc
+./solvers/__pycache__/*
+
 ./utils/__pycache__
+./utils/__pycache__/handle_filetypes.cpython-313.pyc
+./utils/__pycache__/*
