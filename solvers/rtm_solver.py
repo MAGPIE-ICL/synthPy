@@ -3,7 +3,11 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 
 '''
-Ray Transfer Matrix Solver - Modified from Jack Hare's Version
+Ray Transfer Matrix Solver
+
+BASED VERSION CODED BY: Aidan CRILLY / Jack HARE
+MODIFIED/UPDATED BY: Stefano MERLINI / Louis Evans
+
 Example:
 
 ###INITIALISE RAYS###
