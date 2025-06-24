@@ -149,5 +149,3 @@ def hdf_to_pvti(hdf_filename, pvti_filename):
     extent_z = (dims[2]*spacing[2])/2
     
     export_pvti(ne, fname = pvti_filename, extent_x = extent_x, extent_y = extent_y, extent_z = extent_z)
-    
-

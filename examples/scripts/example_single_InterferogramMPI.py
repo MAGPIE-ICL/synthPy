@@ -44,7 +44,7 @@ if __name__ == '__main__':
 	file_loc = str(sys.argv[2])
 	output_loc = str(sys.argv[3])
 
-	#load pvti 
+	#load pvti
 	ne, dim, spacing = utilIO.pvti_readin(str(file_loc))
 	extent_x = ((dim[0]*spacing[0])/2)
 	extent_y = ((dim[1]*spacing[1])/2)

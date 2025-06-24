@@ -89,7 +89,6 @@ from scipy.interpolate import RegularGridInterpolator
 from time import time
 import scipy.constants as sc
 
-
 c = sc.c # honestly, this could be 3e8 *shrugs*
 
 # Define a scalar domain
@@ -117,6 +116,7 @@ class ScalarDomain:
         """
         self.x, self.y, self.z = np.float32(x), np.float32(y), np.float32(z)
         self.XX, self.YY, self.ZZ = np.meshgrid(x, y, z, indexing='ij', copy = False)
+        print(self.XX)
         self.extent = extent
         self.probing_direction = probing_direction
         # Logical switches
@@ -162,6 +162,7 @@ class ScalarDomain:
             s ([type], optional): scale of exponential growth. Defaults to 2e-3 m.
         """
         self.ne = n_e0*10**(self.XX/s)*(1+np.cos(2*np.pi*self.YY/Ly))
+        print(self.ne)
         
     def external_ne(self, ne):
         """Load externally generated grid
@@ -213,7 +214,7 @@ class ScalarDomain:
         """
 
         self.omega = 2*np.pi*(c/lwl)
-        nc = 3.14207787e-4*self.omega**2
+        nc = 3.14207787e-4*self.omega**2 # (epsilon_0 * m_e / e^2) * w^2 = n_c
 
         # Find Faraday rotation constant http://farside.ph.utexas.edu/teaching/em/lectures/node101.html
         if (self.B_on):
@@ -278,7 +279,7 @@ class ScalarDomain:
         # Phase shift
         if(self.phaseshift):
             self.refractive_index_interp = RegularGridInterpolator((self.x, self.y, self.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
-
+    
     def plot_midline_gradients(self,ax,probing_direction):
         """I actually don't know what this does. Presumably plots the gradients half way through the box? Cool.
 
@@ -370,8 +371,13 @@ class ScalarDomain:
         s0 = s0.flatten() #odeint insists
 
         start = time()
+
         dsdt_ODE = lambda t, y: dsdt(t, y, self)
+
+        print("Starting ray trace.")
+
         sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t)
+
         finish = time()
         print("Ray trace completed in:\t",finish-start,"s")
 
