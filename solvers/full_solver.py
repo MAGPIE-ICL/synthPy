@@ -279,7 +279,7 @@ class ScalarDomain:
         # Phase shift
         if(self.phaseshift):
             self.refractive_index_interp = RegularGridInterpolator((self.x, self.y, self.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
-    
+
     def plot_midline_gradients(self,ax,probing_direction):
         """I actually don't know what this does. Presumably plots the gradients half way through the box? Cool.
 
@@ -304,7 +304,7 @@ class ScalarDomain:
             ax.plot(self.y,self.dndx[N_V,:,N_V])
             ax.plot(self.y,self.dndy[N_V,:,N_V])
             ax.plot(self.y,self.dndz[N_V,:,N_V])
-    
+
     def dndr(self,x):
         """returns the gradient at the locations x
 
