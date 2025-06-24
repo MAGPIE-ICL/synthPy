@@ -29,8 +29,8 @@ import field_generator.gaussian1D as g1
 import field_generator.gaussian2D as g2
 import field_generator.gaussian3D as g3
 import utils.handle_filetypes as utilIO
-import solver.full_solver as s
-import solver.rtm_solver as rtm
+import solvers.full_solver as s
+import solvers.rtm_solver as rtm
 import matplotlib.pyplot as plt
 import gc
 import vtk
@@ -59,7 +59,7 @@ def calculate_field(file_loc, manager, probing_direction):
     elif probing_direction == 'z':
         extent = extent_z
     field = m.ScalarDomain(ne_x, ne_y, ne_z, extent = extent, probing_direction = probing_direction)       # modify probing direction HERE
-    field.external_ne(ne)
+    field.external_ne(ne*1e6)  # from 1/m3 to 1/cm3
     field.calc_dndr()
     field.clear_memory()
     del ne
@@ -127,6 +127,7 @@ if __name__ == '__main__':
 
     with open(output_loc + 'shadow.pkl', "wb") as filehandler:
         pickle.dump(sh_H, filehandler)
+        
     with open(output_loc + 'refract.pkl', "wb") as filehandler:
         pickle.dump(r_H, filehandler)
 

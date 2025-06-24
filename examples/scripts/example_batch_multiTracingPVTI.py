@@ -31,8 +31,8 @@ import field_generator.gaussian1D as g1
 import field_generator.gaussian2D as g2
 import field_generator.gaussian3D as g3
 import utils.handle_filetypes as utilIO
-import solver.full_solver as s
-import solver.rtm_solver as rtm
+import solvers.full_solver as s
+import solvers.rtm_solver as rtm
 import matplotlib.pyplot as plt
 import gc
 import vtk

@@ -89,7 +89,6 @@ from scipy.interpolate import RegularGridInterpolator
 from time import time
 import scipy.constants as sc
 
-
 c = sc.c # honestly, this could be 3e8 *shrugs*
 
 # Define a scalar domain
@@ -115,8 +114,9 @@ class ScalarDomain:
             z (float array): z coordinates, m
             extent (float): physical size, m
         """
-        self.z,self.y,self.x = np.float32(z), np.float32(y), np.float32(x)
-        self.XX, self.YY, self.ZZ = np.meshgrid(x,y,z, indexing='ij', copy = False)
+        self.x, self.y, self.z = np.float32(x), np.float32(y), np.float32(z)
+        self.XX, self.YY, self.ZZ = np.meshgrid(x, y, z, indexing='ij', copy = False)
+        print(self.XX)
         self.extent = extent
         self.probing_direction = probing_direction
         # Logical switches
@@ -162,6 +162,7 @@ class ScalarDomain:
             s ([type], optional): scale of exponential growth. Defaults to 2e-3 m.
         """
         self.ne = n_e0*10**(self.XX/s)*(1+np.cos(2*np.pi*self.YY/Ly))
+        print(self.ne)
         
     def external_ne(self, ne):
         """Load externally generated grid
@@ -213,7 +214,7 @@ class ScalarDomain:
         """
 
         self.omega = 2*np.pi*(c/lwl)
-        nc = 3.14207787e-4*self.omega**2
+        nc = 3.14207787e-4*self.omega**2 # (epsilon_0 * m_e / e^2) * w^2 = n_c
 
         # Find Faraday rotation constant http://farside.ph.utexas.edu/teaching/em/lectures/node101.html
         if (self.B_on):
@@ -278,7 +279,32 @@ class ScalarDomain:
         # Phase shift
         if(self.phaseshift):
             self.refractive_index_interp = RegularGridInterpolator((self.x, self.y, self.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
-    
+
+    def plot_midline_gradients(self,ax,probing_direction):
+        """I actually don't know what this does. Presumably plots the gradients half way through the box? Cool.
+
+        Args:
+            ax ([type]): [description]
+            probing_direction ([type]): [description]
+        """
+        N_V = self.x.shape[0]//2
+        if(probing_direction == 'x'):
+            ax.plot(self.y,self.dndx[:,N_V,N_V])
+            ax.plot(self.y,self.dndy[:,N_V,N_V])
+            ax.plot(self.y,self.dndz[:,N_V,N_V])
+        elif(probing_direction == 'y'):
+            ax.plot(self.y,self.dndx[N_V,:,N_V])
+            ax.plot(self.y,self.dndy[N_V,:,N_V])
+            ax.plot(self.y,self.dndz[N_V,:,N_V])
+        elif(probing_direction == 'z'):
+            ax.plot(self.y,self.dndx[N_V,N_V,:])
+            ax.plot(self.y,self.dndy[N_V,N_V,:])
+            ax.plot(self.y,self.dndz[N_V,N_V,:])
+        else: # Default to y
+            ax.plot(self.y,self.dndx[N_V,:,N_V])
+            ax.plot(self.y,self.dndy[N_V,:,N_V])
+            ax.plot(self.y,self.dndz[N_V,:,N_V])
+
     def dndr(self,x):
         """returns the gradient at the locations x
 
@@ -340,13 +366,18 @@ class ScalarDomain:
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
 
-        t  = np.linspace(0.0,np.sqrt(8.0)*self.extent/c,2)
+        t  = np.linspace(0.0, np.sqrt(8.0)*self.extent/c,2)
 
         s0 = s0.flatten() #odeint insists
 
         start = time()
+
         dsdt_ODE = lambda t, y: dsdt(t, y, self)
+
+        print("Starting ray trace.")
+
         sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t)
+
         finish = time()
         print("Ray trace completed in:\t",finish-start,"s")
 
@@ -366,7 +397,7 @@ class ScalarDomain:
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
-        length = self.extent + z
+        length = z
         t  = np.linspace(0.0,length/c,2)
         s0 = s0.flatten() #odeint insists
 
@@ -381,6 +412,54 @@ class ScalarDomain:
 
         self.rf,self.Jf = ray_to_Jonesvector(self.sf, z, probing_direction = self.probing_direction)
         return self.rf
+
+    def solve_test_ray(self, s0, tracker_indices, z0, return_E = False, dump_ray_path=True, output_filename="ray_path.txt"):
+        # FUNCTION TO DUMP POSITION OF A SINGLE RAY
+        length = z0
+        num_timesteps = 100
+        t  = np.linspace(0.0, length/c, num_timesteps)
+        s0 = s0.flatten() #odeint insists
+        Np = s0.size//9
+
+        start = time()
+        dsdt_ODE = lambda t, y: dsdt(t, y, self)
+        sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t)
+        finish = time()
+        print("Ray trace completed in:\t",finish-start,"s")
+
+        # Extract tracker trajectories
+        tracker_trajectories = {idx: [] for idx in tracker_indices}
+        sol_reshaped = sol.y.reshape(9, Np, num_timesteps)
+
+        with open(output_filename, "w") as f:
+            f.write("# Output file for tracking rays\n")
+            f.write("# time        - Time at each step (s)\n")
+            f.write("# x           - x-position of the ray (m)\n")
+            f.write("# theta       - theta angle of the ray (m)\n")
+            f.write("# y           - y-position of the ray (m)\n")
+            f.write("# phi         - phi angle of the ray (m)\n")
+            f.write("# z           - z-position of the ray (m)\n")
+            f.write("# time\tx\ttheta\ty\tphi\tz\n")
+
+        with open(output_filename, "a") as f:
+            for idx in tracker_indices:
+                f.write(f"# Trajectory for Tracker {idx}\n")
+                for ti, yi in zip(sol.t, sol_reshaped.transpose(2, 1, 0)):
+                    photon_state = yi[idx]  # Extract state vector for each photon
+                    ray_p, ray_J = ray_to_Jonesvector(np.array([photon_state]).T, photon_state[2], probing_direction=self.probing_direction)
+                    # Extract trajectory data
+                    x, theta, y, phi = ray_p[:, 0]
+                    z = photon_state[2]  # Directly extract z-position
+                    f.write(f"{ti:.6e}\t{x:.6e}\t{theta:.6e}\t{y:.6e}\t{phi:.6e}\t{z:.6e}\n")
+                    tracker_trajectories[idx].append(photon_state)
+
+        self.sf = sol.y[:,-1].reshape(9,Np)
+
+        self.rf,self.Jf = ray_to_Jonesvector(self.sf, z0, probing_direction = self.probing_direction)
+        if return_E:
+            return self.rf, self.Jf
+        else:
+            return self.rf
 
     def clear_memory(self):
         """
@@ -469,7 +548,7 @@ class ScalarDomain:
             file.write(content)
         print(f'Scalar Domain electron density succesfully saved under {fname}.pvti !')
     
-    def save_rays_pos(self, fn = None):
+    def save_output_rays(self, fn = None):
         """
         Saves the output rays as a binary numpy format for minimal size.
         Auto-names the file using the current date and time.
@@ -482,8 +561,13 @@ class ScalarDomain:
             fn = '{} rays.npy'.format(dt_string)
         else:
             fn = '{}.npy'.format(fn)
-        with open(fn,'wb') as f:
-            np.save(f, self.rf)
+        
+        if self.Jf is not None:
+            with open(fn, 'wb') as f:
+                np.savez(f, pos = self.rf, E = self.Jf)
+        else:
+            with open(fn,'wb') as f:
+                np.save(f, self.rf)
 
     
 # ODEs of photon paths
@@ -517,7 +601,7 @@ def dsdt(t, s, ScalarDomain):
     return sprime.flatten()
 
 # Initialise beam
-def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z', beam_type = 'circular'):
+def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z', beam_type = 'circular',  N_trackers=0):
     """[summary]
 
     Args:
@@ -534,8 +618,11 @@ def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z', bea
     if(beam_type == 'circular'):
         # position, uniformly within a circle
         t  = 2*np.pi*np.random.rand(Np) #polar angle of position
-        u  = np.random.rand(Np)+np.random.rand(Np) # radial coordinate of position
-        u[u > 1] = 2-u[u > 1]
+
+        #u  = np.random.rand(Np)+np.random.rand(Np) # radial coordinate of position
+        #u[u > 1] = 2-u[u > 1]
+        u = np.random.rand(Np)
+
         # angle
         ϕ = np.pi*np.random.rand(Np) #azimuthal angle of velocity
         χ = divergence*np.random.randn(Np) #polar angle of velocity
@@ -684,14 +771,96 @@ def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z', bea
         s0[0,:] = beam_size*t
         s0[1,:] = 0.0
         s0[2,:] = -ne_extent
+    elif(beam_type == 'rect_trackers'):
+
+        # Randomly choose N_trackers indices to mark as tracking particles
+        # tracker_indices = np.random.choice(Np, N_trackers, replace=False)
+        # position, uniformly within a square
+        t  = 2*np.random.rand(Np)-1.0
+        u  = 2*np.random.rand(Np)-1.0
+        # angle
+        ϕ = np.pi*np.random.rand(Np) #azimuthal angle of velocity
+        χ = divergence*np.random.randn(Np) #polar angle of velocity
+
+        beam_size_1 = beam_size[0] #m
+        beam_size_2 = beam_size[1] #m
+
+        if(probing_direction == 'x'):
+            # Initial velocity
+            s0[3,:] = c * np.cos(χ)
+            s0[4,:] = c * np.sin(χ) * np.cos(ϕ)
+            s0[5,:] = c * np.sin(χ) * np.sin(ϕ)
+            # Initial position
+            s0[0,:] = -ne_extent
+            s0[1,:] = beam_size_1*u
+            s0[2,:] = beam_size_2*t
+        elif(probing_direction == 'y'):
+            # Initial velocity
+            s0[4,:] = c * np.cos(χ)
+            s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
+            s0[5,:] = c * np.sin(χ) * np.sin(ϕ)
+            # Initial position
+            s0[0,:] = beam_size_1*u
+            s0[1,:] = -ne_extent
+            s0[2,:] = beam_size_2*t
+        elif(probing_direction == 'z'):
+            # Initial velocity
+            s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
+            s0[4,:] = c * np.sin(χ) * np.sin(ϕ)
+            s0[5,:] = c * np.cos(χ)
+            # Initial position
+            s0[0,:] = beam_size_1*u
+            s0[1,:] = beam_size_2*t
+            s0[2,:] = -ne_extent
+        else: # Default to y
+            print("Default to y")
+            # Initial velocity
+            s0[4,:] = c * np.cos(χ)
+            s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
+            s0[5,:] = c * np.sin(χ) * np.sin(ϕ)        
+            # Initial position
+            s0[0,:] = beam_size_1*u
+            s0[1,:] = -ne_extent
+            s0[2,:] = beam_size_2*t
     else:
         print("beam_type unrecognised! Accepted args: circular, square, rectangular, linear")
 
     # Initialise amplitude, phase and polarisation
     s0[6,:] = 1.0
     s0[7,:] = 0.0
-    s0[8,:] = 0.0
-    return s0
+
+    if beam_type == 'rect_trackers':
+        # Define region in real space for the selection
+        x_min, x_max = -1e-3, 1e-3  # Range for x
+        y_min, y_max = -1e-3, 1e-3  # Range for y
+        z_min = -ne_extent
+
+        # Extract initial positions
+        x_positions = s0[0, :]  # x-coordinates of the rays
+        y_positions = s0[1, :]  # y-coordinates of the rays
+        z_positions = s0[2, :]  # z-coordinates of the rays
+
+        # Find rays within the region
+        in_region = (
+            (x_positions >= x_min) & (x_positions <= x_max) &
+            (y_positions >= y_min) & (y_positions <= y_max) &
+            (z_positions == z_min)
+        )
+
+        region_indices = np.where(in_region)[0]
+
+        # Check if enough rays are in the region
+        if len(region_indices) < N_trackers:
+            raise ValueError("Not enough rays found in the specified region to allocate all trackers.")
+
+        # Randomly select N_trackers from the region
+        tracker_indices = np.random.choice(region_indices, N_trackers, replace=False)
+        # Mark tracking particles by setting their polarisation to 1
+        s0[8, tracker_indices] = 1.0
+        return s0, tracker_indices
+    else:
+        s0[8,:] = 0.0
+        return s0
 
 # Need to backproject to ne volume, then find angles
 def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction = 'z'):
@@ -769,5 +938,4 @@ def interfere_ref_beam(rf, E, n_fringes, deg):
         ref_beam = np.exp(2*n_fringes/3 * 1.0j*(x_weight*rf[0,:] + y_weight * rf[2,:]))
 
         E[1,:] += ref_beam # assume ref_beam is polarised in y
-
         return E

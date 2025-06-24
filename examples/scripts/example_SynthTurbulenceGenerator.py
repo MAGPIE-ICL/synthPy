@@ -59,7 +59,7 @@ for p in ps:
         x, y, z =  np.linspace(-extent, extent, 2*res), np.linspace(-extent, extent, 2*res), np.linspace(-extent*factor, extent*factor, int(2*res*factor))
         domain  =  s.ScalarDomain(x,y,z)
         domain.external_ne(ne)
-        domain.export_scalar_field(fname = f'./Output/Fields/PS_{str(p)}/ne_{str(mean)}_{str(max_pert)}_depth_{factor}')    #insert path to save here
+        domain.export_scalar_field(fname = f'./Inputs/Fields/PS_{str(p)}/ne_{str(mean)}_{str(max_pert)}_depth_{factor}')    #insert path to save here
         del x
         del y
         del z

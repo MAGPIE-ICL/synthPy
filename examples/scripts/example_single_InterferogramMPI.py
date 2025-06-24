@@ -25,8 +25,8 @@ from mpi4py import MPI
 import pickle
 from mpi4py.util import pkl5
 import utils.handle_filetypes as utilIO
-import solver.full_solver as s
-import solver.rtm_solver as rtm
+import solvers.full_solver as s
+import solvers.rtm_solver as rtm
 import matplotlib.pyplot as plt
 import gc
 import vtk
@@ -44,7 +44,7 @@ if __name__ == '__main__':
 	file_loc = str(sys.argv[2])
 	output_loc = str(sys.argv[3])
 
-	#load pvti 
+	#load pvti
 	ne, dim, spacing = utilIO.pvti_readin(str(file_loc))
 	extent_x = ((dim[0]*spacing[0])/2)
 	extent_y = ((dim[1]*spacing[1])/2)
@@ -60,7 +60,7 @@ if __name__ == '__main__':
 	divergence = 0.05e-3
 
 	field = s.ScalarDomain(ne_x, ne_y, ne_z, extent_x, phaseshift = True, probing_direction = probing_direction)
-	field.external_ne(ne)
+	field.external_ne(ne)	# 1/m3
 	field.calc_dndr(lwl = wl)
 	del ne_x
 	del ne_y
