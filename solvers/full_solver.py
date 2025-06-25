@@ -153,7 +153,7 @@ class ScalarDomain:
         """
         self.ne = n_e0*(1.0+s1*self.XX/self.extent)*(1+s2*np.cos(2*np.pi*self.YY/Ly))
         
-    def test_exponential_cos(self,n_e0=2e23,Ly=1e-3, s=2e-3):
+    def test_exponential_cos(self,n_e0=1e24,Ly=1e-3, s=2e-3):
         """Exponentially growing sinusoidal perturbation
 
         Args:
@@ -529,11 +529,9 @@ class ScalarDomain:
         #prep values to write the pvti, written to match the exported vti using pyvista
 
         relative_fname = fname.split('/')[-1]
-
         spacing_x = (2*np.max(self.x))/np.shape(self.x)[0]
         spacing_y = (2*np.max(self.y))/np.shape(self.y)[0]
         spacing_z = (2*np.max(self.z))/np.shape(self.z)[0]
-
         content = f'''<?xml version="1.0"?>
                         <VTKFile type="PImageData" version="0.1" byte_order="LittleEndian" header_type="UInt32" compressor="vtkZLibDataCompressor">
                             <PImageData WholeExtent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" GhostLevel="0" Origin="0 0 0" Spacing="{spacing_x} {spacing_y} {spacing_z}">
@@ -666,7 +664,6 @@ def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z', bea
             s0[0,:] = beam_size*u*np.cos(t)
             s0[1,:] = -ne_extent
             s0[2,:] = beam_size*u*np.sin(t)
-
     elif(beam_type == 'square'):
         # position, uniformly within a square
         t  = 2*np.random.rand(Np)-1.0
@@ -712,7 +709,6 @@ def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z', bea
             s0[0,:] = beam_size*u
             s0[1,:] = -ne_extent
             s0[2,:] = beam_size*t
-
     elif(beam_type == 'rectangular'):
         # position, uniformly within a square
         t  = 2*np.random.rand(Np)-1.0
@@ -761,7 +757,6 @@ def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z', bea
             s0[0,:] = beam_size_1*u
             s0[1,:] = -ne_extent
             s0[2,:] = beam_size_2*t
-
     elif(beam_type == 'linear'):
         # position, uniformly along a line - probing direction is defaulted z, solved in x,z plane
         t  = 2*np.random.rand(Np)-1.0
@@ -776,22 +771,6 @@ def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z', bea
         s0[0,:] = beam_size*t
         s0[1,:] = 0.0
         s0[2,:] = -ne_extent
-
-    elif(beam_type == 'even'): # evenly distributed circular ray using concentric discs
-        # number of concentric discs and points
-        num_of_circles = (-1 + np.sqrt(1 + 8*(Np//6)))/2 
-        Np = 3*(num_of_circles + 1) * num_of_circles + 1 
-        # angle
-        ϕ = np.pi*np.random.rand(Np) #azimuthal angle of velocity
-        χ = divergence*np.random.randn(Np) #polar angle of velocity
-        # position, uniformly within a circle
-        t = [0]
-        u = [0]
-        for i in range(1,num_of_circles+1): # for every disc
-            for j in range(0,i*6): # for every point in the disc
-                u.append(i / num_of_circles)
-                t.append(j * 2 * np.pi / (i*6))  
-
     elif(beam_type == 'rect_trackers'):
 
         # Randomly choose N_trackers indices to mark as tracking particles
@@ -811,7 +790,6 @@ def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z', bea
             s0[3,:] = c * np.cos(χ)
             s0[4,:] = c * np.sin(χ) * np.cos(ϕ)
             s0[5,:] = c * np.sin(χ) * np.sin(ϕ)
-
             # Initial position
             s0[0,:] = -ne_extent
             s0[1,:] = beam_size_1*u
@@ -821,7 +799,6 @@ def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z', bea
             s0[4,:] = c * np.cos(χ)
             s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
             s0[5,:] = c * np.sin(χ) * np.sin(ϕ)
-
             # Initial position
             s0[0,:] = beam_size_1*u
             s0[1,:] = -ne_extent
@@ -831,7 +808,6 @@ def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z', bea
             s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
             s0[4,:] = c * np.sin(χ) * np.sin(ϕ)
             s0[5,:] = c * np.cos(χ)
-
             # Initial position
             s0[0,:] = beam_size_1*u
             s0[1,:] = beam_size_2*t
@@ -842,13 +818,12 @@ def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z', bea
             s0[4,:] = c * np.cos(χ)
             s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
             s0[5,:] = c * np.sin(χ) * np.sin(ϕ)        
-
             # Initial position
             s0[0,:] = beam_size_1*u
             s0[1,:] = -ne_extent
             s0[2,:] = beam_size_2*t
     else:
-        print("beam_type unrecognised! Accepted args: circular, square, rectangular, linear, even")
+        print("beam_type unrecognised! Accepted args: circular, square, rectangular, linear")
 
     # Initialise amplitude, phase and polarisation
     s0[6,:] = 1.0
@@ -939,8 +914,8 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction = 'z'):
     E_x_init = np.zeros(Np)
     E_y_init = np.ones(Np)
     # Perform rotation for polarisation, multiplication for amplitude, and complex rotation for phase
-    #ray_J[0] = amp*(np.cos(phase)+1.0j*np.sin(phase))*(np.cos(pol)*E_x_init-np.sin(pol)*E_y_init)
-    #ray_J[1] = amp*(np.cos(phase)+1.0j*np.sin(phase))*(np.sin(pol)*E_x_init+np.cos(pol)*E_y_init)
+    ray_J[0] = amp*(np.cos(phase)+1.0j*np.sin(phase))*(np.cos(pol)*E_x_init-np.sin(pol)*E_y_init)
+    ray_J[1] = amp*(np.cos(phase)+1.0j*np.sin(phase))*(np.sin(pol)*E_x_init+np.cos(pol)*E_y_init)
 
     # ray_p [x,phi,y,theta], ray_J [E_x,E_y]
 
