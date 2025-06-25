@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<VTKFile type="PImageData" version="0.1" byte_order="LittleEndian" header_type="UInt32" compressor="vtkZLibDataCompressor">
+    <PImageData WholeExtent="0 100 0 1000 0 100" GhostLevel="0" Origin="0 0 0" Spacing="9.900000000000001e-05 9.9e-06 9.900000000000001e-05">
+         <PCellData Scalars="rnec">
+             <PDataArray type="Float64" Name="rnec">
+             </PDataArray>
+         </PCellData>
+         <Piece Extent="0 100 0 1000 0 100" Source="python_cube.vti"/>
+    </PImageData>
+</VTKFile>
