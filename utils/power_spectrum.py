@@ -1,13 +1,11 @@
-"""METHODS TO COMPUTE POWER SPECTRUM FROM SCALAR FIELDS
-Author: Stefano Merlini
-Date: 25/06/24
 """
-
+Library of Methods to compute the power spectrum from scalar fields
+Authors: Stefano Merlini, Louis Evans, Jack Hare
+"""
 
 import numpy as np
 
-#  Method 1 - Calculate Power Spectrum 
-
+#  Method 1 - Calculate Power Spectrum - Jack Hare
 def scalar1D_fft(data, dx, k_bin_num=100):
     """Calculates and returns the 2D spectrum for a 2D gaussian field of scalars, assuming isotropy of the turbulence
         Example:
@@ -62,7 +60,6 @@ def scalar1D_fft(data, dx, k_bin_num=100):
         spect1D[i-1] = f_filtered.mean() #and take their mean.
         
     return k_bins_weighted, spect1D
-
 
 def scalar2D_fft(data, dx, k_bin_num=100):
     """Calculates and returns the 2D spectrum for a 2D gaussian field of scalars, assuming isotropy of the turbulence
@@ -120,7 +117,6 @@ def scalar2D_fft(data, dx, k_bin_num=100):
         spect2D[i-1] = f_filtered.mean() #and take their mean.
         
     return k_bins_weighted, spect2D
-
 
 def scalar3D_fft(data, dx, k_bin_num=100):
     """Calculates and returns the 3D spectrum for a 3D gaussian field of scalars, assuming isotropy of the turbulence
@@ -180,8 +176,7 @@ def scalar3D_fft(data, dx, k_bin_num=100):
         
     return k_bins_weighted, spect3D
 
-# Method 2 - Calculate Power Spectrum
-
+# Method 2 - Calculate Power Spectrum - Stefano Merlini
 #  ____  _  _   __    __  ____  _  _ 
 # / ___)( \/ ) /  \  /  \(_  _)/ )( \
 # \___ \/ \/ \(  O )(  O ) )(  ) __ (
@@ -206,7 +201,7 @@ def scalar1D_knyquist(r,lx, smooth = False):
     smooth: boolean
         Active/Disactive smooth function for visualisation
     -----------------------------------------------------------------
-"""
+    """
     nx = len(r)
     nt = nx
     n = nx
@@ -245,7 +240,7 @@ def scalar2D_knyquist(r,lx, ly, smooth = False):
     smooth: boolean
         Active/Disactive smooth function for visualisation
     -----------------------------------------------------------------
-"""
+    """
     nx = len(r[:,0])
     ny = len(r[0,:])
     nt = nx*ny
@@ -288,7 +283,7 @@ def scalar3D_knyquist(r,lx, ly, lz, smooth = False):
     smooth: boolean
         Active/Disactive smooth function for visualisation
     -----------------------------------------------------------------
-"""
+    """
     nx = len(r[:,0,0])
     ny = len(r[0,:,0])
     nz = len(r[0,0,:])
@@ -321,6 +316,7 @@ def scalar3D_knyquist(r,lx, ly, lz, smooth = False):
     #
     return knyquist, wave_numbers, tke_spectrum
 
+# Method 3 - Calculate Power Spectrum - Louis Evans
 def radial_1Dspectrum(r, lx, smooth = False):
     """
      Parameters:
@@ -334,7 +330,8 @@ def radial_1Dspectrum(r, lx, smooth = False):
     smooth: boolean
         Active/Disactive smooth function for visualisation
     -----------------------------------------------------------------
-"""
+    """
+
     import numpy as np
     from numpy.fft import fft2, fftshift, fftn, fft
 
@@ -366,8 +363,6 @@ def radial_1Dspectrum(r, lx, smooth = False):
     
     return knyquist, k_centers, tke_spectrum
 
-
-
 def radial_2Dspectrum(r, lx, ly, smooth=False):
     """
      Parameters:
@@ -381,7 +376,7 @@ def radial_2Dspectrum(r, lx, ly, smooth=False):
     smooth: boolean
         Active/Disactive smooth function for visualisation
     -----------------------------------------------------------------
-"""
+    """
     import numpy as np
     from numpy.fft import fft2, fftshift, fftn, fft
     
@@ -400,7 +395,7 @@ def radial_2Dspectrum(r, lx, ly, smooth=False):
     k = np.sqrt(kx**2 + ky**2)
     
     # Make radial bins, evenly spaced in logspace for ease of plotting
-    k_bins = np.logspace(np.log10(k[k>0].min()), np.log10(k.max()), num=50)
+    k_bins = np.logspace(np.log10(k[k>0].min()), np.log10(k.max()), num=100)
     tke_spectrum = np.zeros(len(k_bins)-1)
     
     for i in range(len(k_bins)-1):
@@ -416,8 +411,6 @@ def radial_2Dspectrum(r, lx, ly, smooth=False):
     
     return knyquist, k_centers, tke_spectrum
 
-
-
 def radial_3Dspectrum(r, lx, ly, lz, smooth=False):
     """
      Parameters:
@@ -431,7 +424,8 @@ def radial_3Dspectrum(r, lx, ly, lz, smooth=False):
     smooth: boolean
         Active/Disactive smooth function for visualisation
     -----------------------------------------------------------------
-"""
+    """
+    
     import numpy as np
     from numpy.fft import fft2, fftshift, fftn, fft
     
@@ -439,7 +433,6 @@ def radial_3Dspectrum(r, lx, ly, lz, smooth=False):
     
     rh = fftshift(fftn(r))
     
-
     tkeh = (np.abs(rh)**2) / (nx * ny * nz)**2  # Normalized power spectrum
     
     # Set up wavenumbers

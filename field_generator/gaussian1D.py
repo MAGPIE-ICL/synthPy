@@ -100,59 +100,13 @@ class gaussian1D:
         
         self.ne = _r
         return _r
-    
-    def fft(self, N, d = 1):
-        """A FFT based generator for scalar gaussian fields in 1D
+
+    def fft(self, l_max, l_min, extent, res):
+        '''
+        A FFT based generator for scalar gaussian fields in 1D
         Reference:Timmer, J and König, M. “On Generating Power Law Noise.” Astronomy & Astrophysics 300 (1995):
         1–30. https://doi.org/10.1017/CBO9781107415324.004.
-        Arguments:
-            L_drive {float} -- Driving length scale
-            N {int}  -- size of domain will be (2*N+1)
-            k_func {function} -- a function which takes an input k 
-        Returns:
-            signal {1D array of floats} -- a realisation of a 1D Gaussian process.
-        Example:
-            L_drive = 1e-2
-            def power_spectrum(k,a):
-                return k**-a
 
-            def k41(k):
-                return power_spectrum(k, 5/3)        
-            
-            sig = gaussian1D_FFT( N, k41)
-            
-            fig,ax = plt.subplots()
-            x = np.linspace(-N,N, 2*N+1)
-            ax.plot(x, sig)
-        """
-        M=2*N+1
-        k=np.fft.fftfreq(M, d) #these are the frequencies, starting from 0 up to f_max, then -f_max to 0.
-
-        K=np.sqrt(k**2)
-        K=np.fft.fftshift(K)#numpy convention, highest frequencies at the centre
-
-        Wr=np.random.randn(M) # random number from Gaussian for both 
-        Wi=np.random.randn(M) # real and imaginary components
-
-        Wr = Wr + np.flip(Wr) #f(-k)=f*(k)
-        Wi = Wi - np.flip(Wi)
-
-        W = Wr+1j*Wi
-
-        F = W*np.sqrt(self.k_func(K)) # power spectra follows power law, so sqrt here.
-
-        F_shift=np.fft.ifftshift(F)
-
-        F_shift[0]=0 # 0 mean
-
-        signal=np.fft.ifftn(F_shift)
-        
-        self.ne = signal.real
-
-        return self.ne
-    
-    def domain_fft(self, l_max, l_min, extent, res):
-        '''
         Generate a Gaussian random field with a fourier spectrum following k_func in the domain 2*pi/l_max to 2*pi/l_min, and 0 outside
 
     
@@ -191,11 +145,12 @@ class gaussian1D:
         # Inverse Fourier transform 
         field = np.fft.ifft(fft_field).real
 
+        field = (field) / (np.abs(field).max())
+
         self.ne = field
 
         return x, field
     
-
     def export_scalar_field(self, property: str = 'ne', fname: str = None):
 
         '''

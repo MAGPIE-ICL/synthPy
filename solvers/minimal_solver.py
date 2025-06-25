@@ -1,9 +1,3 @@
-# This is the minimal solver taken reduce from the full solver which computes the ray tracer algorithm
-# for the simple 6 component description of the ray vectors
-# NOT USED in any other classes.
-# This will likely become a minimal solver with just refraction.
-# REQUIRES AN EXAMPLE AND CLEANING UP
-
 """MINIMAL PHYSICS SOLVER - 6 Vector description of rays
 BASED ON: https://journals.aps.org/pre/abstract/10.1103/PhysRevE.61.895
 
@@ -12,7 +6,7 @@ $ \frac{d\vec{v}}{dt} = -\nabla \left( \frac{c^2}{2} \frac{n_e}{n_c} \right) $
 $ \frac{d\vec{x}}{dt} = \vec{v} $
 
 BASED VERSION CODED BY: Aidan CRILLY / Jack HARE
-MODIFIED BY: Stefano MERLINI
+MODIFIED BY: Stefano MERLINI / Louis Evans
 
 EXAMPLES:
 #############################
@@ -170,7 +164,7 @@ class ScalarDomain:
             n_e0 ([type], optional): mean density. Defaults to 2e23 m^-3.
         """
         self.XX, self.YY, self.ZZ = np.meshgrid(self.x,self.y,self.z, indexing='ij')
-        self.ne = n_e0*(1.0+s*self.XX/self.extent_x)
+        self.ne = n_e0*(1.0+s*self.XX)
         
     def test_linear_cos(self,s1=0.1,s2=0.1,n_e0=2e23,Ly=1):
         """Linearly growing sinusoidal perturbation
@@ -315,20 +309,22 @@ class ScalarDomain:
             s0[0,:] = beam_size*u*np.cos(t)
             s0[1,:] = beam_size*u*np.sin(t)
             s0[2,:] = -self.extent
+            print(f"initial position: {str(s0[2,:])}")
         self.s0 = s0
+
 
     def solve(self, method = 'RK45'):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
 
-        t  = np.linspace(0.0,np.sqrt(8.0)*self.extent/c,2)
+        t  = np.linspace(0.0, np.sqrt(self.extent_x**2 + self.extent_y**2 *self.extent_z**2)/c,2)
 
         s0 = self.s0.flatten() #odeint insists
 
         start = time()
         dsdt_ODE = lambda t, y: dsdt(t, y, self)
-        sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t, method = method)
+        sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t, method = 'RK45')
         finish = time()
         print("Ray trace completed in:\t",finish-start,"s")
 
@@ -378,6 +374,10 @@ class ScalarDomain:
         # XY plane
         elif(self.probing_direction == 'z'):
             t_bp = (z-self.extent)/vz
+            print(f"final z position: {str(z)}")
+            print(f"time backprojection: {str(t_bp)}")
+            print(f"propagation extent: {str(self.extent)}")
+            print(f"final plane: {str(z-self.extent)}")
             # Positions on plane
             ray_p[0] = x-vx*t_bp
             ray_p[2] = y-vy*t_bp
@@ -442,7 +442,6 @@ class ScalarDomain:
             min = dt.datetime.now().minute
             hour = dt.datetime.now().hour
 
-
             fname = f'./plasma_PVTI_{day}_{month}_{year}_{hour}_{min}' #default fname to the current date and time 
 
 
@@ -483,15 +482,15 @@ class ScalarDomain:
         spacing_y = (2*self.extent_y)/np.shape(self.y)[0]
         spacing_z = (2*self.extent_z)/np.shape(self.z)[0]
         content = f'''<?xml version="1.0"?>
-<VTKFile type="PImageData" version="0.1" byte_order="LittleEndian" header_type="UInt32" compressor="vtkZLibDataCompressor">
-    <PImageData WholeExtent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" GhostLevel="0" Origin="0 0 0" Spacing="{spacing_x} {spacing_y} {spacing_z}">
-         <PCellData Scalars="rnec">
-             <PDataArray type="Float64" Name="rnec">
-             </PDataArray>
-         </PCellData>
-         <Piece Extent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" Source="{relative_fname}.vti"/>
-    </PImageData>
-</VTKFile>'''
+        <VTKFile type="PImageData" version="0.1" byte_order="LittleEndian" header_type="UInt32" compressor="vtkZLibDataCompressor">
+            <PImageData WholeExtent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" GhostLevel="0" Origin="0 0 0" Spacing="{spacing_x} {spacing_y} {spacing_z}">
+                <PCellData Scalars="rnec">
+                    <PDataArray type="Float64" Name="rnec">
+                    </PDataArray>
+                </PCellData>
+                <Piece Extent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" Source="{relative_fname}.vti"/>
+            </PImageData>
+        </VTKFile>'''
 
 
     
@@ -503,9 +502,6 @@ class ScalarDomain:
         print(f'Scalar Domain electron density succesfully saved under {fname}.pvti !')
         
 
-
-
-    
 # ODEs of photon paths
 def dsdt(t, s, ScalarDomain):
     """Returns an array with the gradients and velocity per ray for ode_int. Cannot be a method of ScalarDomain due to expected call signature for the ODE solver
