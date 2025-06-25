@@ -163,11 +163,16 @@ class Propagator:
         # Then can backproject to surface of volume
         s0 = self.Beam.s0
 
-        t  = np.linspace(0.0,np.sqrt(8.0)*self.extent/c,2)
+        t = np.linspace(0.0,np.sqrt(8.0)*self.extent/c,2)
 
+        print(s0.shape)
+        print(s0.size)
         s0 = s0.flatten() #odeint insists
+        print(s0.shape)
+        print(s0.size)
 
         start = time()
+
         dsdt_ODE = lambda t, y: dsdt(t, y, self)
         sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t)
         finish = time()
@@ -192,6 +197,7 @@ class Propagator:
 
         start = time()
         dsdt_ODE = lambda t, y: dsdt(t, y, self)
+        #try converting to this to jax based diffrax (also pure jax to see if abstraction is significant to performance) and compare solution times
         sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t)
         finish = time()
         self.duration = finish - start

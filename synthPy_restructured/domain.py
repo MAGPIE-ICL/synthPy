@@ -1,6 +1,5 @@
 import numpy as np
 
-
 class ScalarDomain:
     """
     A class to hold and generate scalar domains.

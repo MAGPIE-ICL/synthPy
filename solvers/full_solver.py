@@ -116,7 +116,6 @@ class ScalarDomain:
         """
         self.x, self.y, self.z = np.float32(x), np.float32(y), np.float32(z)
         self.XX, self.YY, self.ZZ = np.meshgrid(x, y, z, indexing='ij', copy = False)
-        print(self.XX)
         self.extent = extent
         self.probing_direction = probing_direction
         # Logical switches
@@ -162,7 +161,6 @@ class ScalarDomain:
             s ([type], optional): scale of exponential growth. Defaults to 2e-3 m.
         """
         self.ne = n_e0*10**(self.XX/s)*(1+np.cos(2*np.pi*self.YY/Ly))
-        print(self.ne)
         
     def external_ne(self, ne):
         """Load externally generated grid
@@ -237,10 +235,14 @@ class ScalarDomain:
         # Useful subroutines
         def omega_pe(ne):
             '''Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28'''
+
             return 5.64e4*np.sqrt(ne)
+
         def v_the(Te):
             '''Calculate electron thermal speed. Provide Te in eV. Retrurns result in m/s'''
+
             return 4.19e5*np.sqrt(Te)
+
         def V(ne, Te, Z, omega):
             o_pe  = omega_pe(ne)
             o_max = np.copy(o_pe)
@@ -248,12 +250,16 @@ class ScalarDomain:
             L_classical = Z*sc.e/Te
             L_quantum = 2.760428269727312e-10/np.sqrt(Te) # sc.hbar/np.sqrt(sc.m_e*sc.e*Te)
             L_max = np.maximum(L_classical, L_quantum)
+
             return o_max*L_max
+
         def coloumbLog(ne, Te, Z, omega):
             return np.maximum(2.0,np.log(v_the(Te)/V(ne, Te, Z, omega)))
+
         ne_cc = self.ne*1e-6
         o_pe  = omega_pe(ne_cc)
         CL    = coloumbLog(ne_cc, self.Te, self.Z, self.omega)
+
         return 3.1e-5*self.Z*c*np.power(ne_cc/self.omega,2)*CL*np.power(self.Te, -1.5) # 1/s
 
     # Plasma refractive index
