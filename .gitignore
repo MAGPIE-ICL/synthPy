@@ -9,3 +9,11 @@
 ./utils/__pycache__
 ./utils/__pycache__/handle_filetypes.cpython-313.pyc
 ./utils/__pycache__/*
+
+./synthPy_restructured/__pycache__
+./synthPy_restructured/__pycache__/beam.cpython-313.pyc
+./synthPy_restructured/__pycache__/diagnostics.cpython-313.pyc
+./synthPy_restructured/__pycache__/domain.cpython-313.pyc
+./synthPy_restructured/__pycache__/propagator.cpython-313.pyc
+./synthPy_restructured/__pycache__/utils.cpython-313.pyc
+./synthPy_restructured/__pycache__/*
