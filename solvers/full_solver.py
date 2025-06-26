@@ -128,7 +128,7 @@ class ScalarDomain:
         Null test, an empty cube
         """
         self.ne = np.zeros_like(self.XX)
-        
+
     def test_slab(self, s=1, n_e0=2e23):
         """A slab with a linear gradient in x:
         n_e =  n_e0 * (1 + s*x/extent)
