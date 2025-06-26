@@ -229,14 +229,15 @@ class ScalarDomain:
         self.dndy_interp = RegularGridInterpolator((self.x, self.y, self.z), self.dndy, bounds_error = False, fill_value = 0.0)
         self.dndz_interp = RegularGridInterpolator((self.x, self.y, self.z), self.dndz, bounds_error = False, fill_value = 0.0)
 
+    def omega_pe(ne):
+        '''Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28'''
+
+        return 5.64e4*np.sqrt(ne)
+
     # NRL formulary inverse brems - cheers Jack Halliday for coding in Python
     # Converted to rate coefficient by multiplying by group velocity in plasma
     def kappa(self):
         # Useful subroutines
-        def omega_pe(ne):
-            '''Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28'''
-
-            return 5.64e4*np.sqrt(ne)
 
         def v_the(Te):
             '''Calculate electron thermal speed. Provide Te in eV. Retrurns result in m/s'''
@@ -257,16 +258,13 @@ class ScalarDomain:
             return np.maximum(2.0,np.log(v_the(Te)/V(ne, Te, Z, omega)))
 
         ne_cc = self.ne*1e-6
-        o_pe  = omega_pe(ne_cc)
-        CL    = coloumbLog(ne_cc, self.Te, self.Z, self.omega)
+        o_pe = omega_pe(ne_cc)
+        CL = coloumbLog(ne_cc, self.Te, self.Z, self.omega)
 
         return 3.1e-5*self.Z*c*np.power(ne_cc/self.omega,2)*CL*np.power(self.Te, -1.5) # 1/s
 
     # Plasma refractive index
     def n_refrac(self):
-        def omega_pe(ne):
-            '''Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28'''
-            return 5.64e4*np.sqrt(ne)
         ne_cc = self.ne*1e-6
         o_pe  = omega_pe(ne_cc)
         return np.sqrt(1.0-(o_pe/self.omega)**2)
@@ -293,6 +291,7 @@ class ScalarDomain:
             ax ([type]): [description]
             probing_direction ([type]): [description]
         """
+
         N_V = self.x.shape[0]//2
         if(probing_direction == 'x'):
             ax.plot(self.y,self.dndx[:,N_V,N_V])
@@ -320,10 +319,12 @@ class ScalarDomain:
         Returns:
             3 x N float: N [dx,dy,dz] electron density gradients
         """
+
         grad = np.zeros_like(x)
         grad[0,:] = self.dndx_interp(x.T)
         grad[1,:] = self.dndy_interp(x.T)
         grad[2,:] = self.dndz_interp(x.T)
+
         return grad
 
     # Attenuation due to inverse bremsstrahlung
@@ -358,6 +359,7 @@ class ScalarDomain:
         Returns:
             N float: N values of ne B.v
         """
+
         if(self.B_on):
             ne_N = self.get_ne(x)
             Bv_N = np.sum(self.get_B(x)*v,axis=0)
