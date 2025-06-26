@@ -165,15 +165,12 @@ class Propagator:
 
         t = np.linspace(0.0,np.sqrt(8.0)*self.extent/c,2)
 
-        print(s0.shape)
-        print(s0.size)
         s0 = s0.flatten() #odeint insists
-        print(s0.shape)
-        print(s0.size)
 
         start = time()
 
         dsdt_ODE = lambda t, y: dsdt(t, y, self)
+        #try converting to this to jax based diffrax (also pure jax to see if abstraction is significant to performance) and compare solution times
         sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t)
         finish = time()
         self.duration = finish - start
@@ -195,12 +192,17 @@ class Propagator:
         t  = np.linspace(0.0,length/c,2)
         s0 = s0.flatten() #odeint insists
 
+        print("Starting ray trace.")
+
         start = time()
+
         dsdt_ODE = lambda t, y: dsdt(t, y, self)
-        #try converting to this to jax based diffrax (also pure jax to see if abstraction is significant to performance) and compare solution times
         sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t)
+
         finish = time()
         self.duration = finish - start
+
+        print("Ray trace completed in:\t", self.duration, "s")
 
         Np = s0.size//9
         self.Beam.sf = sol.y[:,-1].reshape(9,Np)
@@ -236,8 +238,8 @@ def dsdt(t, s, Propagator):
         9N float array: flattened array for ode_int
     """
 
-    Np     = s.size//9
-    s      = s.reshape(9,Np)
+    Np = s.size//9
+    s = s.reshape(9,Np)
     sprime = np.zeros_like(s)
     # Velocity and position
     v = s[3:6,:]
@@ -248,10 +250,10 @@ def dsdt(t, s, Propagator):
     r = s[8,:]
 
     sprime[3:6,:] = Propagator.dndr(x)
-    sprime[:3,:]  = v
-    sprime[6,:]   = Propagator.atten(x)*a
-    sprime[7,:]   = Propagator.phase(x)
-    sprime[8,:]   = Propagator.neB(x,v)
+    sprime[:3,:] = v
+    sprime[6,:] = Propagator.atten(x)*a
+    sprime[7,:] = Propagator.phase(x)
+    sprime[8,:] = Propagator.neB(x,v)
 
     return sprime.flatten()
 
