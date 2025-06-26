@@ -84,11 +84,11 @@ class ScalarDomain:
 
         self.ne = n_e0*(1.0+s1*self.XX/self.x_length)*(1+s2*np.cos(2*np.pi*self.YY/Ly))
     
-    def test_exponential_cos(self,n_e0=1e24,Ly=1e-3, s=2e-3):
+    def test_exponential_cos(self, n_e0=1e24, Ly=1e-3, s=2e-3):
         """Exponentially growing sinusoidal perturbation
 
         Args:
-            n_e0 ([type], optional): mean electron density. Defaults to 2e23 m^-3.
+            n_e0 ([type], optional): mean electron density. Defaults to 1e24 m^-3.
             Ly (int, optional): spatial scale of sinusoidal perturbation. Defaults to 1e-3 m.
             s ([type], optional): scale of exponential growth. Defaults to 2e-3 m.
         """
