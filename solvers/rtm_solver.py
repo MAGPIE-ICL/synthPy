@@ -429,7 +429,7 @@ class Interferometry(Rays):
 
         x_bins = np.linspace(-self.Lx//2,self.Lx//2, pix_x // bin_scale)
         y_bins = np.linspace(-self.Ly//2, self.Ly //2 , pix_y // bin_scale)
-        
+
         amplitude_x = np.zeros((len(y_bins)-1, len(x_bins)-1), dtype=complex)
         amplitude_y = np.zeros((len(y_bins)-1, len(x_bins)-1), dtype=complex)
 

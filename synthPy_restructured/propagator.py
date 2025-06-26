@@ -1,5 +1,16 @@
 import numpy as np
 
+from scipy.interpolate import RegularGridInterpolator
+from scipy.integrate import odeint, solve_ivp
+from time import time
+
+from scipy.constants import c
+
+def omega_pe(ne):
+    '''Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28'''
+
+    return 5.64e4*np.sqrt(ne)
+
 class Propagator:
     
     def __init__(self, ScalarDomain, Beam, inv_brems = False, phaseshift = False):
@@ -7,13 +18,19 @@ class Propagator:
         self.Beam = Beam
         self.inv_brems = inv_brems
         self.phaseshift = phaseshift
-        # finish initialising the beam position using the scalardomain edge position
-        axes = ['x', 'y', 'z']
-        index = np.where(axes == Beam.probing_direction)[0][0]
-        self.integration_length = ScalarDomain.lengths[index]
-        self.extent = integration_length/2
 
-        Beam.init_beam(ne_extent)       #is this a second call instance for init_beam()?
+        # finish initialising the beam position using the scalardomain edge position
+
+        #axes = ['x', 'y', 'z']
+        #print(np.asarray(axes == Beam.probing_direction).nonzero())
+        #print(np.where(axes == assert isinstance(Beam.probing_direction, str)))
+        #index = np.where(axes == Beam.probing_direction)[0]
+
+        index = ['x', 'y', 'z'].index(Beam.probing_direction)
+        self.integration_length = ScalarDomain.lengths[index]
+        self.extent = self.integration_length / 2
+
+        #Beam.init_beam(ne_extent)       # this is the second call instance for init_beam() stefano was referring too
 
 # The following functions are methods to be called by the solve()
     def calc_dndr(self):
@@ -42,12 +59,6 @@ class Propagator:
         self.dndx_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndx, bounds_error = False, fill_value = 0.0)
         self.dndy_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndy, bounds_error = False, fill_value = 0.0)
         self.dndz_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndz, bounds_error = False, fill_value = 0.0)
-
-
-    def omega_pe(ne):
-        '''Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28'''
-
-        return 5.64e4*np.sqrt(ne)
 
     # NRL formulary inverse brems - cheers Jack Halliday for coding in Python
     # Converted to rate coefficient by multiplying by group velocity in plasma
@@ -157,13 +168,14 @@ class Propagator:
 
         return pol
 
-    def solve(self):
+    def solve(self, return_E = False):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
+
         s0 = self.Beam.s0
 
-        t = np.linspace(0.0,np.sqrt(8.0)*self.extent/c,2)
+        t = np.linspace(0.0, np.sqrt(8.0) * self.extent / c, 2)
 
         s0 = s0.flatten() #odeint insists
 
@@ -171,16 +183,20 @@ class Propagator:
 
         dsdt_ODE = lambda t, y: dsdt(t, y, self)
         #try converting to this to jax based diffrax (also pure jax to see if abstraction is significant to performance) and compare solution times
-        sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t)
+        sol = solve_ivp(dsdt_ODE, [0, t[-1]], s0, t_eval=t)
+
         finish = time()
         self.duration = finish - start
 
-        Np = s0.size//9
+        Np = s0.size // 9
         self.Beam.rf = sol.y[:,-1].reshape(9,Np)
 
         self.Beam.rf, self.Beam.Jf = ray_to_Jonesvector(self.Beam.rf, self.extent, probing_direction = self.Beam.probing_direction)
-        
-    
+        if return_E:
+            return self.Beam.rf, self.Beam.Jf
+        else:
+            return self.Beam.rf
+
     def solve_at_depth(self, z):
         '''
         Solve intial rays up until a given depth, z
@@ -259,56 +275,72 @@ def dsdt(t, s, Propagator):
 
 # Need to backproject to ne volume, then find angles
 def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction):
-    """Takes the output from the 9D solver and returns 6D rays for ray-transfer matrix techniques.
+    """
+    Takes the output from the 9D solver and returns 6D rays for ray-transfer matrix techniques.
     Effectively finds how far the ray is from the end of the volume, returns it to the end of the volume.
+
+    Gives position (and angles) in other axes at point where ray is in end plane of its extent in the probing axis
+
     Args:
         ode_sol (6xN float): N rays in (x,y,z,vx,vy,vz) format, m and m/s and amplitude, phase and polarisation
-        ne_extent (float): edge length of cube, m
+        ne_extent (float): edge length of shape (cuboid) in probing direction, m
         probing_direction (str): x, y or z.
+
     Returns:
         [type]: [description]
     """
 
     Np = ode_sol.shape[1] # number of photons
-    ray_p = np.zeros((4,Np))
-    ray_J = np.zeros((2,Np),dtype=complex)
+
+    ray_p = np.zeros((4, Np))
+    ray_J = np.zeros((2, Np), dtype=complex)
 
     x, y, z, vx, vy, vz = ode_sol[0], ode_sol[1], ode_sol[2], ode_sol[3], ode_sol[4], ode_sol[5]
 
     # Resolve distances and angles
     # YZ plane
     if(probing_direction == 'x'):
-        t_bp = (x-ne_extent)/vx
+        t_bp = (x - ne_extent) / vx
+
         # Positions on plane
-        ray_p[0] = y-vy*t_bp
-        ray_p[2] = z-vz*t_bp
+        ray_p[0] = y - vy * t_bp
+        ray_p[2] = z - vz * t_bp
+
         # Angles to plane
-        ray_p[1] = np.arctan(vy/vx)
-        ray_p[3] = np.arctan(vz/vx)
+        ray_p[1] = np.arctan(vy / vx)
+        ray_p[3] = np.arctan(vz / vx)
     # XZ plane
     elif(probing_direction == 'y'):
-        t_bp = (y-ne_extent)/vy
+        t_bp = (y - ne_extent) / vy
+
         # Positions on plane
-        ray_p[0] = x-vx*t_bp
-        ray_p[2] = z-vz*t_bp
+        ray_p[0] = x - vx * t_bp
+        ray_p[2] = z - vz * t_bp
+
         # Angles to plane
-        ray_p[1] = np.arctan(vx/vy)
-        ray_p[3] = np.arctan(vz/vy)
+        ray_p[1] = np.arctan(vx / vy)
+        ray_p[3] = np.arctan(vz / vy)
     # XY plane
     elif(probing_direction == 'z'):
-        t_bp = (z-ne_extent)/vz
+        t_bp = (z - ne_extent) / vz
+
         # Positions on plane
-        ray_p[0] = x-vx*t_bp
-        ray_p[2] = y-vy*t_bp
+        ray_p[0] = x - vx * t_bp
+        ray_p[2] = y - vy * t_bp
+
         # Angles to plane
-        ray_p[1] = np.arctan(vx/vz)
-        ray_p[3] = np.arctan(vy/vz)
+        ray_p[1] = np.arctan(vx / vz)
+        ray_p[3] = np.arctan(vy / vz)
+    else:
+        print("Incorrect probing direction. Use: x, y or z.")
 
     # Resolve Jones vectors
     amp,phase,pol = ode_sol[6], ode_sol[7], ode_sol[8]
+
     # Assume initially polarised along y
     E_x_init = np.zeros(Np)
     E_y_init = np.ones(Np)
+
     # Perform rotation for polarisation, multiplication for amplitude, and complex rotation for phase
     ray_J[0] = amp*(np.cos(phase)+1.0j*np.sin(phase))*(np.cos(pol)*E_x_init-np.sin(pol)*E_y_init)
     ray_J[1] = amp*(np.cos(phase)+1.0j*np.sin(phase))*(np.sin(pol)*E_x_init+np.cos(pol)*E_y_init)

@@ -5,7 +5,7 @@ class ScalarDomain:
     A class to hold and generate scalar domains.
     This contains also the method to propagate rays through the scara domain
     """
-    
+
     def __init__(self, lengths, dim, B_on = False):
         """
         Example:
@@ -23,22 +23,27 @@ class ScalarDomain:
             extent (float): physical size, m
         """
 
-        self.dim = dim
+        # if 1 length given, assumes all are the same
         if isinstance(lengths, (float, int)):
             self.x_length, self.y_length, self.z_length = lengths, lengths, lengths
             self.lengths = np.array([lengths, lengths, lengths])
+        # if array given, checks len = 3 and assigns accordingly
         else:
             if len(lengths) != 3:
                 raise Exception('lengths must have len = 3: (x,y,z)')
+
             self.x_length, self.y_length, self.z_length = lengths[0], lengths[1], lengths[2]
             self.lengths = np.array(lengths)
         
+        #likewise for dim
+        self.dim = dim
         if isinstance(dim, (int, float)):
             self.x_n, self.y_n, self.z_n = dim, dim, dim
             self.dim = np.array([dim,dim,dim])
         else:
             if len(dim) != 3:
                 raise Exception('n must have len = 3: (x_n, y_n, z_n)')
+
             self.x_n, self.y_n, self.z_n = dim[0], dim[1], dim[2]
             self.dim = np.array(dim)
 

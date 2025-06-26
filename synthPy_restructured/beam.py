@@ -2,13 +2,14 @@ import numpy as np
 
 class Beam:
 # Initialise beam
-    def __init__(self, Np, beam_size, divergence, probing_direction = 'z', wavelength = 450e-9, beam_type = 'circular'):
+    def __init__(self, Np, beam_size, divergence, ne_extent, probing_direction = 'z', wavelength = 450e-9, beam_type = 'circular'):
         """[summary]
 
         Args:
             Np (int): Number of photons
             beam_size (float): beam radius, m
             divergence (float): beam divergence, radians
+            ne_extent (float): size of electron density cube, m. Used in initialisation of ray starting positions in auto init_beam() call
             probing_direction (str): direction of probing. I suggest 'z', the best tested
 
         Returns:
@@ -21,6 +22,9 @@ class Beam:
         self.probing_direction = probing_direction
         self.beam_type = beam_type
         self.wavelength = wavelength
+
+        #calls actual initialisation of beam automatically, first function just initialises variables
+        Beam.init_beam(self, ne_extent)
 
     def init_beam(self, ne_extent):
         """
@@ -35,7 +39,10 @@ class Beam:
             probing_direction (str): direction of probing. I suggest 'z', the best tested
 
         Updated object definitions:
-            s0, 9 x N float: N rays with (x, y, z, vx, vy, vz) in m, m/s and amplitude, phase and polarisation (a, p, r) 
+            s0, 9 x N float: N rays with (x, y, z, vx, vy, vz) in m, m/s and amplitude, phase and polarisation (a, p, r)
+
+        Returns:
+            Beam (class Beam): Updated Beam object instance of class
         """
 
         # take all variables from object properties
@@ -44,6 +51,8 @@ class Beam:
         divergence = self.divergence
         probing_direction = self.probing_direction 
         beam_type = self.beam_type
+
+        from scipy.constants import c
 
         s0 = np.zeros((9,Np))
         if(beam_type == 'circular'):

@@ -3,11 +3,15 @@
 
 ./solvers/__pycache__
 ./solvers/__pycache__/full_solver.cpython-313.pyc
+./solvers/__pycache__/minimal_solver.cpython-313.pyc
 ./solvers/__pycache__/rtm_solver.cpython-313.pyc
 ./solvers/__pycache__/*
 
 ./utils/__pycache__
+./utils/__pycache__/eos_opacity.cpython-313.pyc
 ./utils/__pycache__/handle_filetypes.cpython-313.pyc
+./utils/__pycache__/integral_quantities.cpython-313.pyc
+./utils/__pycache__/power_spectrum.cpython-313.pyc
 ./utils/__pycache__/*
 
 ./synthPy_restructured/__pycache__
@@ -17,3 +21,9 @@
 ./synthPy_restructured/__pycache__/propagator.cpython-313.pyc
 ./synthPy_restructured/__pycache__/utils.cpython-313.pyc
 ./synthPy_restructured/__pycache__/*
+
+./field_generator/__pycache__
+./field_generator/__pycache__/gaussian1D.cpython-313.pyc
+./field_generator/__pycache__/gaussian2D.cpython-313.pyc
+./field_generator/__pycache__/gaussian3D.cpython-313.pyc
+./field_generator/__pycache__/*
