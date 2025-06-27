@@ -188,7 +188,7 @@ class Diagnostic:
 
         self.Jf *= np.exp(1.0j * k * (np.sqrt(dx**2 + dy**2)))
 
-    def histogram(self, bin_scale=1, pix_x=3448, pix_y=2574, clear_mem = False):
+    def histogram(self, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
         """Bin data into a histogram. Defaults are for a KAF-8300.
         Outputs are H, the histogram, and xedges and yedges, the bin edges.
 
@@ -196,15 +196,19 @@ class Diagnostic:
             bin_scale (int, optional): bin size, same in x and y. Defaults to 1.
             pix_x (int, optional): number of x pixels in detector plane. Defaults to 3448.
             pix_y (int, optional): number of y pixels in detector plane. Defaults to 2574.
-        """   
-     
-        x = self.r0[0,:]
-        y = self.r0[2,:]
+        """
 
-        x=x[~np.isnan(x)]
-        y=y[~np.isnan(y)]
+        x = self.r0[0, :]
+        y = self.r0[2, :]
 
-        self.H, self.xedges, self.yedges = np.histogram2d(x, y, bins=[pix_x//bin_scale, pix_y//bin_scale], range=[[-self.Lx/2, self.Lx/2],[-self.Ly/2,self.Ly/2]])
+        # means that np.isnan(a) returns True when a is not Nan
+        # ensures that x & y are the same length, if output of either is Nan then will not try to render ray in histogram
+        mask = ~np.isnan(x) & ~np.isnan(y)
+
+        x = x[mask]
+        y = y[mask]
+
+        self.H, self.xedges, self.yedges = np.histogram2d(x, y, bins=[pix_x // bin_scale, pix_y // bin_scale], range=[[-self.Lx / 2, self.Lx / 2],[-self.Ly / 2, self.Ly / 2]])
         self.H = self.H.T
 
         #Optional - clear ray attributes to save memory
@@ -320,6 +324,10 @@ class Refractometry(Diagnostic):
     """
 
     def incoherent_solve(self):
+        ##
+        ## Is there an efficient way to chain these so needlessly variables are not used without having 1 really long line
+        ##
+
         ## Imaging the spatial axis - M = 2
         r1 = distance(self.r0, 3*self.L/4 - self.focal_plane) #displace rays to lens 1. Accounts for object with depth
         r2 = circular_aperture(r1, self.R)      # cut off
@@ -349,8 +357,9 @@ class Refractometry(Diagnostic):
         self.propagate_E(r7, r6)
         self.rf = r7
     
-    def refractogram(self, bin_scale=1, pix_x=3448, pix_y=2574, clear_mem=False):
-        """Bin data into a histogram. Defaults are for a KAF-8300.
+    def refractogram(self, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
+        """
+        Bin data into a histogram. Defaults are for a KAF-8300.
         Outputs are H, the histogram, and xedges and yedges, the bin edges.
 
         Args:
@@ -359,14 +368,14 @@ class Refractometry(Diagnostic):
             pix_y (int, optional): number of y pixels in detector plane. Defaults to 2574.
         """
   
-        x = self.rf[0,:]
-        y = self.rf[2,:]
+        x = self.rf[0, :]
+        y = self.rf[2, :]
 
-        x_bins = np.linspace(-self.Lx//2,self.Lx//2, pix_x // bin_scale)
-        y_bins = np.linspace(-self.Ly//2, self.Ly//2 , pix_y // bin_scale)
+        x_bins = np.linspace(-self.Lx // 2, self.Lx // 2, pix_x // bin_scale)
+        y_bins = np.linspace(-self.Ly // 2, self.Ly // 2 , pix_y // bin_scale)
         
-        amplitude_x = np.zeros((len(y_bins)-1, len(x_bins)-1), dtype=complex)
-        amplitude_y = np.zeros((len(y_bins)-1, len(x_bins)-1), dtype=complex)
+        amplitude_x = np.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype = complex)
+        amplitude_y = np.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype = complex)
 
         x_indices = np.digitize(self.rf[0,:], x_bins) - 1
         y_indices = np.digitize(self.rf[2,:], y_bins) - 1

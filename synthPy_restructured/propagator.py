@@ -251,6 +251,7 @@ class Propagator:
             #    print("Ray tracer failed. This could be a case of diffrax exceeding max steps again due to apparent 'strictness' compared to solve_ivp, check error log.")
 
         self.Beam.rf, self.Beam.Jf = ray_to_Jonesvector(self.Beam.rf, self.extent, probing_direction = self.Beam.probing_direction)
+        print(self.Beam.rf)
         if return_E:
             return self.Beam.rf, self.Beam.Jf
         else:
