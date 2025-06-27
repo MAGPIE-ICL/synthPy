@@ -208,6 +208,8 @@ class Diagnostic:
         x = x[mask]
         y = y[mask]
 
+        print("\nr0 after clearing nan's: (", len(x), ", ", len(y), ")", sep='')
+
         self.H, self.xedges, self.yedges = np.histogram2d(x, y, bins=[pix_x // bin_scale, pix_y // bin_scale], range=[[-self.Lx / 2, self.Lx / 2],[-self.Ly / 2, self.Ly / 2]])
         self.H = self.H.T
 
