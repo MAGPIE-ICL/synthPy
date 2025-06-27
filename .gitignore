@@ -27,3 +27,7 @@ field_generator/__pycache__/gaussian1D.cpython-313.pyc
 field_generator/__pycache__/gaussian2D.cpython-313.pyc
 field_generator/__pycache__/gaussian3D.cpython-313.pyc
 field_generator/__pycache__/*
+
+examples/notebooks/.ipynb_checkpoints
+examples/notebooks/.ipynb_checkpoints/test_SynthRayTracer-checkpoint.ipynb
+examples/notebooks/.ipynb_checkpoints/*

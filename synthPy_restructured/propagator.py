@@ -1,8 +1,14 @@
 import numpy as np
+import diffrax
+import optax
+import matplotlib.pyplot as plt
+import jax.numpy as jnp
+import jax
 
-from scipy.interpolate import RegularGridInterpolator
+#from scipy.interpolate import RegularGridInterpolator
 from scipy.integrate import odeint, solve_ivp
 from time import time
+from jax.scipy.interpolate import RegularGridInterpolator
 
 from scipy.constants import c
 
@@ -98,32 +104,36 @@ class Propagator:
     def set_up_interps(self):
         # Electron density
         self.ne_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.ne, bounds_error = False, fill_value = 0.0)
+
         # Magnetic field
         if(self.B_on):
             self.Bx_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.B[:,:,:,0], bounds_error = False, fill_value = 0.0)
             self.By_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.B[:,:,:,1], bounds_error = False, fill_value = 0.0)
             self.Bz_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.B[:,:,:,2], bounds_error = False, fill_value = 0.0)
+
         # Inverse Bremsstrahlung
         if(self.inv_brems):
             self.kappa_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.kappa(), bounds_error = False, fill_value = 0.0)
+
         # Phase shift
         if(self.phaseshift):
             self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
     
-    def dndr(self,x):
-        """returns the gradient at the locations x
+    def dndr(self, r):
+        """returns the gradient at the locations r
 
         Args:
-            x (3xN float): N [x,y,z] locations
+            r (3xN float): N [x, y, z] locations
 
         Returns:
-            3 x N float: N [dx,dy,dz] electron density gradients
+            3 x N float: N [dx, dy, dz] electron density gradients
         """
 
-        grad = np.zeros_like(x)
-        grad[0,:] = self.dndx_interp(x.T)
-        grad[1,:] = self.dndy_interp(x.T)
-        grad[2,:] = self.dndz_interp(x.T)
+        grad = jnp.zeros_like(r)
+
+        grad = grad.at[0, :].set(self.dndx_interp(r.T))
+        grad = grad.at[1, :].set(self.dndy_interp(r.T))
+        grad = grad.at[2, :].set(self.dndz_interp(r.T))
 
         return grad
 
@@ -168,28 +178,77 @@ class Propagator:
 
         return pol
 
-    def solve(self, return_E = False):
+    def solve(self, return_E = False, parallelise = False):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
 
         s0 = self.Beam.s0
 
+        # 8.0^0.5 is an arbritrary factor to ensure rays have enough time to escape the box
         t = np.linspace(0.0, np.sqrt(8.0) * self.extent / c, 2)
-
-        s0 = s0.flatten() #odeint insists
 
         start = time()
 
-        dsdt_ODE = lambda t, y: dsdt(t, y, self)
-        #try converting to this to jax based diffrax (also pure jax to see if abstraction is significant to performance) and compare solution times
-        sol = solve_ivp(dsdt_ODE, [0, t[-1]], s0, t_eval=t)
+        if not parallelise:
+            s0 = s0.flatten() #odeint insists
+            #s0 = jnp.array(s0) #for diffrax
+
+            # wrapper allows dummy variables t & y to be used by solve_ivp(), self is required by dsdt
+            dsdt_ODE = lambda t, y: dsdt(t, y, self, parallelise)
+            sol = solve_ivp(dsdt_ODE, [0, t[-1]], s0, t_eval = t)
+        else:
+            #dsdt_jit = jax.jit(dsdt)
+
+            # wrapper for same reason, diffrax.ODETerm instantiaties this and passes args (this will contain self)
+            def dsdt_ODE(t, y, args):
+                return dsdt(t, y, args['self'], args['parallelise'])
+
+            def diffrax_solve(dydt, t0, t1, Nt, rtol=1e-5, atol=1e-5):
+                """
+                Here we wrap the diffrax diffeqsolve function such that we can easily parallelise it
+                """
+
+                # We convert our python function to a diffrax ODETerm
+                term = diffrax.ODETerm(dsdt_ODE)
+                # We chose a solver (time-stepping) method from within diffrax library
+                solver = diffrax.Tsit5() # (RK45 - closest I could find to solve_ivp's default method)
+
+                # At what time points you want to save the solution
+                saveat = diffrax.SaveAt(ts = jnp.linspace(t0, t1, Nt))
+                # Diffrax uses adaptive time stepping to gain accuracy within certain tolerances
+                # had to reduce relative tolerance to 1 to get it to run, need to compare to see the consequences of this
+                stepsize_controller = diffrax.PIDController(rtol = 1, atol = 1e-5)
+
+                return lambda s0, args : diffrax.diffeqsolve(term, solver, y0 = jnp.array(s0), args = args, t0 = t0, t1 = t1, dt0 = (t1 - t0) / Nt, saveat = saveat, stepsize_controller = stepsize_controller)
+
+            ODE_solve = diffrax_solve(dsdt_ODE, t[0], t[-1], len(t))
+
+            # Solve for specific s0 intial values
+            args = {'self': self, 'parallelise': parallelise}
+            # pass s0[:, i] for each ray via a jax.vmap for parallelisation
+            # transposed as jax.vmap() expects form of [batch_idx, items] not [items, batch_idx]
+            sol = jax.vmap(lambda s: ODE_solve(s, args))(s0.T)
 
         finish = time()
         self.duration = finish - start
 
         Np = s0.size // 9
-        self.Beam.rf = sol.y[:,-1].reshape(9,Np)
+        if not parallelise:
+            self.Beam.rf = sol.y[:,-1].reshape(9, Np)
+        else:
+            #for i in enumerate(sol.result):
+            #    print(i)
+            #print(next(sol.result))
+            #if sol.result.success:
+            self.Beam.rf = sol.ys[:, -1, :].reshape(9, Np)
+
+            print("\nParallelised output has resulting 3D matrix of form: [batch_count, 2, 9]:", sol.ys.shape)
+            print("\t2 to account the start and end results")
+            print("\t9 containing the 3 position and velocity components, amplitude, phase and polarisation")
+            print("\nWe reshape into the form:", sol.ys[:, -1, :].reshape(9, Np).shape)
+            #else:
+            #    print("Ray tracer failed. This could be a case of diffrax exceeding max steps again due to apparent 'strictness' compared to solve_ivp, check error log.")
 
         self.Beam.rf, self.Beam.Jf = ray_to_Jonesvector(self.Beam.rf, self.extent, probing_direction = self.Beam.probing_direction)
         if return_E:
@@ -201,11 +260,15 @@ class Propagator:
         '''
         Solve intial rays up until a given depth, z
         '''
+
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
+
         length = self.extent + z
-        t  = np.linspace(0.0,length/c,2)
+        t = np.linspace(0.0, length / c, 2)
+
+        s0 = self.Beam.s0
         s0 = s0.flatten() #odeint insists
 
         print("Starting ray trace.")
@@ -231,8 +294,8 @@ class Propagator:
         Clears variables not needed by solve method, saving memory
 
         Can also use after calling solve to clear ray positions - important when running large number of rays
-
         """
+
         self.dndx = None
         self.dndy = None
         self.dndz = None
@@ -242,7 +305,7 @@ class Propagator:
         self.Beam.rf = None
 
 # ODEs of photon paths, standalone function to support the solve()
-def dsdt(t, s, Propagator):
+def dsdt(t, s, Propagator, parallelise):
     """Returns an array with the gradients and velocity per ray for ode_int
 
     Args:
@@ -254,22 +317,32 @@ def dsdt(t, s, Propagator):
         9N float array: flattened array for ode_int
     """
 
-    Np = s.size//9
-    s = s.reshape(9,Np)
-    sprime = np.zeros_like(s)
-    # Velocity and position
-    v = s[3:6,:]
-    x = s[:3,:]
-    # Amplitude, phase and polarisation
-    a = s[6,:]
-    p = s[7,:]
-    r = s[8,:]
+    if not parallelise:
+        # jnp.reshape() auto converts to a jax array rather than having to do after a numpy reshape
+        s = jnp.reshape(s, (9, s.size // 9))
+    else:
+        # forces s to be a matrix even if has the indexes of a 1d array such that dsdt() can be generalised
+        s = jnp.reshape(s, (9, 1))  # one ray per vmap iteration if parallelised
 
-    sprime[3:6,:] = Propagator.dndr(x)
-    sprime[:3,:] = v
-    sprime[6,:] = Propagator.atten(x)*a
-    sprime[7,:] = Propagator.phase(x)
-    sprime[8,:] = Propagator.neB(x,v)
+    #sprime = np.zeros_like(s.reshape(9, s.size // 9))
+    sprime = jnp.zeros_like(s)
+
+    # Position and velocity
+    # needs to be before the reshape to avoid indexing errors
+    x = s[:3, :]
+    v = s[3:6, :]
+
+    # Amplitude, phase and polarisation
+    a = s[6, :]
+    #p = s[7,:]
+    #r = s[8,:]
+
+    sprime = sprime.at[3:6, :].set(Propagator.dndr(x))
+    sprime = sprime.at[:3, :].set(v)
+
+    sprime = sprime.at[6, :].set(Propagator.atten(x) * a)
+    sprime = sprime.at[7, :].set(Propagator.phase(x))
+    sprime = sprime.at[8, :].set(Propagator.neB(x, v))
 
     return sprime.flatten()
 
