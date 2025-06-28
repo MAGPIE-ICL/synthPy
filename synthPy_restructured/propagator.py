@@ -9,6 +9,7 @@ import jax
 from scipy.integrate import odeint, solve_ivp
 from time import time
 from jax.scipy.interpolate import RegularGridInterpolator
+from equinox import filter_jit
 
 from scipy.constants import c
 
@@ -178,7 +179,7 @@ class Propagator:
 
         return pol
 
-    def solve(self, return_E = False, parallelise = False):
+    def solve(self, return_E = False, parallelise = True, jitted = True):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
@@ -198,11 +199,9 @@ class Propagator:
             dsdt_ODE = lambda t, y: dsdt(t, y, self, parallelise)
             sol = solve_ivp(dsdt_ODE, [0, t[-1]], s0, t_eval = t)
         else:
-            #dsdt_jit = jax.jit(dsdt)
-
             # wrapper for same reason, diffrax.ODETerm instantiaties this and passes args (this will contain self)
             def dsdt_ODE(t, y, args):
-                return dsdt(t, y, args['self'], args['parallelise'])
+                return dsdt(t, y, args[0], args[1])
 
             def diffrax_solve(dydt, t0, t1, Nt, rtol=1e-5, atol=1e-5):
                 """
@@ -220,12 +219,34 @@ class Propagator:
                 # had to reduce relative tolerance to 1 to get it to run, need to compare to see the consequences of this
                 stepsize_controller = diffrax.PIDController(rtol = 1, atol = 1e-5)
 
-                return lambda s0, args : diffrax.diffeqsolve(term, solver, y0 = jnp.array(s0), args = args, t0 = t0, t1 = t1, dt0 = (t1 - t0) / Nt, saveat = saveat, stepsize_controller = stepsize_controller)
+                return lambda s0, args : diffrax.diffeqsolve(
+                    term,
+                    solver,
+                    y0 = jnp.array(s0),
+                    args = args,
+                    t0 = t0,
+                    t1 = t1,
+                    dt0 = (t1 - t0) / Nt,
+                    saveat = saveat,
+                    stepsize_controller = stepsize_controller
+                )
 
             ODE_solve = diffrax_solve(dsdt_ODE, t[0], t[-1], len(t))
 
+            if jitted:
+                start_comp = time()
+
+                # equinox.filter_jit() (imported as filter_jit()) provides debugging info unlike jax.jit() - it does not like static args though so sticking with jit for now
+                ODE_solve = jax.jit(ODE_solve, static_argnums = 1)
+
+                finish_comp = time()
+                print("jax compilation of solver took:", finish_comp - start_comp)
+
             # Solve for specific s0 intial values
-            args = {'self': self, 'parallelise': parallelise}
+            #args = {'self': self, 'parallelise': parallelise}
+            #args = [self, parallelise]
+            args = (self, parallelise) # passed args must be hashable to be made static for jax.jit, tuple is hashable, array & dict are not
+
             # pass s0[:, i] for each ray via a jax.vmap for parallelisation
             # transposed as jax.vmap() expects form of [batch_idx, items] not [items, batch_idx]
             sol = jax.vmap(lambda s: ODE_solve(s, args))(s0.T)
@@ -237,10 +258,22 @@ class Propagator:
         if not parallelise:
             self.Beam.rf = sol.y[:,-1].reshape(9, Np)
         else:
+            '''
             #for i in enumerate(sol.result):
             #    print(i)
+            for idx, result in enumerate(sol.result):
+                # Check if each result is successful
+                if result.success:
+                    print(f"Solution at index {idx} succeeded.")
+                else:
+                    print(f"Solution at index {idx} failed.")
+        
             #print(next(sol.result))
-            #if sol.result.success:
+            #print(next(sol.result))
+            #print(type(sol.result[0]))  # Check the type of results
+            '''
+
+            #if sol.result == RESULTS.successful:
             self.Beam.rf = sol.ys[:, -1, :].reshape(9, Np)
 
             print("\nParallelised output has resulting 3D matrix of form: [batch_count, 2, 9]:", sol.ys.shape)
@@ -251,7 +284,7 @@ class Propagator:
             #    print("Ray tracer failed. This could be a case of diffrax exceeding max steps again due to apparent 'strictness' compared to solve_ivp, check error log.")
 
         self.Beam.rf, self.Beam.Jf = ray_to_Jonesvector(self.Beam.rf, self.extent, probing_direction = self.Beam.probing_direction)
-        print(self.Beam.rf)
+        #print("\n", self.Beam.rf)
         if return_E:
             return self.Beam.rf, self.Beam.Jf
         else:
@@ -272,7 +305,7 @@ class Propagator:
         s0 = self.Beam.s0
         s0 = s0.flatten() #odeint insists
 
-        print("Starting ray trace.")
+        print("\nStarting ray trace.")
 
         start = time()
 
@@ -282,7 +315,7 @@ class Propagator:
         finish = time()
         self.duration = finish - start
 
-        print("Ray trace completed in:\t", self.duration, "s")
+        print("\nRay trace completed in:\t", self.duration, "s")
 
         Np = s0.size//9
         self.Beam.sf = sol.y[:,-1].reshape(9,Np)
@@ -406,7 +439,7 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction):
         ray_p[1] = np.arctan(vx / vz)
         ray_p[3] = np.arctan(vy / vz)
     else:
-        print("Incorrect probing direction. Use: x, y or z.")
+        print("\nIncorrect probing direction. Use: x, y or z.")
 
     # Resolve Jones vectors
     amp,phase,pol = ode_sol[6], ode_sol[7], ode_sol[8]
