@@ -1,0 +1,163 @@
+## ***************************************************************************************
+##
+##
+##
+## This is my style guide for creating matplotlib plots. It is updated as I come across
+## new styles and colours that I like
+##
+## Author: Stefano Merlini
+##
+## 
+##
+##
+## ***************************************************************************************
+
+### LINES (http://matplotlib.org/api/artist_api.html#module-matplotlib.lines)
+lines.linewidth   : 2.0     
+lines.linestyle   : -       # solid line
+lines.antialiased : True    # render lines in antialiased (no jaggies)
+
+
+### AXES (http://matplotlib.org/api/axes_api.html#module-matplotlib.axes)
+axes.facecolor      : white  # axes background color
+axes.edgecolor      : black  # axes edge color
+axes.linewidth      : 2.5    # edge linewidth
+axes.grid           : True        
+axes.grid.which     : major
+axes.grid.axis      : both
+axes.titlesize      : large   # fontsize of the axes title
+#axes.titley         : 0.98    # at the top, no autopositioning.
+axes.titlepad       : 6.0     # pad between axes and title in points
+axes.titleweight    : normal  # font weight for axes title
+axes.labelsize      : 20      # fontsize of the x any y labels
+axes.labelpad       : 5.0     # space between label and axis
+axes.labelweight    : normal  # weight of the x and y labels
+axes.labelcolor     : black
+axes.axisbelow      : False   # whether axis gridlines and ticks are below
+                              # the axes elements (lines, text, etc)
+                              
+                              
+axes.formatter.limits       : -5, 6 # use scientific notation if log10
+                                    # of the axis range is smaller than the
+                                    # first or larger than the second
+                                    
+axes.formatter.use_mathtext : False # When True, use mathtext for scientific
+                                    # notation.        
+                                    
+axes.formatter.useoffset    : False # If True, the tick label formatter
+                                	# will default to labeling ticks relative
+                                    # to an offset when the data range is very
+                                    # small compared to the minimum absolute
+                                    # value of the data.
+                                    
+axes.formatter.offset_threshold : 4 # When useoffset is True, the offset
+                                    # will be used when it can remove
+                                    # at least this number of significant
+                                    # digits from tick labels.
+
+axes.unicode_minus  : True    # use unicode for the minus symbol
+                              # rather than hyphen
+                              
+axes.prop_cycle    : cycler(color=['tab:blue', 'tab:orange', 'tab:red', 'tab:green'])
+                                           # color cycle for plot lines
+                                           
+                                           
+axes.autolimit_mode : data
+axes.xmargin        : .05  # x margin.  See `axes.Axes.margins`
+axes.ymargin        : .05  # y margin See `axes.Axes.margins`
+axes.spines.bottom  : True
+axes.spines.left    : True
+axes.spines.right   : True
+axes.spines.top     : True
+polaraxes.grid      : True # display grid on polar axes
+axes3d.grid         : True # display grid on 3d axes
+
+
+### Date Formatting
+date.autoformatter.year:        %Y
+date.autoformatter.month:       %m/%Y
+date.autoformatter.day:         %d/%m/%Y
+date.autoformatter.hour:        %d/%m %H
+date.autoformatter.minute:      %d %H:%M
+date.autoformatter.second:      %H:%M:%S
+date.autoformatter.microsecond: %M:%S.%f
+
+
+### TICKS (http://matplotlib.org/api/axis_api.html#matplotlib.axis.Tick)
+xtick.top            : True     # draw ticks on the top side
+xtick.bottom         : True     # draw ticks on the bottom side
+xtick.major.size     : 8.0      # major tick size in points
+xtick.minor.size     : 4.0      # minor tick size in points
+xtick.minor.visible  : True
+xtick.major.width    : 2      # major tick width in points
+xtick.minor.width    : 1.5      # minor tick width in points
+xtick.major.pad      : 8      # distance to major tick label in points
+xtick.minor.pad      : 7      # distance to the minor tick label in points
+xtick.color          : black    # color of the tick labels
+xtick.labelsize      : 20       # fontsize of the tick labels
+xtick.direction      : in       # direction: in, out, or inout
+xtick.major.top      : True     # draw x axis top major ticks
+xtick.major.bottom   : True     # draw x axis bottom major ticks
+xtick.minor.top      : True     # draw x axis top minor ticks
+xtick.minor.bottom   : True     # draw x axis bottom minor ticks
+xtick.alignment : center
+
+ytick.left           : True     # draw ticks on the left side
+ytick.right          : True    # draw ticks on the right side
+ytick.major.size     : 8.0      # major tick size in points
+ytick.minor.size     : 4.0      # minor tick size in points
+ytick.minor.visible  : True
+ytick.major.width    : 2      # major tick width in points
+ytick.minor.width    : 1.5      # minor tick width in points
+ytick.major.pad      : 8      # distance to major tick label in points
+ytick.minor.pad      : 7      # distance to the minor tick label in points
+ytick.color          : black    # color of the tick labels
+ytick.labelsize      : 20       # fontsize of the tick labels
+ytick.direction      : in       # direction: in, out, or inout
+ytick.major.left     : True     # draw y axis left major ticks
+ytick.major.right    : True     # draw y axis right major ticks
+ytick.minor.left     : True     # draw y axis left minor ticks
+ytick.minor.right    : True     # draw y axis right minor ticks
+ytick.alignment      : center_baseline
+
+
+### GRIDS
+grid.color       :   b0b0b0  # grid color
+grid.linestyle   :   -       # solid
+grid.linewidth   :   1.0     # in points
+grid.alpha       :   0.3     # transparency, between 0.0 and 1.0
+
+### LEGEND
+legend.fontsize    : 16		  # setting legend font size  
+
+### FIGURE (http://matplotlib.org/api/figure_api.html#matplotlib.figure.Figure)
+figure.titlesize   : large    # size of the figure title
+figure.titleweight : normal   # weight of the figure title
+figure.figsize     : 12, 6   # figure size in inches
+figure.dpi         : 100      # figure dots per inch
+figure.facecolor   : white    # figure facecolor; 0.75 is scalar gray
+figure.edgecolor   : white    # figure edgecolor
+figure.autolayout  : False    # When True, automatically adjust subplot
+                              # parameters to make the plot fit the figure
+figure.frameon : True
+
+figure.subplot.left    : 0.125  # the left side of the subplots of the figure
+figure.subplot.right   : 0.95   # the right side of the subplots of the figure
+figure.subplot.bottom  : 0.10   # the bottom of the subplots of the figure
+figure.subplot.top     : 0.95   # the top of the subplots of the figure
+figure.subplot.wspace  : 0.2    # the amount of width reserved for space between subplots,
+                                # expressed as a fraction of the average axis width
+figure.subplot.hspace  : 0.10   # the amount of height reserved for space between subplots,
+                                # expressed as a fraction of the average axis height
+
+
+### Errorbar Properties
+errorbar.capsize: 3
+
+
+### Scatter Properties
+scatter.marker: s
+
+
+### Histogram Properties
+hist.bins: 25                   # The default number of histogram bins or 'auto'

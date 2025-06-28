@@ -1,5 +1,4 @@
-"""
-FULL PHYSICS SOLVER - 9 Vector description of rays - Include Phase and Polarisation
+"""FULL PHYSICS SOLVER - 9 Vector description of rays - Include Phase and Polarisation
 BASED ON: https://journals.aps.org/pre/abstract/10.1103/PhysRevE.61.895
 
 SOLVES: 
@@ -7,7 +6,7 @@ $ \frac{d\vec{v}}{dt} = -\nabla \left( \frac{c^2}{2} \frac{n_e}{n_c} \right) $
 $ \frac{d\vec{x}}{dt} = \vec{v} $
 
 BASED VERSION CODED BY: Aidan CRILLY / Jack HARE
-MODIFIED BY: Stefano MERLINI, Louis Evans
+MODIFIED BY: Stefano MERLINI
 
 EXAMPLES:
 #############################
@@ -80,15 +79,13 @@ ax2.set_xlabel(r"$\theta$ (mrad)")
 ax2.set_ylabel(r"$\phi$ (mrad)")
 
 fig.tight_layout()
-
 """
 
 import numpy as np
-from scipy.integrate import odeint, solve_ivp
+from scipy.integrate import odeint,solve_ivp
 from scipy.interpolate import RegularGridInterpolator
 from time import time
 import scipy.constants as sc
-
 
 c = sc.c # honestly, this could be 3e8 *shrugs*
 
@@ -99,7 +96,7 @@ class ScalarDomain:
     This contains also the method to propagate rays through the scara domain
     """
     
-    def __init__(self, x, y, z, extent, B_on = False, inv_brems = False, phaseshift = False):
+    def __init__(self, x, y, z, extent, B_on = False, inv_brems = False, phaseshift = False, probing_direction = 'z'):
         """
         Example:
             N_V = 100
@@ -115,12 +112,10 @@ class ScalarDomain:
             z (float array): z coordinates, m
             extent (float): physical size, m
         """
-        self.x, self.y, self.z = np.float32(x), np.float32(y), np.float32(z)
-        self.XX, self.YY, self.ZZ = np.meshgrid(x, y, z, indexing='ij', copy = False)
-
+        self.z,self.y,self.x = np.float32(z), np.float32(y), np.float32(x)
+        self.XX, self.YY, self.ZZ = np.meshgrid(x,y,z, indexing='ij', copy = False)
         self.extent = extent
-        self.probing_direction = probing_direction # must be doubled in legacy code as init_beam takes only probing_direction and not self object, therefore need to change parameters to avoid doubling - seems like a pointless change in legacy code
-
+        self.probing_direction = probing_direction
         # Logical switches
         self.B_on       = B_on
         self.inv_brems  = inv_brems
@@ -131,7 +126,7 @@ class ScalarDomain:
         Null test, an empty cube
         """
         self.ne = np.zeros_like(self.XX)
-
+        
     def test_slab(self, s=1, n_e0=2e23):
         """A slab with a linear gradient in x:
         n_e =  n_e0 * (1 + s*x/extent)
@@ -215,7 +210,7 @@ class ScalarDomain:
         """
 
         self.omega = 2*np.pi*(c/lwl)
-        nc = 3.14207787e-4*self.omega**2 # (epsilon_0 * m_e / e^2) * w^2 = n_c
+        nc = 3.14207787e-4*self.omega**2
 
         # Find Faraday rotation constant http://farside.ph.utexas.edu/teaching/em/lectures/node101.html
         if (self.B_on):
@@ -232,21 +227,16 @@ class ScalarDomain:
         self.dndy_interp = RegularGridInterpolator((self.x, self.y, self.z), self.dndy, bounds_error = False, fill_value = 0.0)
         self.dndz_interp = RegularGridInterpolator((self.x, self.y, self.z), self.dndz, bounds_error = False, fill_value = 0.0)
 
-    def omega_pe(ne):
-        '''Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28'''
-
-        return 5.64e4*np.sqrt(ne)
-
     # NRL formulary inverse brems - cheers Jack Halliday for coding in Python
     # Converted to rate coefficient by multiplying by group velocity in plasma
     def kappa(self):
         # Useful subroutines
-
+        def omega_pe(ne):
+            '''Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28'''
+            return 5.64e4*np.sqrt(ne)
         def v_the(Te):
             '''Calculate electron thermal speed. Provide Te in eV. Retrurns result in m/s'''
-
             return 4.19e5*np.sqrt(Te)
-
         def V(ne, Te, Z, omega):
             o_pe  = omega_pe(ne)
             o_max = np.copy(o_pe)
@@ -254,20 +244,19 @@ class ScalarDomain:
             L_classical = Z*sc.e/Te
             L_quantum = 2.760428269727312e-10/np.sqrt(Te) # sc.hbar/np.sqrt(sc.m_e*sc.e*Te)
             L_max = np.maximum(L_classical, L_quantum)
-
             return o_max*L_max
-
         def coloumbLog(ne, Te, Z, omega):
             return np.maximum(2.0,np.log(v_the(Te)/V(ne, Te, Z, omega)))
-
         ne_cc = self.ne*1e-6
-        o_pe = omega_pe(ne_cc)
-        CL = coloumbLog(ne_cc, self.Te, self.Z, self.omega)
-
+        o_pe  = omega_pe(ne_cc)
+        CL    = coloumbLog(ne_cc, self.Te, self.Z, self.omega)
         return 3.1e-5*self.Z*c*np.power(ne_cc/self.omega,2)*CL*np.power(self.Te, -1.5) # 1/s
 
     # Plasma refractive index
     def n_refrac(self):
+        def omega_pe(ne):
+            '''Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28'''
+            return 5.64e4*np.sqrt(ne)
         ne_cc = self.ne*1e-6
         o_pe  = omega_pe(ne_cc)
         return np.sqrt(1.0-(o_pe/self.omega)**2)
@@ -287,14 +276,13 @@ class ScalarDomain:
         if(self.phaseshift):
             self.refractive_index_interp = RegularGridInterpolator((self.x, self.y, self.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
 
-    def plot_midline_gradients(self, ax, probing_direction):
+    def plot_midline_gradients(self,ax,probing_direction):
         """I actually don't know what this does. Presumably plots the gradients half way through the box? Cool.
 
         Args:
             ax ([type]): [description]
             probing_direction ([type]): [description]
         """
-
         N_V = self.x.shape[0]//2
         if(probing_direction == 'x'):
             ax.plot(self.y,self.dndx[:,N_V,N_V])
@@ -312,7 +300,7 @@ class ScalarDomain:
             ax.plot(self.y,self.dndx[N_V,:,N_V])
             ax.plot(self.y,self.dndy[N_V,:,N_V])
             ax.plot(self.y,self.dndz[N_V,:,N_V])
-
+    
     def dndr(self,x):
         """returns the gradient at the locations x
 
@@ -322,12 +310,10 @@ class ScalarDomain:
         Returns:
             3 x N float: N [dx,dy,dz] electron density gradients
         """
-
         grad = np.zeros_like(x)
         grad[0,:] = self.dndx_interp(x.T)
         grad[1,:] = self.dndy_interp(x.T)
         grad[2,:] = self.dndz_interp(x.T)
-
         return grad
 
     # Attenuation due to inverse bremsstrahlung
@@ -340,6 +326,7 @@ class ScalarDomain:
     # Phase shift introduced by refractive index
     def phase(self,x):
         if(self.phaseshift):
+
             self.refractive_index_interp = RegularGridInterpolator((self.x, self.y, self.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
             return self.omega*(self.refractive_index_interp(x.T)-1.0)
         else:
@@ -362,7 +349,6 @@ class ScalarDomain:
         Returns:
             N float: N values of ne B.v
         """
-
         if(self.B_on):
             ne_N = self.get_ne(x)
             Bv_N = np.sum(self.get_B(x)*v,axis=0)
@@ -372,44 +358,13 @@ class ScalarDomain:
 
         return pol
 
-    def solve(self, s0, return_E = False):
+    def solve(self, s0):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
 
-        t  = np.linspace(0.0, np.sqrt(8.0)*self.extent/c,2)
+        t  = np.linspace(0.0,np.sqrt(8.0)*self.extent/c,2)
 
-        s0 = s0.flatten() #odeint insists
-
-        start = time()
-
-        dsdt_ODE = lambda t, y: dsdt(t, y, self)
-
-        print("Starting ray trace.")
-
-        sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t)
-
-        finish = time()
-        print("Ray trace completed in:\t",finish-start,"s")
-
-        Np = s0.size//9
-        self.sf = sol.y[:,-1].reshape(9,Np)
-
-        self.rf,self.Jf = ray_to_Jonesvector(self.sf, self.extent, probing_direction = self.probing_direction)
-        if return_E:
-            return self.rf, self.Jf
-        else:
-            return self.rf
-    
-    def solve_at_depth(self, s0, z):
-        '''
-        Solve intial rays up until a given depth, z, assuming self.extent variable is the extent in propagation direction
-        '''
-        # Need to make sure all rays have left volume
-        # Conservative estimate of diagonal across volume
-        # Then can backproject to surface of volume
-        length = z
-        t  = np.linspace(0.0,length/c,2)
         s0 = s0.flatten() #odeint insists
 
         start = time()
@@ -420,8 +375,52 @@ class ScalarDomain:
 
         Np = s0.size//9
         self.sf = sol.y[:,-1].reshape(9,Np)
+
         self.rf,self.Jf = ray_to_Jonesvector(self.sf, self.extent, probing_direction = self.probing_direction)
         return self.rf
+    
+    def solve_at_extent(self, s0, z):
+    # Need to make sure all rays have left volume
+    # Conservative estimate of diagonal across volume
+    # Then can backproject to surface of volume
+
+        t  = np.linspace(0.0,z/c,2)
+
+        s0 = s0.flatten() #odeint insists
+
+        start = time()
+        dsdt_ODE = lambda t, y: dsdt(t, y, self)
+        sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t)
+        finish = time()
+        print("Ray trace completed in:\t",finish-start,"s")
+
+        Np = s0.size//9
+        self.sf = sol.y[:,-1].reshape(9,Np)
+
+        self.rf,self.Jf = ray_to_Jonesvector(self.sf, z, probing_direction = self.probing_direction)
+        return self.rf
+
+    
+    
+    def solve_with_E(self, s0):
+        # Need to make sure all rays have left volume
+        # Conservative estimate of diagonal across volume
+        # Then can backproject to surface of volume
+
+        t  = np.linspace(0.0,np.sqrt(8.0)*self.extent/c,2)
+
+        s0 = s0.flatten() #odeint insists
+
+        start = time()
+        dsdt_ODE = lambda t, y: dsdt(t, y, self)
+        sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t)
+        finish = time()
+        print("Ray trace completed in:\t",finish-start,"s")
+
+        Np = s0.size//9
+        self.sf = sol.y[:,-1].reshape(9,Np)
+        self.rf,self.Jf = ray_to_Jonesvector(self.sf, self.extent, probing_direction = self.probing_direction)
+        return self.rf, self.Jf
 
     def clear_memory(self):
         """
@@ -438,15 +437,23 @@ class ScalarDomain:
         self.sf = None
         self.rf = None
     
+
     def export_scalar_field(self, property: str = 'ne', fname: str = None):
+
         '''
         Export the current scalar electron density profile as a pvti file format, property added for future scalability to export temperature, B-field, etc.
+
         Args:
             property: str, 'ne': export the electron density (default)
+            
             fname: str, file path and name to save under. A VTI pointed to by a PVTI file are saved in this location. If left blank, the name will default to:
+
                     ./plasma_PVTI_DD_MM_YYYY_HR_MIN
+        
+        
         '''
         import pyvista as pv
+
     
         if fname is None:
             import datetime as dt
@@ -456,7 +463,9 @@ class ScalarDomain:
             min = dt.datetime.now().minute
             hour = dt.datetime.now().hour
 
+
             fname = f'./plasma_PVTI_{day}_{month}_{year}_{hour}_{min}' #default fname to the current date and time 
+
 
         if property == 'ne':
 
@@ -491,23 +500,27 @@ class ScalarDomain:
         #prep values to write the pvti, written to match the exported vti using pyvista
 
         relative_fname = fname.split('/')[-1]
-        spacing_x = (2*self.extent)/np.shape(self.x)[0]
-        spacing_y = (2*self.extent)/np.shape(self.y)[0]
-        spacing_z = (2*self.extent)/np.shape(self.z)[0]
+        spacing_x = (2*np.max(self.x))/np.shape(self.x)[0]
+        spacing_y = (2*np.max(self.y))/np.shape(self.y)[0]
+        spacing_z = (2*np.max(self.z))/np.shape(self.z)[0]
         content = f'''<?xml version="1.0"?>
-                        <VTKFile type="PImageData" version="0.1" byte_order="LittleEndian" header_type="UInt32" compressor="vtkZLibDataCompressor">
-                            <PImageData WholeExtent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" GhostLevel="0" Origin="0 0 0" Spacing="{spacing_x} {spacing_y} {spacing_z}">
-                                <PCellData Scalars="rnec">
-                                    <PDataArray type="Float64" Name="rnec">
-                                    </PDataArray>
-                                </PCellData>
-                                <Piece Extent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" Source="{relative_fname}.vti"/>
-                            </PImageData>
-                        </VTKFile>'''
+<VTKFile type="PImageData" version="0.1" byte_order="LittleEndian" header_type="UInt32" compressor="vtkZLibDataCompressor">
+    <PImageData WholeExtent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" GhostLevel="0" Origin="0 0 0" Spacing="{spacing_x} {spacing_y} {spacing_z}">
+         <PCellData Scalars="rnec">
+             <PDataArray type="Float64" Name="rnec">
+             </PDataArray>
+         </PCellData>
+         <Piece Extent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" Source="{relative_fname}.vti"/>
+    </PImageData>
+</VTKFile>'''
+
+
     
         # write file
+
         with open(f'{fname}.pvti', 'w') as file:
             file.write(content)
+        
         print(f'Scalar Domain electron density succesfully saved under {fname}.pvti !')
 
 
@@ -544,11 +557,10 @@ def dsdt(t, s, ScalarDomain):
     sprime[6,:]   = ScalarDomain.atten(x)*a
     sprime[7,:]   = ScalarDomain.phase(x)
     sprime[8,:]   = ScalarDomain.neB(x,v)
-
     return sprime.flatten()
 
 # Initialise beam
-def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z'):
+def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z', beam_type = 'circular'):
     """[summary]
 
     Args:
@@ -561,10 +573,8 @@ def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z'):
     Returns:
         s0, 9 x N float: N rays with (x, y, z, vx, vy, vz) in m, m/s and amplitude, phase and polarisation (a, p, r) 
     """
-
     s0 = np.zeros((9,Np))
-
-    if (beam_type == 'circular'):
+    if(beam_type == 'circular'):
         # position, uniformly within a circle
         t  = 2*np.pi*np.random.rand(Np) #polar angle of position
         u  = np.random.rand(Np)+np.random.rand(Np) # radial coordinate of position
@@ -610,7 +620,6 @@ def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z'):
             s0[0,:] = beam_size*u*np.cos(t)
             s0[1,:] = -ne_extent
             s0[2,:] = beam_size*u*np.sin(t)
-
     elif(beam_type == 'square'):
         # position, uniformly within a square
         t  = 2*np.random.rand(Np)-1.0
@@ -656,7 +665,6 @@ def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z'):
             s0[0,:] = beam_size*u
             s0[1,:] = -ne_extent
             s0[2,:] = beam_size*t
-
     elif(beam_type == 'rectangular'):
         # position, uniformly within a square
         t  = 2*np.random.rand(Np)-1.0
@@ -705,7 +713,6 @@ def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z'):
             s0[0,:] = beam_size_1*u
             s0[1,:] = -ne_extent
             s0[2,:] = beam_size_2*t
-
     elif(beam_type == 'linear'):
         # position, uniformly along a line - probing direction is defaulted z, solved in x,z plane
         t  = 2*np.random.rand(Np)-1.0
@@ -720,130 +727,25 @@ def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z'):
         s0[0,:] = beam_size*t
         s0[1,:] = 0.0
         s0[2,:] = -ne_extent
-
-    elif(beam_type == 'rect_trackers'):
-        # Randomly choose N_trackers indices to mark as tracking particles
-        # tracker_indices = np.random.choice(Np, N_trackers, replace=False)
-
-        # position, uniformly within a square
-        t  = 2*np.random.rand(Np)-1.0
-        u  = 2*np.random.rand(Np)-1.0
-
-        # angle
-        ϕ = np.pi*np.random.rand(Np) #azimuthal angle of velocity
-        χ = divergence*np.random.randn(Np) #polar angle of velocity
-
-        beam_size_1 = beam_size[0] #m
-        beam_size_2 = beam_size[1] #m
-
-        if(probing_direction == 'x'):
-            # Initial velocity
-            s0[3,:] = c * np.cos(χ)
-            s0[4,:] = c * np.sin(χ) * np.cos(ϕ)
-            s0[5,:] = c * np.sin(χ) * np.sin(ϕ)
-
-            # Initial position
-            s0[0,:] = -ne_extent
-            s0[1,:] = beam_size_1*u
-            s0[2,:] = beam_size_2*t
-        elif(probing_direction == 'y'):
-            # Initial velocity
-            s0[4,:] = c * np.cos(χ)
-            s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
-            s0[5,:] = c * np.sin(χ) * np.sin(ϕ)
-
-            # Initial position
-            s0[0,:] = beam_size_1*u
-            s0[1,:] = -ne_extent
-            s0[2,:] = beam_size_2*t
-        elif(probing_direction == 'z'):
-            # Initial velocity
-            s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
-            s0[4,:] = c * np.sin(χ) * np.sin(ϕ)
-            s0[5,:] = c * np.cos(χ)
-
-            # Initial position
-            s0[0,:] = beam_size_1*u
-            s0[1,:] = beam_size_2*t
-            s0[2,:] = -ne_extent
-        else: # Default to y
-            print("Default to y")
-            # Initial velocity
-            s0[4,:] = c * np.cos(χ)
-            s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
-            s0[5,:] = c * np.sin(χ) * np.sin(ϕ)
-
-            # Initial position
-            s0[0,:] = beam_size_1*u
-            s0[1,:] = -ne_extent
-            s0[2,:] = beam_size_2*t
-
-    elif(beam_type == 'even'): # evenly distributed circular ray using concentric discs
-        # number of concentric discs and points
-        num_of_circles = (-1 + np.sqrt(1 + 8*(Np//6)))/2 
-        Np = 3*(num_of_circles + 1) * num_of_circles + 1
-
-        # angle
-        ϕ = np.pi*np.random.rand(Np) #azimuthal angle of velocity
-        χ = divergence*np.random.randn(Np) #polar angle of velocity
-
-        # position, uniformly within a circle
-        t = [0]
-        u = [0]
-
-        for i in range(1,num_of_circles+1): # for every disc
-            for j in range(0,i*6): # for every point in the disc
-                u.append(i / num_of_circles)
-                t.append(j * 2 * np.pi / (i*6))
-
     else:
-        print("beam_type unrecognised! Accepted args: circular, square, rectangular, linear, even")
+        print("beam_type unrecognised! Accepted args: circular, square, rectangular, linear")
 
     # Initialise amplitude, phase and polarisation
     s0[6,:] = 1.0
     s0[7,:] = 0.0
-
-    if beam_type == 'rect_trackers':
-        # Define region in real space for the selection
-        x_min, x_max = -1e-3, 1e-3  # Range for x
-        y_min, y_max = -1e-3, 1e-3  # Range for y
-        z_min = -ne_extent
-
-        # Extract initial positions
-        x_positions = s0[0, :]  # x-coordinates of the rays
-        y_positions = s0[1, :]  # y-coordinates of the rays
-        z_positions = s0[2, :]  # z-coordinates of the rays
-
-        # Find rays within the region
-        in_region = (
-            (x_positions >= x_min) & (x_positions <= x_max) &
-            (y_positions >= y_min) & (y_positions <= y_max) &
-            (z_positions == z_min)
-        )
-
-        region_indices = np.where(in_region)[0]
-
-        # Check if enough rays are in the region
-        if len(region_indices) < N_trackers:
-            raise ValueError("Not enough rays found in the specified region to allocate all trackers.")
-
-        # Randomly select N_trackers from the region
-        tracker_indices = np.random.choice(region_indices, N_trackers, replace=False)
-        # Mark tracking particles by setting their polarisation to 1
-        s0[8, tracker_indices] = 1.0
-        return s0, tracker_indices
-    else:
-        s0[8,:] = 0.0
-        return s0
+    s0[8,:] = 0.0
+    return s0
 
 # Need to backproject to ne volume, then find angles
 def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction = 'z'):
     """Takes the output from the 9D solver and returns 6D rays for ray-transfer matrix techniques.
     Effectively finds how far the ray is from the end of the volume, returns it to the end of the volume.
+
     Args:
         ode_sol (6xN float): N rays in (x,y,z,vx,vy,vz) format, m and m/s and amplitude, phase and polarisation
         ne_extent (float): edge length of cube, m
         probing_direction (str): x, y or z.
+
     Returns:
         [type]: [description]
     """
@@ -893,4 +795,21 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction = 'z'):
 
     # ray_p [x,phi,y,theta], ray_J [E_x,E_y]
 
-    return ray_p, ray_J
+    return ray_p,ray_J
+
+
+def interfere_ref_beam(rf, E, n_fringes, deg):
+        ''' input beam ray positions and electric field component, and desired angle of background fringes.'''
+        if deg >= 45:
+            deg = - np.abs(deg - 90)
+
+            
+        rad = deg* np.pi /180 #deg to rad
+        y_weight = np.arctan(rad)#take x_weight is 1
+        x_weight = np.sqrt(1-y_weight**2)
+
+        ref_beam = np.exp(2*n_fringes/3 * 1.0j*(x_weight*rf[0,:] + y_weight * rf[2,:]))
+
+        E[1,:] += ref_beam # assume ref_beam is polarised in y
+
+        return E

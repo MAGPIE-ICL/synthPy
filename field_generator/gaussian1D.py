@@ -102,13 +102,13 @@ class gaussian1D:
         return _r
 
     def fft(self, l_max, l_min, extent, res):
+    #def domain_fft(self, l_max, l_min, extent, res):, alternate name in case previous no longer works past merge
         '''
         A FFT based generator for scalar gaussian fields in 1D
         Reference:Timmer, J and König, M. “On Generating Power Law Noise.” Astronomy & Astrophysics 300 (1995):
         1–30. https://doi.org/10.1017/CBO9781107415324.004.
 
         Generate a Gaussian random field with a fourier spectrum following k_func in the domain 2*pi/l_max to 2*pi/l_min, and 0 outside
-
     
         Args:
             l_max: max length scale, usually = 2*extent due to physical boundary conditions
@@ -207,7 +207,10 @@ class gaussian1D:
             # Add the data values to the cell data
 
             x_y_data = np.column_stack((xc,self.ne))
+            x_y_data = np.column_stack((xc,self.ne))
 
+        else:
+            x_y_data = None
         else:
             x_y_data = None
         # write the file to fname

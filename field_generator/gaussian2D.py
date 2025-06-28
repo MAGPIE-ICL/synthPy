@@ -74,9 +74,7 @@ class gaussian2D:
         cb = plt.colorbar(cp)
 
         # I you want to calculate the spectrum
-
         knyquist, wavenumbers, tkespec = calcspec.compute2Dspectum(r, lx, ly, False)
-
         """
         # --------------------------------------------------------------------------
 
@@ -124,6 +122,7 @@ class gaussian2D:
         return _r
     
     def fft(self, l_max, l_min, extent, res):
+    #def domain_fft(self, l_max, l_min, extent, res):, alternate name in case previous no longer works past merge
         '''
         Generate a Gaussian random field with a fourier spectrum following k_func in the domain 2*pi/l_max to 2*pi/l_min, and 0 outside
         Reference:Timmer, J and König, M. “On Generating Power Law Noise.” Astronomy & Astrophysics 300 (1995):
@@ -194,13 +193,10 @@ class gaussian2D:
             import pickle
 
             ne = pickle.load( open(fname.pkl, "rb" ) )
-        
-        
         '''
+
         import pyvista as pv
-
         import pickle
-
     
         if fname is None:
             import datetime as dt
@@ -212,8 +208,6 @@ class gaussian2D:
 
 
             fname = f'./plasma_PVTI_{day}_{month}_{year}_{hour}_{min}' #default fname to the current date and time 
-
-
 
         if property == 'ne':
 
@@ -237,9 +231,6 @@ class gaussian2D:
 
             values = np.concatenate((spatial_vals, rnec), axis = 1)
 
-
         filehandler = open(f'{fname}.pkl',"wb")
         pickle.dump(values,filehandler)
         filehandler.close()
-        
-        
