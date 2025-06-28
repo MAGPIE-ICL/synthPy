@@ -132,6 +132,7 @@ class gaussian3D:
         _r = np.zeros((nx,ny,nz))
 
         print("Generating 3-D turbulence...")
+
         for k in range(0,nz):
             for j in range(0,ny):
                 for i in range(0,nx):
@@ -144,66 +145,45 @@ class gaussian3D:
                     _r[i,j,k] = np.sum(bm)
 
         print("Done! 3-D Turbulence has been generated!")
+
         self.ne = _r
+
         return _r
 
     def fft(self, l_max, l_min, extent, res, factor):
-        '''
-        Generate a Gaussian random field with a fourier spectrum following k_func in the domain 2*pi/l_max to 2*pi/l_min, and 0 outside
+        """
+        A FFT based generator for scalar gaussian fields in 1D
 
-        Args:
-            l_max: max length scale, usually = 2*extent due to physical boundary conditions
-            l_min: min length scale, either resolution, or scale at which energy in = energy out (Re = 1)
-            extent: field is made about the origin, from +extent to -extent in each dimension
-            res: resolution, number of cells from 0 to extent, (total number of cells = 2*res*N_dim)
-        
+        Reference: Timmer, J and König, M. “On Generating Power Law Noise.” Astronomy & Astrophysics 300 (1995):
+        1–30. https://doi.org/10.1017/CBO9781107415324.004.
+
+        Arguments:
+            N {int}  -- size of domain will be (2*N+1)^3
+            k_func {function} -- a function which takes an input k
+ 
         Returns:
-            x: spatial coordinates
-            y: spatial coordinates
-            z: spatial coordinates
-            field: 2*res x 2*res x 2*res array of GRF noise
-        '''
+            signal {3D array of floats} -- a realisation of a 3D Gaussian process.
 
-        dx = extent / res
-        x = y =  np.linspace(-extent, extent, 2*res, endpoint=False, dtype=np.float32)
-        z = np.linspace(-extent*factor, extent*factor, int(2*res*factor), endpoint=False, dtype=np.float32)
-        self.xc, self.yc, self.zc = x, y, z
+        Example:
+            N = 100
+            def power_spectrum(k,a):
+                return k**-a
 
-        kx = ky  =  2 * np.pi * np.fft.fftfreq(2*res, d=dx )
-        kz = 2 * np.pi * np.fft.fftfreq(int(2*res * factor), d=dx)
-        kxx, kyy, kzz = np.meshgrid(kx, ky, kz, copy = False)
-        del kx
-        del ky
-        del kz
+            def k41(k):
+                return power_spectrum(k, 5/3)        
+            
+            sig = gaussian3D_FFT(N, k41)
+            
+            fig,ax=plt.subplots(3,3, figsize=(8,8), sharex=True, sharey=True)
+            ax=ax.flatten()
+            
+            for a in ax:
+                r=np.random.randint(0,ny)
+                d=sig[r,:,:]
+                a.imshow(d, cmap='bwr', extent=[-N,N,-N,N])
+                a.set_title("y="+str(r))
+        """
 
-        k = np.sqrt(kxx**2 + kyy**2 + kzz**2, dtype = np.float32)
-
-        del kxx
-        del kyy
-        del kzz
-
-        k_min = 2 * np.pi / l_max
-        k_max = 2 * np.pi / l_min
-
-        # Create the power spectrum
-        S = np.zeros_like(k)
-        mask = (k >= k_min) & (k <= k_max)
-        S[mask] = self.k_func(k[mask])
-
-        # Generate complex Gaussian noise
-        noise = np.random.normal(0, 1, k.shape) + 1j * np.random.normal(0, 1, k.shape)
-
-        # Apply the power spectrum
-        fft_field = noise * np.sqrt(S)
-
-        # Inverse Fourier transform 
-        field = np.fft.ifftn(fft_field).real
-
-        field = (field) / (np.abs(field).max())
-        
-        self.ne = field
-
-        '''
         M = 2*N+1
         k = np.fft.fftfreq(M) #these are the frequencies, starting from 0 up to f_max, then -f_max to 0.
 
@@ -228,11 +208,10 @@ class gaussian3D:
         signal = np.fft.ifftn(F_shift)
 
         self.ne = signal.real
-        '''
-        
+
         return self.ne
 
-# new function from louis branch - need to check how it works
+    # new function from louis branch - need to check how it works
     def domain_fft(self, l_max, l_min, extent, res, factor):
         '''
         Generate a Gaussian random field with a fourier spectrum following k_func in the domain 2*pi/l_max to 2*pi/l_min, and 0 outside
@@ -255,9 +234,10 @@ class gaussian3D:
         z = np.linspace(-extent*factor, extent*factor, int(2*res*factor), endpoint=False, dtype=np.float32)
         self.xc, self.yc, self.zc = x, y, z
 
-        kx = ky  =  2 * np.pi * np.fft.fftfreq(2*res, d=dx )
+        kx = ky = 2 * np.pi * np.fft.fftfreq(2*res, d=dx )
         kz = 2 * np.pi * np.fft.fftfreq(int(2*res * factor), d=dx)
         kxx, kyy, kzz = np.meshgrid(kx, ky, kz, copy = False)
+
         del kx
         del ky
         del kz
@@ -284,9 +264,8 @@ class gaussian3D:
 
         # Inverse Fourier transform 
         field = np.fft.ifftn(fft_field).real
-
         field = (field) / (np.abs(field).max())
-        
+
         self.ne = field
 
         return field

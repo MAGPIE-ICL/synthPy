@@ -1,7 +1,9 @@
 name: MAGPIE_venv
+
 channels:
   - bioconda
   - conda-forge
+
 dependencies:
   - _libgcc_mutex=0.1=conda_forge
   - _openmp_mutex=4.5=2_gnu
@@ -254,4 +256,5 @@ dependencies:
       - wslink==2.0.5
       - xyzservices==2024.6.0
       - yarl==1.9.4
+
 prefix: /rds/general/user/le322/home/anaconda3/envs/MAGPIE_venv

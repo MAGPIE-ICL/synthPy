@@ -152,27 +152,24 @@ class gaussian1D:
         return x, field
     
     def export_scalar_field(self, property: str = 'ne', fname: str = None):
-
         '''
         Export the current scalar electron density profile as a npy file format, 'property' added for future scalability to export temperature, B-field, etc.
 
         Args:
             property: str, 'ne': export the electron density (default)
-            
+
             fname: str, file path and name to save under. A .npy file will be saved. If left blank, the name will default to:
 
                     ./plasma_PVTI_DD_MM_YYYY_HR_MIN
-        
+
         returns:
             text file : x_values = [:, 0], field_values = [:,1]
-        
-            
+
         load in file with e.g: 
 
             import numpy
 
             ne = numpy.loadtxt(fname, dtype = float)
-        
         '''
     
         if fname is None:
@@ -183,9 +180,7 @@ class gaussian1D:
             min = dt.datetime.now().minute
             hour = dt.datetime.now().hour
 
-
             fname = f'./plasma_PVTI_{day}_{month}_{year}_{hour}_{min}' #default fname to the current date and time 
-
 
         if property == 'ne':
 
@@ -211,10 +206,8 @@ class gaussian1D:
 
         else:
             x_y_data = None
-        else:
-            x_y_data = None
-        # write the file to fname
 
+        # write the file to fname
         with open(f'{fname}.txt', 'w') as file:
             np.savetxt(f'{fname}.txt', x_y_data)
 
