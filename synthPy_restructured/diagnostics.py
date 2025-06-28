@@ -519,7 +519,7 @@ class Interferometry(Diagnostic):
         self.H = amplitude
 
 
-def ray_to_Jonesvector(Beam,s0):
+def ray_to_Jonesvector(Beam, s0):
     """Takes the output from the 9D solver and returns 6D rays for ray-transfer matrix techniques.
     Effectively finds how far the ray is from the end of the volume, returns it to the end of the volume.
     Args:

@@ -98,7 +98,7 @@ class ScalarDomain:
     This contains also the method to propagate rays through the scara domain
     """
     
-    def __init__(self, x, y, z, extent, B_on = False, inv_brems = False, phaseshift = False, probing_direction = 'z'):
+    def __init__(self, x, y, z, extent, B_on = False, inv_brems = False, phaseshift = False):
         """
         Example:
             N_V = 100
@@ -117,7 +117,7 @@ class ScalarDomain:
         self.x, self.y, self.z = np.float32(x), np.float32(y), np.float32(z)
         self.XX, self.YY, self.ZZ = np.meshgrid(x, y, z, indexing='ij', copy = False)
         self.extent = extent
-        self.probing_direction = probing_direction
+        self.probing_direction = probing_direction # must be doubled in legacy code as init_beam takes only probing_direction and not self object, therefore need to change parameters to avoid doubling - seems like a pointless change in legacy code
         # Logical switches
         self.B_on       = B_on
         self.inv_brems  = inv_brems
@@ -284,7 +284,7 @@ class ScalarDomain:
         if(self.phaseshift):
             self.refractive_index_interp = RegularGridInterpolator((self.x, self.y, self.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
 
-    def plot_midline_gradients(self,ax,probing_direction):
+    def plot_midline_gradients(self, ax, probing_direction):
         """I actually don't know what this does. Presumably plots the gradients half way through the box? Cool.
 
         Args:
@@ -454,7 +454,7 @@ class ScalarDomain:
                 f.write(f"# Trajectory for Tracker {idx}\n")
                 for ti, yi in zip(sol.t, sol_reshaped.transpose(2, 1, 0)):
                     photon_state = yi[idx]  # Extract state vector for each photon
-                    ray_p, ray_J = ray_to_Jonesvector(np.array([photon_state]).T, photon_state[2], probing_direction=self.probing_direction)
+                    ray_p, ray_J = ray_to_Jonesvector(np.array([photon_state]).T, photon_state[2], probing_direction = self.probing_direction)
                     # Extract trajectory data
                     x, theta, y, phi = ray_p[:, 0]
                     z = photon_state[2]  # Directly extract z-position
@@ -608,6 +608,7 @@ def dsdt(t, s, ScalarDomain):
     sprime[6,:]   = ScalarDomain.atten(x)*a
     sprime[7,:]   = ScalarDomain.phase(x)
     sprime[8,:]   = ScalarDomain.neB(x,v)
+
     return sprime.flatten()
 
 # Initialise beam
