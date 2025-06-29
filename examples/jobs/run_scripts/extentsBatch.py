@@ -16,7 +16,6 @@ import vtk
 import os
 from vtk.util import numpy_support as vtk_np
 
-
 class CustomManager(BaseManager):
     pass
 
@@ -24,6 +23,7 @@ def pvti_readin(filename):
     '''
     Reads in data from pvti with filename, use this to read in electron number density data
     '''
+
     reader = vtk.vtkXMLPImageDataReader()
     reader.SetFileName(filename)
     reader.Update()

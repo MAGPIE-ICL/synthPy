@@ -150,7 +150,7 @@ class gaussian3D:
 
         return _r
 
-    def fft(self, l_max, l_min, extent, res, factor):
+    def fft(self, N):
         """
         A FFT based generator for scalar gaussian fields in 1D
 
@@ -184,11 +184,11 @@ class gaussian3D:
                 a.set_title("y="+str(r))
         """
 
-        M = 2*N+1
+        M = 2 * N + 1
         k = np.fft.fftfreq(M) #these are the frequencies, starting from 0 up to f_max, then -f_max to 0.
 
-        KX,KY,KZ = np.meshgrid(k,k,k)
-        K = np.sqrt(KX**2+KY**2+KZ**2)
+        KX, KY, KZ = np.meshgrid(k, k, k)
+        K = np.sqrt(KX ** 2 + KY ** 2 + KZ ** 2)
         K = np.fft.fftshift(K)#numpy convention, highest frequencies at the centre
 
         Wr = np.random.randn(M, M, M) # random number from Gaussian for both 
@@ -197,7 +197,7 @@ class gaussian3D:
         Wr = Wr + np.flip(Wr) #f(-k)=f*(k)
         Wi = Wi - np.flip(Wi)
 
-        W = Wr+1j*Wi
+        W = Wr + 1j * Wi
 
         F = W*np.sqrt(self.k_func(K)) # power spectra follows power law, so sqrt here.
 

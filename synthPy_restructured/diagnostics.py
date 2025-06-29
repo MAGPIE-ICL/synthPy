@@ -62,8 +62,9 @@ def lens(r, f1,f2):
 
 def sym_lens(r, f):
     '''
-    helper function to create an axisymmetryic lens
+    Helper function to create an axisymmetryic lens
     '''
+
     return lens(r, f, f)
 
 def distance(r, d):
@@ -86,7 +87,7 @@ def circular_aperture(r, R, E = None):
     Rejects rays outside radius R
     '''
 
-    filt = r[0,:] ** 2 + r[2,:] ** 2 > R ** 2
+    filt = r[0, :] ** 2 + r[2, :] ** 2 > R ** 2
     # if you want to reject rays outside of the radius, then when filt is true you should set equal to None
     r[:, filt] = None
 
@@ -163,8 +164,10 @@ class Diagnostic:
     Inheritable class for ray diagnostics.
     """
 
+    # I think this is in mm's not metres?
     def __init__(self, Beam, focal_plane = 0, L = 400, R = 25, Lx = 18, Ly = 13.5):
-        """Initialise ray diagnostic.
+        """
+        Initialise ray diagnostic.
 
         Args:
             r0 (4xN float array): N rays, [x, theta, y, phi]
@@ -182,11 +185,13 @@ class Diagnostic:
     
     def propagate_E(self, r1, r0):
         lwl = self.Beam.wavelength
-        dx = r1[0,:] - r0[0,:]
-        dy = r1[2,:] - r0[2,:]
+
+        dx = r1[0, :] - r0[0, :]
+        dy = r1[2, :] - r0[2, :]
+
         k = 2 * np.pi / lwl
 
-        self.Jf *= np.exp(1.0j * k * (np.sqrt(dx**2 + dy**2)))
+        self.Jf *= np.exp(1.0j * k * np.sqrt(dx ** 2 + dy ** 2))
 
     def histogram(self, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
         """Bin data into a histogram. Defaults are for a KAF-8300.
@@ -242,9 +247,8 @@ class Diagnostic:
         '''
 
     def plot(self, ax, clim=None, cmap=None):
-        ax.imshow(self.H, interpolation='nearest', origin='lower', clim=clim, cmap=cmap,
-                extent=[self.xedges[0], self.xedges[-1], self.yedges[0], self.yedges[-1]])
-        
+        ax.imshow(self.H, interpolation='nearest', origin='lower', clim=clim, cmap=cmap, extent = [self.xedges[0], self.xedges[-1], self.yedges[0], self.yedges[-1]])
+
 class Shadowgraphy(Diagnostic):
     """
     Example shadowgraphy diagnostic. Inherits from Rays, has custom solve method.
@@ -254,20 +258,20 @@ class Shadowgraphy(Diagnostic):
 
     def single_lens_solve(self):
         ## single lens - M = Variable (around ~2) (based on Detector position. Real experimental setup)
-        r1 = distance(self.r0, 3*self.L/4 - self.focal_plane) #displace rays to lens. Accounts for object with depth
+        r1 = distance(self.r0, 3 * self.L / 4 - self.focal_plane) #displace rays to lens. Accounts for object with depth
         r2 = circular_aperture(r1, self.R)      # cut off
-        r3 = sym_lens(r2, self.L/2)             # lens 1
-        r4 = distance(r3, 3*self.L/2)           # detector
+        r3 = sym_lens(r2, self.L / 2)             # lens 1
+        r4 = distance(r3, 3*self.L / 2)           # detector
         self.rf = r4
         
     def two_lens_solve(self):
         ## 2 lens telescope, M = 1
         r1 = distance(self.r0, self.L - self.focal_plane) #displace rays to lens. Accounts for object with depth
         r2 = circular_aperture(r1, self.R)    # cut off
-        r3 = sym_lens(r2, self.L/2)           # lens 1
-        r4 = distance(r3, self.L*2)           # displace rays to lens 2.
+        r3 = sym_lens(r2, self.L / 2)           # lens 1
+        r4 = distance(r3, self.L * 2)           # displace rays to lens 2.
         r5 = circular_aperture(r4, self.R)    # cut off
-        r6 = sym_lens(r5, self.L/2)           # lens 2
+        r6 = sym_lens(r5, self.L / 2)           # lens 2
         r7 = distance(r6, self.L)             # displace rays to detector
         self.rf = r7
     
@@ -409,7 +413,7 @@ class Interferometry(Diagnostic):
             deg = - np.abs(deg - 90)
 
         rad = deg* np.pi /180 #deg to rad
-        y_weight = np.arctan(rad)#take x_weight is 1
+        y_weight = np.arctan(rad) #take x_weight is 1
         x_weight = np.sqrt(1-y_weight**2)
 
         ref_beam = np.exp(2 * n_fringes / 3 * 1.0j * (x_weight * self.rf[0,:] + y_weight * self.rf[2,:]))
@@ -429,26 +433,27 @@ class Interferometry(Diagnostic):
         self.propagate_E(r1, rr0)
         r2 = circular_aperture(r1, self.R, E = self.Jf)    # cut off
         r3 = sym_lens(r2, self.L/2)           # lens 1
-        self.propagate_E(r3,r2)
+        self.propagate_E(r3, r2)
 
         r4 = distance(r3, self.L*2)           # displace rays to lens 2.
-        self.propagate_E(r4,r3)
+        self.propagate_E(r4, r3)
         r5 = circular_aperture(r4, self.R, E = self.Jf)    # cut off
         r6 = sym_lens(r5, self.L/2)                             # lens 2
-        self.propagate_E(r6,r5)
+        self.propagate_E(r6, r5)
         
         r7 = distance(r6, self.L)             # displace rays to detector
-        self.propagate_E(r7,r6)
+        self.propagate_E(r7, r6)
         rf = r7
-         #interferogram of background
-        x= rf[0,:]
-        y= rf[2,:]
 
-        x_bins = np.linspace(-self.Lx//2,self.Lx//2, pix_x // bin_scale)
-        y_bins = np.linspace(-self.Ly//2, self.Ly //2 , pix_y // bin_scale)
+        #interferogram of background
+        x = rf[0,:]
+        y = rf[2,:]
+
+        x_bins = np.linspace(-self.Lx // 2, self.Lx // 2, pix_x // bin_scale)
+        y_bins = np.linspace(-self.Ly // 2, self.Ly // 2, pix_y // bin_scale)
         
-        amplitude_x = np.zeros((len(y_bins)-1, len(x_bins)-1), dtype=complex)
-        amplitude_y = np.zeros((len(y_bins)-1, len(x_bins)-1), dtype=complex)
+        amplitude_x = np.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype=complex)
+        amplitude_y = np.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype=complex)
 
         x_indices = np.digitize(self.rf[0,:], x_bins) - 1
         y_indices = np.digitize(self.rf[2,:], y_bins) - 1
@@ -458,8 +463,8 @@ class Interferometry(Diagnostic):
                 amplitude_x[y_indices[i], x_indices[i]] += self.Jf[0, i]
                 amplitude_y[y_indices[i], x_indices[i]] += self.Jf[1, i]
 
-        amplitude = np.sqrt(np.real(amplitude_x)**2 + np.real(amplitude_y)**2)
-        
+        amplitude = np.sqrt(np.real(amplitude_x) ** 2 + np.real(amplitude_y) ** 2)
+
         # amplitude_normalised = (amplitude - amplitude.min()) / (amplitude.max() - amplitude.min()) # this line needs work and is currently causing problems
         self.bkg_signal = amplitude
 
@@ -474,13 +479,13 @@ class Interferometry(Diagnostic):
         self.propagate_E(r1, self.r0)
         r2 = circular_aperture(r1, self.R, E = self.Jf)    # cut off
         r3 = sym_lens(r2, self.L/2)           # lens 1
-        self.propagate_E(r3,r2)
+        self.propagate_E(r3, r2)
 
         r4 = distance(r3, self.L*2)           # displace rays to lens 2.
-        self.propagate_E(r4,r3)
+        self.propagate_E(r4, r3)
         r5 = circular_aperture(r4, self.R, E = self.Jf)    # cut off
         r6 = sym_lens(r5, self.L/2)                             # lens 2
-        self.propagate_E(r6,r5)
+        self.propagate_E(r6, r5)
         
         r7 = distance(r6, self.L)             # displace rays to detector
         self.propagate_E(r7,r6)
@@ -496,14 +501,14 @@ class Interferometry(Diagnostic):
             pix_y (int, optional): number of y pixels in detector plane. Defaults to 2574.
         """
     
-        x=self.rf[0,:]
-        y=self.rf[2,:]
+        x = self.rf[0,:]
+        y = self.rf[2,:]
 
-        x_bins = np.linspace(-self.Lx//2,self.Lx//2, pix_x // bin_scale)
-        y_bins = np.linspace(-self.Ly//2, self.Ly //2 , pix_y // bin_scale)
+        x_bins = np.linspace(-self.Lx // 2, self.Lx // 2, pix_x // bin_scale)
+        y_bins = np.linspace(-self.Ly // 2, self.Ly // 2, pix_y // bin_scale)
         
-        amplitude_x = np.zeros((len(y_bins)-1, len(x_bins)-1), dtype=complex)
-        amplitude_y = np.zeros((len(y_bins)-1, len(x_bins)-1), dtype=complex)
+        amplitude_x = np.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype=complex)
+        amplitude_y = np.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype=complex)
 
         x_indices = np.digitize(self.rf[0,:], x_bins) - 1
         y_indices = np.digitize(self.rf[2,:], y_bins) - 1
