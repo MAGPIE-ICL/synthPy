@@ -8,17 +8,17 @@ Ray Transfer Matrix Solver - Modified from Jack Hare's Version
 Example:
 
 ###INITIALISE RAYS###
-#Rays are a 4 vector of x, theta, y, phi,
+#Rays are a 4 vector of x, theta, y, phi - 6 vector (E_x and E_y added) if E field is taken into account in solver
 #here we initialise 10*7 randomly distributed rays
 rr0=np.random.rand(6,int(1e7))
-rr0[0,:]-=0.5 #rand generates [0,1], so we recentre [-0.5,0.5]
-rr0[2,:]-=0.5
+rr0[0,:]-= 0.5 #rand generates [0,1], so we recentre [-0.5,0.5]
+rr0[2,:]-= 0.5
 
-rr0[4,:]-=0.5 #rand generates [0,1], so we recentre [-0.5,0.5]
-rr0[5,:]-=0.5
+rr0[4,:]-= 0.5 #rand generates [0,1], so we recentre [-0.5,0.5]
+rr0[5,:]-= 0.5
 
 #x, θ, y, ϕ
-scales=np.diag(np.array([10,0,10,0,1,1j])) #set angles to 0, collimated beam. x, y in [-5,5]. Circularly polarised beam, E_x = iE_y
+scales=np.diag(np.array([10, 0, 10, 0, 1, 1j])) #set angles to 0, collimated beam. x, y in [-5,5]. Circularly polarised beam, E_x = iE_y
 rr0=np.matmul(scales, rr0)
 r0=circular_aperture(5, rr0) #cut out a circle
 
@@ -34,6 +34,80 @@ cm='gray'
 clim=[0,100]
 
 s.plot(axs, clim=clim, cmap=cm)
+
+###CREATE A SHOCK PAIR FOR TESTING###
+def α(x, n_e0, w, x0, Dx, l=10):
+    dn_e = n_e0*(np.tanh((x+Dx+x0)/w)**2-np.tanh((x-Dx+x0)/w)**2)
+    n_c=1e21
+    a = 0.5* l/n_c * dn_e
+    return a
+
+def ne(x,n_e0, w, Dx, x0):
+    return n_e0*(np.tanh((x+Dx+x0)/w)-np.tanh((x-Dx+x0)/w))
+
+def ne_ramp(y, ne_0, scale):
+    return ne_0*10**(y/scale)
+
+# Parameters for shock pair
+w=0.1
+Dx=1
+x0=0
+ne0=1e18
+s=5
+
+x=np.linspace(-5,5,1000)
+y=np.linspace(-5,5,1000)
+
+a=α(x, n_e0=ne0, w=w, Dx=Dx, x0=x0)
+n=ne(x, n_e0=ne0, w=w, Dx=Dx, x0=x0)
+ne0s=ne_ramp(y, ne_0=ne0, scale=s)
+
+nn=np.array([ne(x, n_e0=n0, w=w, Dx=Dx, x0=x0) for n0 in ne0s])
+nn=np.rot90(nn)
+
+###PLOT SHOCKS###
+fig, (ax1,ax2) = plt.subplots(1,2, figsize=(6.67/2, 2))
+
+ax1.imshow(nn, clim=[1e16,1e19], cmap='inferno')
+ax1.axis('off')
+ax2.plot(x, n/5e18, label=r'$n_e$')
+ax2.plot(x, a*57, label=r'$\alpha$')
+
+ax2.set_xlim([-5,5])
+ax2.set_xticks([])
+ax2.set_yticks([])
+ax2.legend(borderpad=0.5, handlelength=1, handletextpad=0.2, labelspacing=0.2)
+fig.subplots_adjust(left=0, bottom=0.14, right=0.98, top=0.89, wspace=0.1, hspace=None)
+
+###DEFLECT RAYS###
+r0[3,:]=α(r0[2,:],n_e0=ne_ramp(r0[0,:], ne0, s), w=w, Dx=Dx, x0=x0)
+
+###SOLVE FOR RAYS###
+b=refractometerRays(r0)
+sh=ShadowgraphyRays(r0)
+sc=SchlierenRays(r0)
+
+sh.solve(displacement=10)
+sh.histogram(bin_scale=10)
+sc.solve()
+sc.histogram(bin_scale=10)
+b.solve()
+b.histogram(bin_scale=10)
+
+###PLOT DATA###
+fig, axs = plt.subplots(1,3,figsize=(6.67, 1.8))
+
+cm='gray'
+clim=[0,100]
+
+sh.plot(axs[1], clim=clim, cmap=cm)
+#axs[0].imshow(nn.T, extent=[-5,5,-5,5])
+sc.plot(axs[0], clim=clim, cmap=cm)
+b.plot(axs[2], clim=clim, cmap=cm)
+
+for ax in axs:
+    ax.axis('off')
+fig.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0.1, hspace=None)
 '''
 
 def m_to_mm(r):
@@ -46,17 +120,20 @@ def mm_to_m(r):
     rr[0::2,:]*=1e-3
     return rr
 
-def lens(r, f1,f2):
-    '''4x4 matrix for a thin lens, focal lengths f1 and f2 in orthogonal axes
+def lens(r, f1, f2):
+    '''
+    4x4 matrix for a thin lens, focal lengths f1 and f2 in orthogonal axes
     See: https://en.wikipedia.org/wiki/Ray_transfer_matrix_analysis
     '''
-    l1= np.array([[1,    0],
-                [-1/f1, 1]])
-    l2= np.array([[1,    0],
-                [-1/f2, 1]])
-    L=np.zeros((4,4))
-    L[:2,:2]=l1
-    L[2:,2:]=l2
+
+    l1 = np.array([[1, 0],
+            [-1 / f1, 1]])
+    l2 = np.array([[1, 0],
+            [-1 / f2, 1]])
+
+    L = np.zeros((4,4))
+    L[:2, :2] = l1
+    L[2:, 2:] = l2
 
     return np.matmul(L, r)
 
@@ -124,10 +201,11 @@ def rect_aperture(r, Lx, Ly):
     Rejects rays outside a rectangular aperture, total size 2*Lx x 2*Ly
     '''
 
-    filt1 = (r[0,:]**2 > Lx**2)
-    filt2 = (r[2,:]**2 > Ly**2)
-    filt=filt1*filt2
-    r[:,filt]=None
+    filt1 = (r[0, :] ** 2 > Lx ** 2)
+    filt2 = (r[2, :] ** 2 > Ly ** 2)
+
+    filt = filt1 * filt2
+    r[:, filt] = None
 
     return r
 
@@ -138,16 +216,18 @@ def knife_edge(r, offset, axis, direction):
     '''
 
     if axis == 'y':
-        a=2
+        a = 2
     if axis == 'x':
-        a=0
+        a = 0
+
     if direction > 0:
         filt = r[a,:] > offset
     if direction < 0:
         filt = r[a,:] < offset
     if direction == 0:
-        print('Direction must be <0 or >0')
-    r[:,filt]=None
+        print('Direction must be < 0 or > 0')
+
+    r[:, filt] = None
 
     return r
 
@@ -159,12 +239,23 @@ def clear_rays(self):
     self.r0 = None
     self.rf = None
 
+def ray(x, θ, y, ϕ):
+    '''
+    Returns a 4x1 matrix representing a ray. Spatial units must be consistent, angular units in radians.
+    '''
+
+    return sym.Matrix([x, θ, y, ϕ])
+
+def d2r(d):
+    # helper function, degrees to radians
+    return d * np.pi / 180
+
 class Diagnostic:
     """
     Inheritable class for ray diagnostics.
     """
 
-    # I think this is in mm's not metres?
+    # this is in mm's not metres - self.rf is converted to mm's (not sure if everything else is covered though)
     def __init__(self, Beam, focal_plane = 0, L = 400, R = 25, Lx = 18, Ly = 13.5):
         """
         Initialise ray diagnostic.
@@ -182,7 +273,7 @@ class Diagnostic:
         self.rf = self.Beam.rf
         self.Jf = self.Beam.Jf
         self.r0 = m_to_mm(self.rf)
-    
+
     def propagate_E(self, r1, r0):
         lwl = self.Beam.wavelength
 
@@ -194,17 +285,18 @@ class Diagnostic:
         self.Jf *= np.exp(1.0j * k * np.sqrt(dx ** 2 + dy ** 2))
 
     def histogram(self, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
-        """Bin data into a histogram. Defaults are for a KAF-8300.
+        '''
+        Bin data into a histogram. Defaults are for a KAF-8300.
         Outputs are H, the histogram, and xedges and yedges, the bin edges.
 
         Args:
             bin_scale (int, optional): bin size, same in x and y. Defaults to 1.
             pix_x (int, optional): number of x pixels in detector plane. Defaults to 3448.
             pix_y (int, optional): number of y pixels in detector plane. Defaults to 2574.
-        """
-
-        x = self.r0[0, :]
-        y = self.r0[2, :]
+        '''
+    
+        x = self.rf[0, :]
+        y = self.rf[2, :]
 
         # means that np.isnan(a) returns True when a is not Nan
         # ensures that x & y are the same length, if output of either is Nan then will not try to render ray in histogram
@@ -215,36 +307,36 @@ class Diagnostic:
 
         print("\nr0 after clearing nan's: (", len(x), ", ", len(y), ")", sep='')
 
+        # some legacy code, need to check what it does and if still relevant
+        # this line is still relevant, repeated across many functions, make a function for it to reduce repeats
+        # was this replaced by np.histogram2d function?
+        '''
+        x_bins = np.linspace(-self.Lx // 2, self.Lx // 2, pix_x // bin_scale)
+        y_bins = np.linspace(-self.Ly // 2, self.Ly // 2, pix_y // bin_scale)
+
+        amplitude_x = np.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype=complex)
+        amplitude_y = np.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype=complex)
+
+        x_indices = np.digitize(self.rf[0, :], x_bins) - 1
+        y_indices = np.digitize(self.rf[2, :], y_bins) - 1
+
+        for i in range(self.rf.shape[1]):
+            if 0 <= x_indices[i] < amplitude_x.shape[1] and 0 <= y_indices[i] < amplitude_x.shape[0]:
+                amplitude_x[y_indices[i], x_indices[i]] += self.Jf[0, i]
+                amplitude_y[y_indices[i], x_indices[i]] += self.Jf[1, i]
+
+        amplitude = np.sqrt(np.real(amplitude_x)**2 + np.real(amplitude_y)**2)
+
+        # amplitude_normalised = (amplitude - amplitude.min()) / (amplitude.max() - amplitude.min()) # this line needs work and is currently causing problems
+        self.H = amplitude
+        '''
+
         self.H, self.xedges, self.yedges = np.histogram2d(x, y, bins=[pix_x // bin_scale, pix_y // bin_scale], range=[[-self.Lx / 2, self.Lx / 2],[-self.Ly / 2, self.Ly / 2]])
         self.H = self.H.T
 
         #Optional - clear ray attributes to save memory
         if(clear_mem):
             clear_rays(self)
-
-        # some legacy code, need to check what it does and if still relevant
-        # this line is still relevant, repeated across many functions, make a function for it to reduce repeats
-        # was this replaced by np.histogram2d function?
-        '''
-        x_bins = np.linspace(-self.Lx//2,self.Lx//2, pix_x // bin_scale)
-        y_bins = np.linspace(-self.Ly//2, self.Ly //2 , pix_y // bin_scale)
-
-        amplitude_x = np.zeros((len(y_bins)-1, len(x_bins)-1), dtype=complex)
-        amplitude_y = np.zeros((len(y_bins)-1, len(x_bins)-1), dtype=complex)
-
-        x_indices = np.digitize(self.rf[0,:], x_bins) - 1
-        y_indices = np.digitize(self.rf[2,:], y_bins) - 1
-
-        for i in range(self.rf.shape[1]):
-            if 0 <= x_indices[i] < amplitude_x.shape[1] and 0 <= y_indices[i] < amplitude_x.shape[0]:
-                amplitude_x[y_indices[i], x_indices[i]] += self.rE[0, i]
-                amplitude_y[y_indices[i], x_indices[i]] += self.rE[1, i]
-
-        amplitude = np.sqrt(np.real(amplitude_x)**2 + np.real(amplitude_y)**2)
-        
-        # amplitude_normalised = (amplitude - amplitude.min()) / (amplitude.max() - amplitude.min()) # this line needs work and is currently causing problems
-        self.H = amplitude
-        '''
 
     def plot(self, ax, clim=None, cmap=None):
         ax.imshow(self.H, interpolation='nearest', origin='lower', clim=clim, cmap=cmap, extent = [self.xedges[0], self.xedges[-1], self.yedges[0], self.yedges[-1]])
@@ -490,7 +582,7 @@ class Interferometry(Diagnostic):
         r7 = distance(r6, self.L)             # displace rays to detector
         self.propagate_E(r7,r6)
         self.rf = r7
-    
+
     def interferogram(self, bin_scale=1, pix_x=3448, pix_y=2574, clear_mem=False):
         """Bin data into a histogram. Defaults are for a KAF-8300.
         Outputs are H, the histogram, and xedges and yedges, the bin edges.
@@ -522,7 +614,6 @@ class Interferometry(Diagnostic):
         
         # amplitude_normalised = (amplitude - amplitude.min()) / (amplitude.max() - amplitude.min()) # this line needs work and is currently causing problems
         self.H = amplitude
-
 
 def ray_to_Jonesvector(Beam, s0):
     """Takes the output from the 9D solver and returns 6D rays for ray-transfer matrix techniques.

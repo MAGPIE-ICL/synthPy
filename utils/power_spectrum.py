@@ -375,10 +375,12 @@ def radial_2Dspectrum(r, lx, ly, smooth=False):
     ----------------------------------------------------------------
     r:  float-vector
         The 3D random field
+        - Contains, nx: integer and ny: integer
+            the number of grid points in the []-direction
     lx: float
         the domain size in the x-direction.
-    nx: integer
-        the number of grid points in the x-direction
+    ly: float
+        the domain size in the y-direction.
     smooth: boolean
         Active/Disactive smooth function for visualisation
     -----------------------------------------------------------------
@@ -389,27 +391,28 @@ def radial_2Dspectrum(r, lx, ly, smooth=False):
     nx, ny = r.shape
     
     rh = fftshift(fft2(r))
-    
 
     tkeh = (np.abs(rh)**2) / (nx * ny)**2  # Normalized power spectrum
     
     # Set up wavenumbers
-    kx = 2.0 * np.pi * np.fft.fftfreq(nx, d=lx/nx)
-    ky = 2.0 * np.pi * np.fft.fftfreq(ny, d=ly/ny)
+    kx = 2.0 * np.pi * np.fft.fftfreq(nx, d = lx / nx)
+    ky = 2.0 * np.pi * np.fft.fftfreq(ny, d = ly / ny)
+
     kx, ky = np.meshgrid(kx, ky)
     kx, ky = fftshift(kx), fftshift(ky)
-    k = np.sqrt(kx**2 + ky**2)
+
+    k = np.sqrt(kx ** 2 + ky ** 2)
     
     # Make radial bins, evenly spaced in logspace for ease of plotting
-    k_bins = np.logspace(np.log10(k[k>0].min()), np.log10(k.max()), num=100)
-    tke_spectrum = np.zeros(len(k_bins)-1)
+    k_bins = np.logspace(np.log10(k[k>0].min()), np.log10(k.max()), num = 100)
+    tke_spectrum = np.zeros(len(k_bins) - 1)
     
-    for i in range(len(k_bins)-1):
-        mask = (k >= k_bins[i]) & (k < k_bins[i+1])
+    for i in range(len(k_bins) - 1):
+        mask = (k >= k_bins[i]) & (k < k_bins[i + 1])
         tke_spectrum[i] = np.mean(tkeh[mask])
     
     k_centers = np.sqrt(k_bins[:-1] * k_bins[1:])
-    
+
     knyquist = np.max(k) / 2
 
     if smooth:

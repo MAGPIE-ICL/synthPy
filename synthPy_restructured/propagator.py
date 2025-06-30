@@ -19,7 +19,6 @@ def omega_pe(ne):
     return 5.64e4*np.sqrt(ne)
 
 class Propagator:
-    
     def __init__(self, ScalarDomain, Beam, inv_brems = False, phaseshift = False):
         self.ScalarDomain = ScalarDomain
         self.Beam = Beam
@@ -455,4 +454,4 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction):
 
     # ray_p [x,phi,y,theta], ray_J [E_x,E_y]
 
-    return ray_p,ray_J
+    return ray_p, ray_J

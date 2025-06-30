@@ -1,9 +1,15 @@
+# This is the ray transfer metrix routine for optics
+# this is effectively the diagnostics module where shadow, schlieren and refractometry images are performed
+# if we want to include also interferometry this is the right place
+# REQUIRES CHANGING NAMES AND EXAMPLES
+
+import sympy as sym
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
 '''
-Ray Transfer Matrix Solver
+OPTICS - Ray Transfer Matrix Solver
 
 BASED VERSION CODED BY: Aidan CRILLY / Jack HARE
 MODIFIED/UPDATED BY: Stefano MERLINI / Louis Evans
@@ -21,9 +27,9 @@ rr0[4,:]-=0.5 #rand generates [0,1], so we recentre [-0.5,0.5]
 rr0[5,:]-=0.5
 
 #x, θ, y, ϕ
-scales=np.diag(np.array([10,0,10,0,1,1j])) #set angles to 0, collimated beam. x, y in [-5,5]. Circularly polarised beam, E_x = iE_y
-rr0=np.matmul(scales, rr0)
-r0=circular_aperture(5, rr0) #cut out a circle
+scales = np.diag(np.array([10, 0, 10, 0, 1, 1j])) #set angles to 0, collimated beam. x, y in [-5,5]. Circularly polarised beam, E_x = iE_y
+rr0 = np.matmul(scales, rr0)
+r0 = circular_aperture(10, rr0) #cut out a circle
 
 ### Shadowgraphy, no polarisation
 ## object_length: determines where the focal plane is. If you object is 10 mm long, object length = 5 will
