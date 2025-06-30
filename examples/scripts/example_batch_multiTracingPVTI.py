@@ -105,7 +105,7 @@ if __name__ == '__main__':
     file_loc += '.pvti'
 
     #beam properties 
-    divergence =0.05e-3
+    divergence = 0.05e-3
     beam_size = 5e-3 #5mm beam readius
     probing_direction = 'z'
 

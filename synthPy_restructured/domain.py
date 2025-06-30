@@ -1,4 +1,5 @@
 import numpy as np
+import jax.numpy as jnp
 
 class ScalarDomain:
     """
@@ -12,9 +13,9 @@ class ScalarDomain:
             N_V = 100
             M_V = 2*N_V+1
             ne_extent = 5.0e-3
-            ne_x = np.linspace(-ne_extent,ne_extent,M_V)
-            ne_y = np.linspace(-ne_extent,ne_extent,M_V)
-            ne_z = np.linspace(-ne_extent,ne_extent,M_V)
+            ne_x = jnp.linspace(-ne_extent,ne_extent,M_V)
+            ne_y = jnp.linspace(-ne_extent,ne_extent,M_V)
+            ne_z = jnp.linspace(-ne_extent,ne_extent,M_V)
 
         Args:
             x (float array): x coordinates, m
@@ -26,32 +27,32 @@ class ScalarDomain:
         # if 1 length given, assumes all are the same
         if isinstance(lengths, (float, int)):
             self.x_length, self.y_length, self.z_length = lengths, lengths, lengths
-            self.lengths = np.array([lengths, lengths, lengths])
+            self.lengths = jnp.array([lengths, lengths, lengths])
         # if array given, checks len = 3 and assigns accordingly
         else:
             if len(lengths) != 3:
                 raise Exception('lengths must have len = 3: (x,y,z)')
 
             self.x_length, self.y_length, self.z_length = lengths[0], lengths[1], lengths[2]
-            self.lengths = np.array(lengths)
+            self.lengths = jnp.array(lengths)
         
         #likewise for dim
         self.dim = dim
         if isinstance(dim, (int, float)):
             self.x_n, self.y_n, self.z_n = dim, dim, dim
-            self.dim = np.array([dim,dim,dim])
+            self.dim = jnp.array([dim,dim,dim])
         else:
             if len(dim) != 3:
                 raise Exception('n must have len = 3: (x_n, y_n, z_n)')
 
             self.x_n, self.y_n, self.z_n = dim[0], dim[1], dim[2]
-            self.dim = np.array(dim)
+            self.dim = jnp.array(dim)
 
 
         # define coordinate space
-        self.x = np.float32(np.linspace(-self.x_length/2, self.x_length/2, self.x_n))
-        self.y = np.float32(np.linspace(-self.y_length/2, self.y_length/2, self.y_n))
-        self.z = np.float32(np.linspace(-self.z_length/2, self.z_length/2, self.z_n))
+        self.x = jnp.float32(jnp.linspace(-self.x_length/2, self.x_length/2, self.x_n))
+        self.y = jnp.float32(jnp.linspace(-self.y_length/2, self.y_length/2, self.y_n))
+        self.z = jnp.float32(jnp.linspace(-self.z_length/2, self.z_length/2, self.z_n))
         self.XX, self.YY, self.ZZ = np.meshgrid(self.x, self.y, self.z, indexing='ij', copy = False)
 
         # Logical switches
@@ -62,7 +63,7 @@ class ScalarDomain:
         Null test, an empty cube
         """
 
-        self.ne = np.zeros_like(self.XX)
+        self.ne = jnp.zeros_like(self.XX)
     
     def test_slab(self, s=1, n_e0=2e23):
         """A slab with a linear gradient in x:
@@ -87,7 +88,7 @@ class ScalarDomain:
             Ly (int, optional): spatial scale of sinusoidal perturbation. Defaults to 1.
         """
 
-        self.ne = n_e0*(1.0+s1*self.XX/self.x_length)*(1+s2*np.cos(2*np.pi*self.YY/Ly))
+        self.ne = n_e0*(1.0+s1*self.XX/self.x_length)*(1+s2*jnp.cos(2*jnp.pi*self.YY/Ly))
     
     def test_exponential_cos(self, n_e0=1e24, Ly=1e-3, s=2e-3):
         """Exponentially growing sinusoidal perturbation
@@ -98,7 +99,7 @@ class ScalarDomain:
             s ([type], optional): scale of exponential growth. Defaults to 2e-3 m.
         """
 
-        self.ne = n_e0*10**(self.XX/s)*(1+np.cos(2*np.pi*self.YY/Ly))
+        self.ne = n_e0*10**(self.XX/s)*(1+jnp.cos(2*jnp.pi*self.YY/Ly))
         
     def external_ne(self, ne):
         """Load externally generated grid
@@ -125,7 +126,7 @@ class ScalarDomain:
             Te ([type]): MxMxM grid of electron temperature in eV
         """
 
-        self.Te = np.maximum(Te_min,Te)
+        self.Te = jnp.maximum(Te_min,Te)
 
     def external_Z(self, Z):
         """Load externally generated grid
@@ -144,7 +145,7 @@ class ScalarDomain:
             Bmax ([type], optional): maximum B field, default 1.0 T
         """
 
-        self.B          = np.zeros(np.append(np.array(self.XX.shape),3))
+        self.B          = jnp.zeros(jnp.append(jnp.array(self.XX.shape),3))
         self.B[:,:,:,2] = Bmax*self.XX/self.x_length
 
     def export_scalar_field(self, property: str = 'ne', fname: str = None):
@@ -171,7 +172,7 @@ class ScalarDomain:
         if property == 'ne':
 
             try: #check to ensure electron density has been added
-                np.shape(self.ne)
+                jnp.shape(self.ne)
                 rnec = self.ne
             except:
                 raise Exception('No electron density currently loaded!')
@@ -181,14 +182,14 @@ class ScalarDomain:
 
             # Set the grid dimensions: shape + 1 because we want to inject our values on
             # the CELL data
-            grid.dimensions = np.array(rnec.shape) + 1
+            grid.dimensions = jnp.array(rnec.shape) + 1
             # Edit the spatial reference
             grid.origin = (0, 0, 0)  # The bottom left corner of the data set
 
             #scaling
-            x_size = np.max(self.x) / ((np.shape(self.ne)[0] - 1)//2 )  #assuming centering about the origin
-            y_size = np.max(self.y) / ((np.shape(self.ne)[1] - 1)//2 ) 
-            z_size = np.max(self.z) / ((np.shape(self.ne)[2] - 1)//2 )
+            x_size = jnp.max(self.x) / ((jnp.shape(self.ne)[0] - 1)//2 )  #assuming centering about the origin
+            y_size = jnp.max(self.y) / ((jnp.shape(self.ne)[1] - 1)//2 ) 
+            z_size = jnp.max(self.z) / ((jnp.shape(self.ne)[2] - 1)//2 )
             grid.spacing = (x_size, y_size, z_size)  # These are the cell sizes along each axis
 
             # Add the data values to the cell data
@@ -201,17 +202,17 @@ class ScalarDomain:
         #prep values to write the pvti, written to match the exported vti using pyvista
 
         relative_fname = fname.split('/')[-1]
-        spacing_x = (2*np.max(self.x))/np.shape(self.x)[0]
-        spacing_y = (2*np.max(self.y))/np.shape(self.y)[0]
-        spacing_z = (2*np.max(self.z))/np.shape(self.z)[0]
+        spacing_x = (2*jnp.max(self.x))/jnp.shape(self.x)[0]
+        spacing_y = (2*jnp.max(self.y))/jnp.shape(self.y)[0]
+        spacing_z = (2*jnp.max(self.z))/jnp.shape(self.z)[0]
         content = f'''<?xml version="1.0"?>
                         <VTKFile type="PImageData" version="0.1" byte_order="LittleEndian" header_type="UInt32" compressor="vtkZLibDataCompressor">
-                            <PImageData WholeExtent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" GhostLevel="0" Origin="0 0 0" Spacing="{spacing_x} {spacing_y} {spacing_z}">
+                            <PImageData WholeExtent="0 {jnp.shape(self.ne)[0]} 0 {jnp.shape(self.ne)[1]} 0 {jnp.shape(self.ne)[2]}" GhostLevel="0" Origin="0 0 0" Spacing="{spacing_x} {spacing_y} {spacing_z}">
                                 <PCellData Scalars="rnec">
                                     <PDataArray type="Float64" Name="rnec">
                                     </PDataArray>
                                 </PCellData>
-                                <Piece Extent="0 {np.shape(self.ne)[0]} 0 {np.shape(self.ne)[1]} 0 {np.shape(self.ne)[2]}" Source="{relative_fname}.vti"/>
+                                <Piece Extent="0 {jnp.shape(self.ne)[0]} 0 {jnp.shape(self.ne)[1]} 0 {jnp.shape(self.ne)[2]}" Source="{relative_fname}.vti"/>
                             </PImageData>
                         </VTKFile>'''
     

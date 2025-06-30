@@ -1,4 +1,4 @@
-import numpy as np
+import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
@@ -10,7 +10,7 @@ Example:
 ###INITIALISE RAYS###
 #Rays are a 4 vector of x, theta, y, phi - 6 vector (E_x and E_y added) if E field is taken into account in solver
 #here we initialise 10*7 randomly distributed rays
-rr0=np.random.rand(6,int(1e7))
+rr0=jnp.random.rand(6,int(1e7))
 rr0[0,:]-= 0.5 #rand generates [0,1], so we recentre [-0.5,0.5]
 rr0[2,:]-= 0.5
 
@@ -18,8 +18,8 @@ rr0[4,:]-= 0.5 #rand generates [0,1], so we recentre [-0.5,0.5]
 rr0[5,:]-= 0.5
 
 #x, θ, y, ϕ
-scales=np.diag(np.array([10, 0, 10, 0, 1, 1j])) #set angles to 0, collimated beam. x, y in [-5,5]. Circularly polarised beam, E_x = iE_y
-rr0=np.matmul(scales, rr0)
+scales=jnp.diag(jnp.array([10, 0, 10, 0, 1, 1j])) #set angles to 0, collimated beam. x, y in [-5,5]. Circularly polarised beam, E_x = iE_y
+rr0=jnp.matmul(scales, rr0)
 r0=circular_aperture(5, rr0) #cut out a circle
 
 ### Shadowgraphy, no polarisation
@@ -37,13 +37,13 @@ s.plot(axs, clim=clim, cmap=cm)
 
 ###CREATE A SHOCK PAIR FOR TESTING###
 def α(x, n_e0, w, x0, Dx, l=10):
-    dn_e = n_e0*(np.tanh((x+Dx+x0)/w)**2-np.tanh((x-Dx+x0)/w)**2)
+    dn_e = n_e0*(jnp.tanh((x+Dx+x0)/w)**2-jnp.tanh((x-Dx+x0)/w)**2)
     n_c=1e21
     a = 0.5* l/n_c * dn_e
     return a
 
 def ne(x,n_e0, w, Dx, x0):
-    return n_e0*(np.tanh((x+Dx+x0)/w)-np.tanh((x-Dx+x0)/w))
+    return n_e0*(jnp.tanh((x+Dx+x0)/w)-jnp.tanh((x-Dx+x0)/w))
 
 def ne_ramp(y, ne_0, scale):
     return ne_0*10**(y/scale)
@@ -55,15 +55,15 @@ x0=0
 ne0=1e18
 s=5
 
-x=np.linspace(-5,5,1000)
-y=np.linspace(-5,5,1000)
+x=jnp.linspace(-5,5,1000)
+y=jnp.linspace(-5,5,1000)
 
 a=α(x, n_e0=ne0, w=w, Dx=Dx, x0=x0)
 n=ne(x, n_e0=ne0, w=w, Dx=Dx, x0=x0)
 ne0s=ne_ramp(y, ne_0=ne0, scale=s)
 
-nn=np.array([ne(x, n_e0=n0, w=w, Dx=Dx, x0=x0) for n0 in ne0s])
-nn=np.rot90(nn)
+nn=jnp.array([ne(x, n_e0=n0, w=w, Dx=Dx, x0=x0) for n0 in ne0s])
+nn=jnp.rot90(nn)
 
 ###PLOT SHOCKS###
 fig, (ax1,ax2) = plt.subplots(1,2, figsize=(6.67/2, 2))
@@ -111,12 +111,12 @@ fig.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0.1, hspace=None)
 '''
 
 def m_to_mm(r):
-    rr = np.ndarray.copy(r)
+    rr = jnp.ndarray.copy(r)
     rr[0::2,:]*=1e3
     return rr
 
 def mm_to_m(r):
-    rr = np.ndarray.copy(r)
+    rr = jnp.ndarray.copy(r)
     rr[0::2,:]*=1e-3
     return rr
 
@@ -126,16 +126,16 @@ def lens(r, f1, f2):
     See: https://en.wikipedia.org/wiki/Ray_transfer_matrix_analysis
     '''
 
-    l1 = np.array([[1, 0],
+    l1 = jnp.array([[1, 0],
             [-1 / f1, 1]])
-    l2 = np.array([[1, 0],
+    l2 = jnp.array([[1, 0],
             [-1 / f2, 1]])
 
-    L = np.zeros((4,4))
+    L = jnp.zeros((4,4))
     L[:2, :2] = l1
     L[2:, 2:] = l2
 
-    return np.matmul(L, r)
+    return jnp.matmul(L, r)
 
 def sym_lens(r, f):
     '''
@@ -149,15 +149,15 @@ def distance(r, d):
     See: https://en.wikipedia.org/wiki/Ray_transfer_matrix_analysis
     '''
 
-    d = np.array([[1, d],
+    d = jnp.array([[1, d],
                   [0, 1]])
 
-    L = np.zeros((4, 4))
+    L = jnp.zeros((4, 4))
 
     L[:2, :2] = d
     L[2:, 2:] = d
 
-    return np.matmul(L, r)
+    return jnp.matmul(L, r)
 
 def circular_aperture(r, R, E = None):
     '''
@@ -169,8 +169,8 @@ def circular_aperture(r, R, E = None):
     r[:, filt] = None
 
     if E is not None:
-        E = np.array(E, dtype = object)
-        #E[:, np.array(r) == None] = None
+        E = jnp.array(E, dtype = object)
+        #E[:, jnp.array(r) == None] = None
         E[:, filt] = None
 
     return r
@@ -248,7 +248,7 @@ def ray(x, θ, y, ϕ):
 
 def d2r(d):
     # helper function, degrees to radians
-    return d * np.pi / 180
+    return d * jnp.pi / 180
 
 class Diagnostic:
     """
@@ -280,9 +280,9 @@ class Diagnostic:
         dx = r1[0, :] - r0[0, :]
         dy = r1[2, :] - r0[2, :]
 
-        k = 2 * np.pi / lwl
+        k = 2 * jnp.pi / lwl
 
-        self.Jf *= np.exp(1.0j * k * np.sqrt(dx ** 2 + dy ** 2))
+        self.Jf *= jnp.exp(1.0j * k * jnp.sqrt(dx ** 2 + dy ** 2))
 
     def histogram(self, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
         '''
@@ -298,9 +298,9 @@ class Diagnostic:
         x = self.rf[0, :]
         y = self.rf[2, :]
 
-        # means that np.isnan(a) returns True when a is not Nan
+        # means that jnp.isnan(a) returns True when a is not Nan
         # ensures that x & y are the same length, if output of either is Nan then will not try to render ray in histogram
-        mask = ~np.isnan(x) & ~np.isnan(y)
+        mask = ~jnp.isnan(x) & ~jnp.isnan(y)
 
         x = x[mask]
         y = y[mask]
@@ -309,29 +309,29 @@ class Diagnostic:
 
         # some legacy code, need to check what it does and if still relevant
         # this line is still relevant, repeated across many functions, make a function for it to reduce repeats
-        # was this replaced by np.histogram2d function?
+        # was this replaced by jnp.histogram2d function?
         '''
-        x_bins = np.linspace(-self.Lx // 2, self.Lx // 2, pix_x // bin_scale)
-        y_bins = np.linspace(-self.Ly // 2, self.Ly // 2, pix_y // bin_scale)
+        x_bins = jnp.linspace(-self.Lx // 2, self.Lx // 2, pix_x // bin_scale)
+        y_bins = jnp.linspace(-self.Ly // 2, self.Ly // 2, pix_y // bin_scale)
 
-        amplitude_x = np.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype=complex)
-        amplitude_y = np.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype=complex)
+        amplitude_x = jnp.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype=complex)
+        amplitude_y = jnp.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype=complex)
 
-        x_indices = np.digitize(self.rf[0, :], x_bins) - 1
-        y_indices = np.digitize(self.rf[2, :], y_bins) - 1
+        x_indices = jnp.digitize(self.rf[0, :], x_bins) - 1
+        y_indices = jnp.digitize(self.rf[2, :], y_bins) - 1
 
         for i in range(self.rf.shape[1]):
             if 0 <= x_indices[i] < amplitude_x.shape[1] and 0 <= y_indices[i] < amplitude_x.shape[0]:
                 amplitude_x[y_indices[i], x_indices[i]] += self.Jf[0, i]
                 amplitude_y[y_indices[i], x_indices[i]] += self.Jf[1, i]
 
-        amplitude = np.sqrt(np.real(amplitude_x)**2 + np.real(amplitude_y)**2)
+        amplitude = jnp.sqrt(jnp.real(amplitude_x)**2 + jnp.real(amplitude_y)**2)
 
         # amplitude_normalised = (amplitude - amplitude.min()) / (amplitude.max() - amplitude.min()) # this line needs work and is currently causing problems
         self.H = amplitude
         '''
 
-        self.H, self.xedges, self.yedges = np.histogram2d(x, y, bins=[pix_x // bin_scale, pix_y // bin_scale], range=[[-self.Lx / 2, self.Lx / 2],[-self.Ly / 2, self.Ly / 2]])
+        self.H, self.xedges, self.yedges = jnp.histogram2d(x, y, bins=[pix_x // bin_scale, pix_y // bin_scale], range=[[-self.Lx / 2, self.Lx / 2],[-self.Ly / 2, self.Ly / 2]])
         self.H = self.H.T
 
         #Optional - clear ray attributes to save memory
@@ -469,21 +469,21 @@ class Refractometry(Diagnostic):
         x = self.rf[0, :]
         y = self.rf[2, :]
 
-        x_bins = np.linspace(-self.Lx // 2, self.Lx // 2, pix_x // bin_scale)
-        y_bins = np.linspace(-self.Ly // 2, self.Ly // 2 , pix_y // bin_scale)
+        x_bins = jnp.linspace(-self.Lx // 2, self.Lx // 2, pix_x // bin_scale)
+        y_bins = jnp.linspace(-self.Ly // 2, self.Ly // 2 , pix_y // bin_scale)
         
-        amplitude_x = np.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype = complex)
-        amplitude_y = np.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype = complex)
+        amplitude_x = jnp.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype = complex)
+        amplitude_y = jnp.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype = complex)
 
-        x_indices = np.digitize(self.rf[0,:], x_bins) - 1
-        y_indices = np.digitize(self.rf[2,:], y_bins) - 1
+        x_indices = jnp.digitize(self.rf[0,:], x_bins) - 1
+        y_indices = jnp.digitize(self.rf[2,:], y_bins) - 1
 
         for i in range(self.rf.shape[1]):
             if 0 <= x_indices[i] < amplitude_x.shape[1] and 0 <= y_indices[i] < amplitude_x.shape[0]:
                 amplitude_x[y_indices[i], x_indices[i]] += self.Jf[0, i]
                 amplitude_y[y_indices[i], x_indices[i]] += self.Jf[1, i]
 
-        amplitude = np.sqrt(np.real(amplitude_x)**2 + np.real(amplitude_y)**2)
+        amplitude = jnp.sqrt(jnp.real(amplitude_x)**2 + jnp.real(amplitude_y)**2)
         # amplitude_normalised = (amplitude - amplitude.min()) / (amplitude.max() - amplitude.min()) # this line needs work and is currently causing problems
         self.H = amplitude
 
@@ -502,13 +502,13 @@ class Interferometry(Diagnostic):
         '''
 
         if deg >= 45:
-            deg = - np.abs(deg - 90)
+            deg = - jnp.abs(deg - 90)
 
-        rad = deg* np.pi /180 #deg to rad
-        y_weight = np.arctan(rad) #take x_weight is 1
-        x_weight = np.sqrt(1-y_weight**2)
+        rad = deg* jnp.pi /180 #deg to rad
+        y_weight = jnp.arctan(rad) #take x_weight is 1
+        x_weight = jnp.sqrt(1-y_weight**2)
 
-        ref_beam = np.exp(2 * n_fringes / 3 * 1.0j * (x_weight * self.rf[0,:] + y_weight * self.rf[2,:]))
+        ref_beam = jnp.exp(2 * n_fringes / 3 * 1.0j * (x_weight * self.rf[0,:] + y_weight * self.rf[2,:]))
 
         self.Jf[1,:] += ref_beam # assume ref_beam is polarised in y
     
@@ -541,21 +541,21 @@ class Interferometry(Diagnostic):
         x = rf[0,:]
         y = rf[2,:]
 
-        x_bins = np.linspace(-self.Lx // 2, self.Lx // 2, pix_x // bin_scale)
-        y_bins = np.linspace(-self.Ly // 2, self.Ly // 2, pix_y // bin_scale)
+        x_bins = jnp.linspace(-self.Lx // 2, self.Lx // 2, pix_x // bin_scale)
+        y_bins = jnp.linspace(-self.Ly // 2, self.Ly // 2, pix_y // bin_scale)
         
-        amplitude_x = np.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype=complex)
-        amplitude_y = np.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype=complex)
+        amplitude_x = jnp.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype=complex)
+        amplitude_y = jnp.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype=complex)
 
-        x_indices = np.digitize(self.rf[0,:], x_bins) - 1
-        y_indices = np.digitize(self.rf[2,:], y_bins) - 1
+        x_indices = jnp.digitize(self.rf[0,:], x_bins) - 1
+        y_indices = jnp.digitize(self.rf[2,:], y_bins) - 1
 
         for i in range(self.rf.shape[1]):
             if 0 <= x_indices[i] < amplitude_x.shape[1] and 0 <= y_indices[i] < amplitude_x.shape[0]:
                 amplitude_x[y_indices[i], x_indices[i]] += self.Jf[0, i]
                 amplitude_y[y_indices[i], x_indices[i]] += self.Jf[1, i]
 
-        amplitude = np.sqrt(np.real(amplitude_x) ** 2 + np.real(amplitude_y) ** 2)
+        amplitude = jnp.sqrt(jnp.real(amplitude_x) ** 2 + jnp.real(amplitude_y) ** 2)
 
         # amplitude_normalised = (amplitude - amplitude.min()) / (amplitude.max() - amplitude.min()) # this line needs work and is currently causing problems
         self.bkg_signal = amplitude
@@ -596,21 +596,21 @@ class Interferometry(Diagnostic):
         x = self.rf[0,:]
         y = self.rf[2,:]
 
-        x_bins = np.linspace(-self.Lx // 2, self.Lx // 2, pix_x // bin_scale)
-        y_bins = np.linspace(-self.Ly // 2, self.Ly // 2, pix_y // bin_scale)
+        x_bins = jnp.linspace(-self.Lx // 2, self.Lx // 2, pix_x // bin_scale)
+        y_bins = jnp.linspace(-self.Ly // 2, self.Ly // 2, pix_y // bin_scale)
         
-        amplitude_x = np.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype=complex)
-        amplitude_y = np.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype=complex)
+        amplitude_x = jnp.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype=complex)
+        amplitude_y = jnp.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype=complex)
 
-        x_indices = np.digitize(self.rf[0,:], x_bins) - 1
-        y_indices = np.digitize(self.rf[2,:], y_bins) - 1
+        x_indices = jnp.digitize(self.rf[0,:], x_bins) - 1
+        y_indices = jnp.digitize(self.rf[2,:], y_bins) - 1
 
         for i in range(self.rf.shape[1]):
             if 0 <= x_indices[i] < amplitude_x.shape[1] and 0 <= y_indices[i] < amplitude_x.shape[0]:
                 amplitude_x[y_indices[i], x_indices[i]] += self.Jf[0, i]
                 amplitude_y[y_indices[i], x_indices[i]] += self.Jf[1, i]
 
-        amplitude = np.sqrt(np.real(amplitude_x)**2 + np.real(amplitude_y)**2)
+        amplitude = jnp.sqrt(jnp.real(amplitude_x)**2 + jnp.real(amplitude_y)**2)
         
         # amplitude_normalised = (amplitude - amplitude.min()) / (amplitude.max() - amplitude.min()) # this line needs work and is currently causing problems
         self.H = amplitude
@@ -627,8 +627,8 @@ def ray_to_Jonesvector(Beam, s0):
     """
 
     Np = Beam.Np
-    ray_p = np.zeros((4,Np))
-    ray_J = np.zeros((2,Np),dtype=complex)
+    ray_p = jnp.zeros((4,Np))
+    ray_J = jnp.zeros((2,Np),dtype=complex)
 
     x, y, z, vx, vy, vz = s0[0], s0[1], s0[2], s0[3], s0[4], s0[5]
 
@@ -641,33 +641,33 @@ def ray_to_Jonesvector(Beam, s0):
         ray_p[0] = y
         ray_p[2] = z
         # Angles to plane
-        ray_p[1] = np.arctan(vy/vx)
-        ray_p[3] = np.arctan(vz/vx)
+        ray_p[1] = jnp.arctan(vy/vx)
+        ray_p[3] = jnp.arctan(vz/vx)
     # XZ plane
     elif(probing_direction == 'y'):
         # Positions on plane
         ray_p[0] = x
         ray_p[2] = z
         # Angles to plane
-        ray_p[1] = np.arctan(vx/vy)
-        ray_p[3] = np.arctan(vz/vy)
+        ray_p[1] = jnp.arctan(vx/vy)
+        ray_p[3] = jnp.arctan(vz/vy)
     # XY plane
     elif(probing_direction == 'z'):
         # Positions on plane
         ray_p[0] = x
         ray_p[2] = y
         # Angles to plane
-        ray_p[1] = np.arctan(vx/vz)
-        ray_p[3] = np.arctan(vy/vz)
+        ray_p[1] = jnp.arctan(vx/vz)
+        ray_p[3] = jnp.arctan(vy/vz)
 
     # Resolve Jones vectors
     amp,phase,pol = s0[6], s0[7], s0[8]
     # Assume initially polarised along y
-    E_x_init = np.zeros(Np)
-    E_y_init = np.ones(Np)
+    E_x_init = jnp.zeros(Np)
+    E_y_init = jnp.ones(Np)
     # Perform rotation for polarisation, multiplication for amplitude, and complex rotation for phase
-    ray_J[0] = amp*(np.cos(phase)+1.0j*np.sin(phase))*(np.cos(pol)*E_x_init-np.sin(pol)*E_y_init)
-    ray_J[1] = amp*(np.cos(phase)+1.0j*np.sin(phase))*(np.sin(pol)*E_x_init+np.cos(pol)*E_y_init)
+    ray_J[0] = amp*(jnp.cos(phase)+1.0j*jnp.sin(phase))*(jnp.cos(pol)*E_x_init-jnp.sin(pol)*E_y_init)
+    ray_J[1] = amp*(jnp.cos(phase)+1.0j*jnp.sin(phase))*(jnp.sin(pol)*E_x_init+jnp.cos(pol)*E_y_init)
 
     # ray_p [x,phi,y,theta], ray_J [E_x,E_y]
 

@@ -2,8 +2,8 @@ import numpy as np
 import diffrax
 import optax
 import matplotlib.pyplot as plt
-import jax.numpy as jnp
 import jax
+import jax.numpy as jnp
 
 #from scipy.interpolate import RegularGridInterpolator
 from scipy.integrate import odeint, solve_ivp
@@ -187,7 +187,8 @@ class Propagator:
         s0 = self.Beam.s0
 
         # 8.0^0.5 is an arbritrary factor to ensure rays have enough time to escape the box
-        t = jnp.linspace(0.0, jnp.sqrt(8.0) * self.extent / c, 2)
+        # think we should change this???
+        t = jnp.linspace(0.0, np.sqrt(8.0) * self.extent / c, 2)
 
         start = time()
 
@@ -206,7 +207,7 @@ class Propagator:
             def dsdt_ODE(t, y, args):
                 return dsdt(t, y, args[0], args[1])
 
-            def diffrax_solve(dydt, t0, t1, Nt, rtol=1e-5, atol=1e-5):
+            def diffrax_solve(dydt, t0, t1 = 1.0, Nt, rtol = 1e-5, atol = 1e-5):
                 """
                 Here we wrap the diffrax diffeqsolve function such that we can easily parallelise it
                 """
@@ -220,7 +221,7 @@ class Propagator:
                 saveat = diffrax.SaveAt(ts = jnp.linspace(t0, t1, Nt))
                 # Diffrax uses adaptive time stepping to gain accuracy within certain tolerances
                 # had to reduce relative tolerance to 1 to get it to run, need to compare to see the consequences of this
-                stepsize_controller = diffrax.PIDController(rtol = 1, atol = 1e-5)
+                stepsize_controller = diffrax.PIDController(rtol = rtol, atol = atol)
 
                 return lambda s0, args : diffrax.diffeqsolve(
                     term,
@@ -234,16 +235,27 @@ class Propagator:
                     stepsize_controller = stepsize_controller
                 )
 
+
+            # hardoded to normalise to 1 due to diffrax bug
             ODE_solve = diffrax_solve(dsdt_ODE, t[0], t[-1], len(t))
 
             if jitted:
                 start_comp = time()
 
                 # equinox.filter_jit() (imported as filter_jit()) provides debugging info unlike jax.jit() - it does not like static args though so sticking with jit for now
-                ODE_solve = jax.jit(ODE_solve, static_argnums = 1, device = available_devices[0])
+                #ODE_solve = jax.jit(ODE_solve, static_argnums = 1, device = available_devices[0])
+                ODE_solve = filter_jit(ODE_solve, device = available_devices[0])
 
                 finish_comp = time()
                 print("jax compilation of solver took:", finish_comp - start_comp)
+
+
+            # remove unnecessary static arguments to increase speed
+            # normalise timesteps
+            # mess with rtol and atol parameters
+            # change algorithm?
+            # set higher precision in diffrax config
+            # increase max steps?
 
             # Solve for specific s0 intial values
             #args = {'self': self, 'parallelise': parallelise}
@@ -278,6 +290,9 @@ class Propagator:
 
             #if sol.result == RESULTS.successful:
             self.Beam.rf = sol.ys[:, -1, :].reshape(9, Np)
+            #self.Beam.rf[0, :] /= t[-1]
+            #self.Beam.rf[1, :] /= t[-1]
+            #self.Beam.rf[2, :] /= t[-1]
 
             print("\nParallelised output has resulting 3D matrix of form: [batch_count, 2, 9]:", sol.ys.shape)
             print("\t2 to account the start and end results")
@@ -402,8 +417,8 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction):
 
     Np = ode_sol.shape[1] # number of photons
 
-    ray_p = jnp.zeros((4, Np))
-    ray_J = jnp.zeros((2, Np), dtype=complex)
+    ray_p = np.zeros((4, Np))
+    ray_J = np.zeros((2, Np), dtype = complex)
 
     x, y, z, vx, vy, vz = ode_sol[0], ode_sol[1], ode_sol[2], ode_sol[3], ode_sol[4], ode_sol[5]
 
@@ -417,8 +432,8 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction):
         ray_p[2] = z - vz * t_bp
 
         # Angles to plane
-        ray_p[1] = jnp.arctan(vy / vx)
-        ray_p[3] = jnp.arctan(vz / vx)
+        ray_p[1] = np.arctan(vy / vx)
+        ray_p[3] = np.arctan(vz / vx)
     # XZ plane
     elif(probing_direction == 'y'):
         t_bp = (y - ne_extent) / vy
@@ -428,8 +443,8 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction):
         ray_p[2] = z - vz * t_bp
 
         # Angles to plane
-        ray_p[1] = jnp.arctan(vx / vy)
-        ray_p[3] = jnp.arctan(vz / vy)
+        ray_p[1] = np.arctan(vx / vy)
+        ray_p[3] = np.arctan(vz / vy)
     # XY plane
     elif(probing_direction == 'z'):
         t_bp = (z - ne_extent) / vz
@@ -439,7 +454,7 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction):
         ray_p[2] = y - vy * t_bp
 
         # Angles to plane
-        ray_p[1] = jnp.arctan(vx / vz)
+        ray_p[1] = p.arctan(vx / vz)
         ray_p[3] = jnp.arctan(vy / vz)
     else:
         print("\nIncorrect probing direction. Use: x, y or z.")
@@ -448,13 +463,13 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction):
     amp,phase,pol = ode_sol[6], ode_sol[7], ode_sol[8]
 
     # Assume initially polarised along y
-    E_x_init = jnp.zeros(Np)
-    E_y_init = jnp.ones(Np)
+    E_x_init = np.zeros(Np)
+    E_y_init = np.ones(Np)
 
     # Perform rotation for polarisation, multiplication for amplitude, and complex rotation for phase
-    ray_J[0] = amp*(jnp.cos(phase)+1.0j*jnp.sin(phase))*(jnp.cos(pol)*E_x_init-jnp.sin(pol)*E_y_init)
-    ray_J[1] = amp*(jnp.cos(phase)+1.0j*jnp.sin(phase))*(jnp.sin(pol)*E_x_init+jnp.cos(pol)*E_y_init)
+    ray_J[0] = amp * (jnp.cos(phase) + 1.0j * jnp.sin(phase)) * (jnp.cos(pol) * E_x_init - jnp.sin(pol) * E_y_init)
+    ray_J[1] = amp * (jnp.cos(phase) + 1.0j * jnp.sin(phase)) * (jnp.sin(pol) * E_x_init + jnp.cos(pol) * E_y_init)
 
     # ray_p [x,phi,y,theta], ray_J [E_x,E_y]
 
-    return ray_p, ray_J
+    return jnp.array(ray_p), jnp.array(ray_J)
