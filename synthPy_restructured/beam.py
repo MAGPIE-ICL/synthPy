@@ -277,10 +277,10 @@ class Beam:
         self.rf = s0
 
     def save_rays_pos(self, fn = None):
-        """
+        '''
         Saves the output rays as a binary numpy format for minimal size.
         Auto-names the file using the current date and time.
-        """
+        '''
 
         from datetime import datetime
 

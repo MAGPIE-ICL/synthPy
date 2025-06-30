@@ -16,7 +16,7 @@ from scipy.constants import c
 def omega_pe(ne):
     '''Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28'''
 
-    return 5.64e4*np.sqrt(ne)
+    return 5.64e4*jnp.sqrt(ne)
 
 class Propagator:
     def __init__(self, ScalarDomain, Beam, inv_brems = False, phaseshift = False):
@@ -28,9 +28,9 @@ class Propagator:
         # finish initialising the beam position using the scalardomain edge position
 
         #axes = ['x', 'y', 'z']
-        #print(np.asarray(axes == Beam.probing_direction).nonzero())
-        #print(np.where(axes == assert isinstance(Beam.probing_direction, str)))
-        #index = np.where(axes == Beam.probing_direction)[0]
+        #print(jnp.asarray(axes == Beam.probing_direction).nonzero())
+        #print(jnp.where(axes == assert isinstance(Beam.probing_direction, str)))
+        #index = jnp.where(axes == Beam.probing_direction)[0]
 
         index = ['x', 'y', 'z'].index(Beam.probing_direction)
         self.integration_length = ScalarDomain.lengths[index]
@@ -48,20 +48,20 @@ class Propagator:
 
         lwl = self.Beam.wavelength
 
-        self.omega = 2*np.pi*(c/lwl)
+        self.omega = 2*jnp.pi*(c/lwl)
         nc = 3.14207787e-4*self.omega**2
 
         # Find Faraday rotation constant http://farside.ph.utexas.edu/teaching/em/lectures/node101.html
         if (self.ScalarDomain.B_on):
             self.VerdetConst = 2.62e-13*lwl**2 # radians per Tesla per m^2
 
-        self.ne_nc = np.array(self.ScalarDomain.ne / nc, dtype = np.float32) #normalise to critical density
+        self.ne_nc = jnp.array(self.ScalarDomain.ne / nc, dtype = jnp.float32) #normalise to critical density
         
         #More compact notation is possible here, but we are explicit
         # can we find a way to reduce ram allocation
-        self.dndx = -0.5 *c ** 2 * np.gradient(self.ne_nc, self.ScalarDomain.x, axis=0)
-        self.dndy = -0.5 *c ** 2 * np.gradient(self.ne_nc, self.ScalarDomain.y, axis=1)
-        self.dndz = -0.5 *c ** 2 * np.gradient(self.ne_nc, self.ScalarDomain.z, axis=2)
+        self.dndx = -0.5 *c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.x, axis=0)
+        self.dndy = -0.5 *c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.y, axis=1)
+        self.dndz = -0.5 *c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.z, axis=2)
         
         self.dndx_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndx, bounds_error = False, fill_value = 0.0)
         self.dndy_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndy, bounds_error = False, fill_value = 0.0)
@@ -74,33 +74,33 @@ class Propagator:
         def v_the(Te):
             '''Calculate electron thermal speed. Provide Te in eV. Retrurns result in m/s'''
 
-            return 4.19e5*np.sqrt(Te)
+            return 4.19e5*jnp.sqrt(Te)
 
         def V(ne, Te, Z, omega):
             o_pe  = omega_pe(ne)
-            o_max = np.copy(o_pe)
+            o_max = jnp.copy(o_pe)
             o_max[o_pe < omega] = omega
             L_classical = Z*sc.e/Te
-            L_quantum = 2.760428269727312e-10/np.sqrt(Te) # sc.hbar/np.sqrt(sc.m_e*sc.e*Te)
-            L_max = np.maximum(L_classical, L_quantum)
+            L_quantum = 2.760428269727312e-10/jnp.sqrt(Te) # sc.hbar/jnp.sqrt(sc.m_e*sc.e*Te)
+            L_max = jnp.maximum(L_classical, L_quantum)
 
             return o_max*L_max
 
         def coloumbLog(ne, Te, Z, omega):
-            return np.maximum(2.0,np.log(v_the(Te)/V(ne, Te, Z, omega)))
+            return jnp.maximum(2.0,jnp.log(v_the(Te)/V(ne, Te, Z, omega)))
 
         ne_cc = self.ScalarDomain.ne*1e-6
         o_pe  = omega_pe(ne_cc)
         CL    = coloumbLog(ne_cc, self.ScalarDomain.Te, self.ScalarDomain.Z, self.omega)
 
-        return 3.1e-5*self.ScalarDomain.Z*c*np.power(ne_cc/self.omega,2)*CL*np.power(self.ScalarDomain.Te, -1.5) # 1/s
+        return 3.1e-5*self.ScalarDomain.Z*c*jnp.power(ne_cc/self.omega,2)*CL*jnp.power(self.ScalarDomain.Te, -1.5) # 1/s
 
     # Plasma refractive index
     def n_refrac(self):
 
         ne_cc = self.ScalarDomain.ne*1e-6
         o_pe  = omega_pe(ne_cc)
-        return np.sqrt(1.0-(o_pe/self.omega)**2)
+        return jnp.sqrt(1.0-(o_pe/self.omega)**2)
 
     def set_up_interps(self):
         # Electron density
@@ -157,7 +157,7 @@ class Propagator:
         return self.ne_interp(x.T)
 
     def get_B(self,x):
-        return np.array([self.Bx_interp(x.T),self.By_interp(x.T),self.Bz_interp(x.T)])
+        return jnp.array([self.Bx_interp(x.T),self.By_interp(x.T),self.Bz_interp(x.T)])
 
     def neB(self,x,v):
         """returns the VerdetConst ne B.v
@@ -172,7 +172,7 @@ class Propagator:
 
         if(self.ScalarDomain.B_on):
             ne_N = self.get_ne(x)
-            Bv_N = np.sum(self.get_B(x)*v,axis=0)
+            Bv_N = jnp.sum(self.get_B(x)*v,axis=0)
             pol  = self.VerdetConst*ne_N*Bv_N
         else:
             pol = 0.0
@@ -187,7 +187,7 @@ class Propagator:
         s0 = self.Beam.s0
 
         # 8.0^0.5 is an arbritrary factor to ensure rays have enough time to escape the box
-        t = np.linspace(0.0, np.sqrt(8.0) * self.extent / c, 2)
+        t = jnp.linspace(0.0, jnp.sqrt(8.0) * self.extent / c, 2)
 
         start = time()
 
@@ -199,6 +199,9 @@ class Propagator:
             dsdt_ODE = lambda t, y: dsdt(t, y, self, parallelise)
             sol = solve_ivp(dsdt_ODE, [0, t[-1]], s0, t_eval = t)
         else:
+            available_devices = jax.devices()
+            print(f"Available devices: {available_devices}")
+
             # wrapper for same reason, diffrax.ODETerm instantiaties this and passes args (this will contain self)
             def dsdt_ODE(t, y, args):
                 return dsdt(t, y, args[0], args[1])
@@ -237,7 +240,7 @@ class Propagator:
                 start_comp = time()
 
                 # equinox.filter_jit() (imported as filter_jit()) provides debugging info unlike jax.jit() - it does not like static args though so sticking with jit for now
-                ODE_solve = jax.jit(ODE_solve, static_argnums = 1)
+                ODE_solve = jax.jit(ODE_solve, static_argnums = 1, device = available_devices[0])
 
                 finish_comp = time()
                 print("jax compilation of solver took:", finish_comp - start_comp)
@@ -300,7 +303,7 @@ class Propagator:
         # Then can backproject to surface of volume
 
         length = self.extent + z
-        t = np.linspace(0.0, length / c, 2)
+        t = jnp.linspace(0.0, length / c, 2)
 
         s0 = self.Beam.s0
         s0 = s0.flatten() #odeint insists
@@ -358,7 +361,7 @@ def dsdt(t, s, Propagator, parallelise):
         # forces s to be a matrix even if has the indexes of a 1d array such that dsdt() can be generalised
         s = jnp.reshape(s, (9, 1))  # one ray per vmap iteration if parallelised
 
-    #sprime = np.zeros_like(s.reshape(9, s.size // 9))
+    #sprime = jnp.zeros_like(s.reshape(9, s.size // 9))
     sprime = jnp.zeros_like(s)
 
     # Position and velocity
@@ -399,8 +402,8 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction):
 
     Np = ode_sol.shape[1] # number of photons
 
-    ray_p = np.zeros((4, Np))
-    ray_J = np.zeros((2, Np), dtype=complex)
+    ray_p = jnp.zeros((4, Np))
+    ray_J = jnp.zeros((2, Np), dtype=complex)
 
     x, y, z, vx, vy, vz = ode_sol[0], ode_sol[1], ode_sol[2], ode_sol[3], ode_sol[4], ode_sol[5]
 
@@ -414,8 +417,8 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction):
         ray_p[2] = z - vz * t_bp
 
         # Angles to plane
-        ray_p[1] = np.arctan(vy / vx)
-        ray_p[3] = np.arctan(vz / vx)
+        ray_p[1] = jnp.arctan(vy / vx)
+        ray_p[3] = jnp.arctan(vz / vx)
     # XZ plane
     elif(probing_direction == 'y'):
         t_bp = (y - ne_extent) / vy
@@ -425,8 +428,8 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction):
         ray_p[2] = z - vz * t_bp
 
         # Angles to plane
-        ray_p[1] = np.arctan(vx / vy)
-        ray_p[3] = np.arctan(vz / vy)
+        ray_p[1] = jnp.arctan(vx / vy)
+        ray_p[3] = jnp.arctan(vz / vy)
     # XY plane
     elif(probing_direction == 'z'):
         t_bp = (z - ne_extent) / vz
@@ -436,8 +439,8 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction):
         ray_p[2] = y - vy * t_bp
 
         # Angles to plane
-        ray_p[1] = np.arctan(vx / vz)
-        ray_p[3] = np.arctan(vy / vz)
+        ray_p[1] = jnp.arctan(vx / vz)
+        ray_p[3] = jnp.arctan(vy / vz)
     else:
         print("\nIncorrect probing direction. Use: x, y or z.")
 
@@ -445,12 +448,12 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction):
     amp,phase,pol = ode_sol[6], ode_sol[7], ode_sol[8]
 
     # Assume initially polarised along y
-    E_x_init = np.zeros(Np)
-    E_y_init = np.ones(Np)
+    E_x_init = jnp.zeros(Np)
+    E_y_init = jnp.ones(Np)
 
     # Perform rotation for polarisation, multiplication for amplitude, and complex rotation for phase
-    ray_J[0] = amp*(np.cos(phase)+1.0j*np.sin(phase))*(np.cos(pol)*E_x_init-np.sin(pol)*E_y_init)
-    ray_J[1] = amp*(np.cos(phase)+1.0j*np.sin(phase))*(np.sin(pol)*E_x_init+np.cos(pol)*E_y_init)
+    ray_J[0] = amp*(jnp.cos(phase)+1.0j*jnp.sin(phase))*(jnp.cos(pol)*E_x_init-jnp.sin(pol)*E_y_init)
+    ray_J[1] = amp*(jnp.cos(phase)+1.0j*jnp.sin(phase))*(jnp.sin(pol)*E_x_init+jnp.cos(pol)*E_y_init)
 
     # ray_p [x,phi,y,theta], ray_J [E_x,E_y]
 
