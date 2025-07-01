@@ -5,11 +5,15 @@ import matplotlib.pyplot as plt
 import jax
 import jax.numpy as jnp
 
+# defaults float data types to 64-bit instead of 32 for greater precision
+jax.config.update('jax_enable_x64', True)
+
 #from scipy.interpolate import RegularGridInterpolator
 from scipy.integrate import odeint, solve_ivp
 from time import time
 from jax.scipy.interpolate import RegularGridInterpolator
 from equinox import filter_jit
+from datetime import datetime
 
 from scipy.constants import c
 
@@ -201,16 +205,21 @@ class Propagator:
             sol = solve_ivp(dsdt_ODE, [0, t[-1]], s0, t_eval = t)
         else:
             available_devices = jax.devices()
-            print(f"Available devices: {available_devices}")
+            print(f"\nAvailable devices: {available_devices}")
+
+            scalar = c / (1e-3)
 
             # wrapper for same reason, diffrax.ODETerm instantiaties this and passes args (this will contain self)
             def dsdt_ODE(t, y, args):
                 return dsdt(t, y, args[0], args[1])
 
-            def diffrax_solve(dydt, t0, t1 = 1.0, Nt, rtol = 1e-5, atol = 1e-5):
+            def diffrax_solve(dydt, t0, t1, Nt, rtol = 1e-5, atol = 1e-5):
                 """
                 Here we wrap the diffrax diffeqsolve function such that we can easily parallelise it
                 """
+
+                t0 *= scalar
+                t1 *= scalar
 
                 # We convert our python function to a diffrax ODETerm
                 term = diffrax.ODETerm(dsdt_ODE)
@@ -232,11 +241,12 @@ class Propagator:
                     t1 = t1,
                     dt0 = (t1 - t0) / Nt,
                     saveat = saveat,
-                    stepsize_controller = stepsize_controller
+                    stepsize_controller = stepsize_controller,
+                    # set max steps to no. of cells x100
+                    max_steps = self.ScalarDomain.x_n * self.ScalarDomain.y_n * self.ScalarDomain.z_n * 100 #10000 - default for solve_ivp?????
                 )
 
-
-            # hardoded to normalise to 1 due to diffrax bug
+            # hardcode to normalise to 1 due to diffrax bug - how do we un-normalise after solving?, check aidrian's issue
             ODE_solve = diffrax_solve(dsdt_ODE, t[0], t[-1], len(t))
 
             if jitted:
@@ -245,10 +255,10 @@ class Propagator:
                 # equinox.filter_jit() (imported as filter_jit()) provides debugging info unlike jax.jit() - it does not like static args though so sticking with jit for now
                 #ODE_solve = jax.jit(ODE_solve, static_argnums = 1, device = available_devices[0])
                 ODE_solve = filter_jit(ODE_solve, device = available_devices[0])
+                # not sure about the performance of non-static specified arguments with filter_jit() - only use for debugging not in 'production'
 
                 finish_comp = time()
                 print("jax compilation of solver took:", finish_comp - start_comp)
-
 
             # remove unnecessary static arguments to increase speed
             # normalise timesteps
@@ -265,6 +275,8 @@ class Propagator:
             # pass s0[:, i] for each ray via a jax.vmap for parallelisation
             # transposed as jax.vmap() expects form of [batch_idx, items] not [items, batch_idx]
             sol = jax.vmap(lambda s: ODE_solve(s, args))(s0.T)
+
+            jax.profiler.save_device_memory_profile(f"../../evaluation/memory_benchmarks/memory_{s0.shape[1]}_rays-{datetime.now().strftime("%Y%m%d-%H%M%S")}.prof")
 
         finish = time()
         self.duration = finish - start
@@ -290,19 +302,36 @@ class Propagator:
 
             #if sol.result == RESULTS.successful:
             self.Beam.rf = sol.ys[:, -1, :].reshape(9, Np)
-            #self.Beam.rf[0, :] /= t[-1]
-            #self.Beam.rf[1, :] /= t[-1]
-            #self.Beam.rf[2, :] /= t[-1]
+
+            #self.Beam.rf = self.Beam.rf.at[:, :].set(self.Beam.rf[:, :] * (1e-3) / c)
 
             print("\nParallelised output has resulting 3D matrix of form: [batch_count, 2, 9]:", sol.ys.shape)
-            print("\t2 to account the start and end results")
+            print("\t2 to account for the start and end results")
             print("\t9 containing the 3 position and velocity components, amplitude, phase and polarisation")
-            print("\nWe reshape into the form:", sol.ys[:, -1, :].reshape(9, Np).shape)
+            print("\nWe reshape into the form:", sol.ys[:, -1, :].reshape(9, Np).shape, "to work with later code.")
             #else:
             #    print("Ray tracer failed. This could be a case of diffrax exceeding max steps again due to apparent 'strictness' compared to solve_ivp, check error log.")
+        '''
+
+        x = self.Beam.rf[0, :]
+        y = self.Beam.rf[2, :]
+
+        print("\nx-y size expected: (", len(x), ", ", len(y), ")", sep='')
+        print('Final rays:', self.Beam.rf[:, :9])
+
+        # means that jnp.isnan(a) returns True when a is not Nan
+        # ensures that x & y are the same length, if output of either is Nan then will not try to render ray in histogram
+        mask = ~jnp.isnan(x) & ~jnp.isnan(y)
+
+        x = x[mask]
+        y = y[mask]
+
+        print("x-y after clearing nan's: (", len(x), ", ", len(y), ")", sep='')
+        '''
 
         self.Beam.rf, self.Beam.Jf = ray_to_Jonesvector(self.Beam.rf, self.extent, probing_direction = self.Beam.probing_direction)
-        #print("\n", self.Beam.rf)
+        print("Jonesvector's output as 2 array's of form's:", self.Beam.rf.shape, self.Beam.Jf.shape)
+
         if return_E:
             return self.Beam.rf, self.Beam.Jf
         else:
@@ -327,7 +356,7 @@ class Propagator:
 
         start = time()
 
-        dsdt_ODE = lambda t, y: dsdt(t, y, self)
+        dsdt_ODE = lambda t, y: dsdt(t, y, self, parallelise = False)
         sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t)
 
         finish = time()
@@ -338,8 +367,7 @@ class Propagator:
         Np = s0.size//9
         self.Beam.sf = sol.y[:,-1].reshape(9,Np)
 
-        self.Beam.rf, self.Beam.Jf = ray_to_Jonesvector(self.Beam.sf, self.extent, probing_direction = self.Beam.probing_direction)
-        del self.Beam.Jf
+        self.Beam.rf, _ = ray_to_Jonesvector(self.Beam.sf, self.extent, probing_direction = self.Beam.probing_direction)
 
     def clear_memory(self):
         """
@@ -454,8 +482,8 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction):
         ray_p[2] = y - vy * t_bp
 
         # Angles to plane
-        ray_p[1] = p.arctan(vx / vz)
-        ray_p[3] = jnp.arctan(vy / vz)
+        ray_p[1] = np.arctan(vx / vz)
+        ray_p[3] = np.arctan(vy / vz)
     else:
         print("\nIncorrect probing direction. Use: x, y or z.")
 
@@ -467,8 +495,8 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction):
     E_y_init = np.ones(Np)
 
     # Perform rotation for polarisation, multiplication for amplitude, and complex rotation for phase
-    ray_J[0] = amp * (jnp.cos(phase) + 1.0j * jnp.sin(phase)) * (jnp.cos(pol) * E_x_init - jnp.sin(pol) * E_y_init)
-    ray_J[1] = amp * (jnp.cos(phase) + 1.0j * jnp.sin(phase)) * (jnp.sin(pol) * E_x_init + jnp.cos(pol) * E_y_init)
+    ray_J[0] = amp * (np.cos(phase) + 1.0j * np.sin(phase)) * (np.cos(pol) * E_x_init - np.sin(pol) * E_y_init)
+    ray_J[1] = amp * (np.cos(phase) + 1.0j * np.sin(phase)) * (np.sin(pol) * E_x_init + np.cos(pol) * E_y_init)
 
     # ray_p [x,phi,y,theta], ray_J [E_x,E_y]
 

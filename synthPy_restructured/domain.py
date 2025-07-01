@@ -40,7 +40,7 @@ class ScalarDomain:
         self.dim = dim
         if isinstance(dim, (int, float)):
             self.x_n, self.y_n, self.z_n = dim, dim, dim
-            self.dim = jnp.array([dim,dim,dim])
+            self.dim = jnp.array([dim, dim, dim])
         else:
             if len(dim) != 3:
                 raise Exception('n must have len = 3: (x_n, y_n, z_n)')

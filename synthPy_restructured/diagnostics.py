@@ -1,6 +1,10 @@
-import jax.numpy as jnp
+import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+import jax
+import jax.numpy as jnp
+
+#jax.tree_util.tree_leaves(x, is_leaf = lambda x: x is None)
 
 '''
 (rtm_solver)
@@ -111,13 +115,15 @@ fig.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0.1, hspace=None)
 '''
 
 def m_to_mm(r):
-    rr = jnp.ndarray.copy(r)
-    rr[0::2,:]*=1e3
+    rr = jnp.copy(r)
+    rr = rr.at[0::2, :].set(rr[0::2, :] * 1e3)
+
     return rr
 
 def mm_to_m(r):
-    rr = jnp.ndarray.copy(r)
-    rr[0::2,:]*=1e-3
+    rr = jnp.copy(r)
+    rr = rr.at[0::2, :].set(rr[0::2, :] * 1e-3)
+
     return rr
 
 def lens(r, f1, f2):
@@ -126,12 +132,12 @@ def lens(r, f1, f2):
     See: https://en.wikipedia.org/wiki/Ray_transfer_matrix_analysis
     '''
 
-    l1 = jnp.array([[1, 0],
+    l1 = np.array([[1, 0],
             [-1 / f1, 1]])
-    l2 = jnp.array([[1, 0],
+    l2 = np.array([[1, 0],
             [-1 / f2, 1]])
 
-    L = jnp.zeros((4,4))
+    L = np.zeros((4, 4))
     L[:2, :2] = l1
     L[2:, 2:] = l2
 
@@ -149,10 +155,10 @@ def distance(r, d):
     See: https://en.wikipedia.org/wiki/Ray_transfer_matrix_analysis
     '''
 
-    d = jnp.array([[1, d],
+    d = np.array([[1, d],
                   [0, 1]])
 
-    L = jnp.zeros((4, 4))
+    L = np.zeros((4, 4))
 
     L[:2, :2] = d
     L[2:, 2:] = d
@@ -166,12 +172,14 @@ def circular_aperture(r, R, E = None):
 
     filt = r[0, :] ** 2 + r[2, :] ** 2 > R ** 2
     # if you want to reject rays outside of the radius, then when filt is true you should set equal to None
-    r[:, filt] = None
+    r = r.at[:, filt].set(jnp.nan)
 
     if E is not None:
         E = jnp.array(E, dtype = object)
         #E[:, jnp.array(r) == None] = None
-        E[:, filt] = None
+        E = E.at[:, filt].set(jnp.nan)
+
+        return r, E
 
     return r
 
@@ -181,7 +189,7 @@ def circular_stop(r, R):
     '''
 
     filt = r[0,:]**2+r[2,:]**2 < R**2
-    r[:,filt]=None
+    r = r.at[:, filt].set(jnp.nan)
 
     return r
 
@@ -205,7 +213,7 @@ def rect_aperture(r, Lx, Ly):
     filt2 = (r[2, :] ** 2 > Ly ** 2)
 
     filt = filt1 * filt2
-    r[:, filt] = None
+    r = r.at[:, filt].set(jnp.nan)
 
     return r
 
@@ -227,7 +235,7 @@ def knife_edge(r, offset, axis, direction):
     if direction == 0:
         print('Direction must be < 0 or > 0')
 
-    r[:, filt] = None
+    r = r.at[:, filt].set(jnp.nan)
 
     return r
 
@@ -298,6 +306,9 @@ class Diagnostic:
         x = self.rf[0, :]
         y = self.rf[2, :]
 
+        print("\nrf size expected: (", len(x), ", ", len(y), ")", sep='')
+        print('Final rays:', self.rf[:, 10])
+
         # means that jnp.isnan(a) returns True when a is not Nan
         # ensures that x & y are the same length, if output of either is Nan then will not try to render ray in histogram
         mask = ~jnp.isnan(x) & ~jnp.isnan(y)
@@ -305,7 +316,7 @@ class Diagnostic:
         x = x[mask]
         y = y[mask]
 
-        print("\nr0 after clearing nan's: (", len(x), ", ", len(y), ")", sep='')
+        print("rf after clearing nan's: (", len(x), ", ", len(y), ")", sep='')
 
         # some legacy code, need to check what it does and if still relevant
         # this line is still relevant, repeated across many functions, make a function for it to reduce repeats
@@ -338,7 +349,7 @@ class Diagnostic:
         if(clear_mem):
             clear_rays(self)
 
-    def plot(self, ax, clim=None, cmap=None):
+    def plot(self, ax, clim = None, cmap = None):
         ax.imshow(self.H, interpolation='nearest', origin='lower', clim=clim, cmap=cmap, extent = [self.xedges[0], self.xedges[-1], self.yedges[0], self.yedges[-1]])
 
 class Shadowgraphy(Diagnostic):
@@ -427,7 +438,7 @@ class Refractometry(Diagnostic):
         ##
 
         ## Imaging the spatial axis - M = 2
-        r1 = distance(self.r0, 3*self.L/4 - self.focal_plane) #displace rays to lens 1. Accounts for object with depth
+        r1 = distance(self.r0, 3 * self.L / 4 - self.focal_plane) #displace rays to lens 1. Accounts for object with depth
         r2 = circular_aperture(r1, self.R)      # cut off
         r3 = sym_lens(r2, self.L/2)             # lens 1 - spherical
         r4 = distance(r3, 3*self.L/2)           # displace rays to lens 2 - hybrid
@@ -439,7 +450,7 @@ class Refractometry(Diagnostic):
 
     def coherent_solve(self):
         ## Imaging the spatial axis - M = 2 - Coherent Implementation of the Refractometer
-        r1 = distance(self.r0, 3*self.L/4 - self.focal_plane)
+        r1 = distance(self.r0, 3 * self.L / 4 - self.focal_plane)
         # propagate E field
         self.propagate_E(r1, self.r0)
         r2 = circular_aperture(self.r0, self.R, E = self.Jf)      # cut off

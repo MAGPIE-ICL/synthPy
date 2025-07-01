@@ -31,3 +31,6 @@ field_generator/__pycache__/*
 examples/notebooks/.ipynb_checkpoints
 examples/notebooks/.ipynb_checkpoints/test_SynthRayTracer-checkpoint.ipynb
 examples/notebooks/.ipynb_checkpoints/*
+
+evaluation/memory_benchmarks
+evaluation/memory_benchmarks/*
