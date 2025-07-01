@@ -15,6 +15,7 @@ from time import time
 from jax.scipy.interpolate import RegularGridInterpolator
 from equinox import filter_jit
 from datetime import datetime
+from jax.lib import xla_bridge
 
 from scipy.constants import c
 
@@ -256,14 +257,34 @@ class Propagator:
                 # not sure about the performance of non-static specified arguments with filter_jit() - only use for debugging not in 'production'
 
                 finish_comp = time()
-                print("jax compilation of solver took:", finish_comp - start_comp)
+                print("\njax compilation of solver took:", finish_comp - start_comp)
 
-            # remove unnecessary static arguments to increase speed
-            # normalise timesteps
-            # mess with rtol and atol parameters
-            # change algorithm?
-            # set higher precision in diffrax config
-            # increase max steps?
+            running_device = xla_bridge.get_backend().platform
+            print("Running device:", running_device, end='')
+
+            if running_device == 'cpu':
+                from multiprocessing import cpu_count
+                core_count = cpu_count()
+                print(", with:", core_count, "cores.")
+
+                '''
+                from jax.sharding import PartitionSpec as P, NamedSharding
+
+                # Create a Sharding object to distribute a value across devices:
+                mesh = jax.make_mesh((4, 2), ('x', 'y'))
+
+                # Create an array of random values:
+                x = jax.random.normal(jax.random.key(0), (8192, 8192))
+                # and use jax.device_put to distribute it across devices:
+                y = jax.device_put(x, NamedSharding(mesh, P('x', 'y')))
+                jax.debug.visualize_array_sharding(y)
+                '''
+            elif running_device == 'gpu':
+                pass
+            elif running_device == 'tpu':
+                pass
+            else:
+                print("No suitable device detected!")
 
             # Solve for specific s0 intial values
             #args = {'self': self, 'parallelise': parallelise}
@@ -272,7 +293,10 @@ class Propagator:
 
             # pass s0[:, i] for each ray via a jax.vmap for parallelisation
             # transposed as jax.vmap() expects form of [batch_idx, items] not [items, batch_idx]
+            # remove unnecessary static arguments to increase speed and reduce likelihood of unexpected behaviours
             sol = jax.vmap(lambda s: ODE_solve(s, args))(s0.T)
+
+            jax.debug.visualize_array_sharding(sol.ys[:, -1, :])
 
             path = "../../evaluation/memory_benchmarks/memory-domain" + str(s0.shape[1]) + "_rays-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
             jax.profiler.save_device_memory_profile(path)
@@ -311,7 +335,7 @@ class Propagator:
             print("\nParallelised output has resulting 3D matrix of form: [batch_count, 2, 9]:", sol.ys.shape)
             print("\t2 to account for the start and end results")
             print("\t9 containing the 3 position and velocity components, amplitude, phase and polarisation")
-            print("\nWe reshape into the form:", sol.ys[:, -1, :].reshape(9, Np).shape, "to work with later code.")
+            print("\nWe slice the end result and transpose into the form:", sol.ys[:, -1, :].reshape(9, Np).shape, "to work with later code.")
             #else:
             #    print("Ray tracer failed. This could be a case of diffrax exceeding max steps again due to apparent 'strictness' compared to solve_ivp, check error log.")
 
