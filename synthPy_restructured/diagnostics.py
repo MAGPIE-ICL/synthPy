@@ -290,7 +290,7 @@ class Diagnostic:
 
         k = 2 * jnp.pi / lwl
 
-        self.Jf *= jnp.exp(1.0j * k * jnp.sqrt(dx ** 2 + dy ** 2))
+        self.Jf = self.Jf.at[:, :].set(self.Jf[:, :] * jnp.exp(1.0j * k * jnp.sqrt(dx ** 2 + dy ** 2)))
 
     def histogram(self, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
         '''
@@ -410,26 +410,26 @@ class Schlieren(Diagnostic):
 
     def LF_solve(self, R = 1):
         ## 2 lens telescope, M = 1
-        r1=distance(self.r0, self.L - self.focal_plane) #displace rays to lens. Accounts for object with depth
-        r2=circular_aperture(r1, self.R) # cut off
-        r3=sym_lens(r2, self.L) #lens 1
+        r1 = distance(self.r0, self.L - self.focal_plane) #displace rays to lens. Accounts for object with depth
+        r2 = circular_aperture(r1, self.R) # cut off
+        r3 = sym_lens(r2, self.L) #lens 1
 
-        r4=distance(r3, self.L) #displace rays to stop
-        r5=circular_aperture(r4, R = R) # stop
+        r4 = distance(r3, self.L) #displace rays to stop
+        r5 = circular_aperture(r4, R = R) # stop
 
-        r6=distance(r5, self.L) #displace rays to lens 2
-        r7=circular_aperture(r6, self.R) # cut off
-        r8=sym_lens(r7, self.L) #lens 2
+        r6 = distance(r5, self.L) #displace rays to lens 2
+        r7 = circular_aperture(r6, self.R) # cut off
+        r8 = sym_lens(r7, self.L) #lens 2
 
-        r9=distance(r8, self.L) #displace rays to detector
+        r9 = distance(r8, self.L) #displace rays to detector
         self.rf = r9
         
 class Refractometry(Diagnostic):
-    """
+    '''
     Example of Imaging Refractometer. Inherits from Rays, has custom solve method.
     Implements a spherical lens with focal length f1 = L/2 and M = 2 for the spatial axis and a cylindrical lens
     with focal length f1 and f2.
-    """
+    '''
 
     def incoherent_solve(self):
         ##

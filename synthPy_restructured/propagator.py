@@ -67,7 +67,7 @@ class Propagator:
         self.dndx = -0.5 *c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.x, axis=0)
         self.dndy = -0.5 *c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.y, axis=1)
         self.dndz = -0.5 *c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.z, axis=2)
-        
+
         self.dndx_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndx, bounds_error = False, fill_value = 0.0)
         self.dndy_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndy, bounds_error = False, fill_value = 0.0)
         self.dndz_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndz, bounds_error = False, fill_value = 0.0)
@@ -237,7 +237,7 @@ class Propagator:
                     args = args,
                     t0 = t0,
                     t1 = t1,
-                    dt0 = (t1 - t0) / Nt,
+                    dt0 = (t1 - t0) * norm_factor**2 / Nt,
                     saveat = saveat,
                     stepsize_controller = stepsize_controller,
                     # set max steps to no. of cells x100
@@ -277,7 +277,8 @@ class Propagator:
             path = "../../evaluation/memory_benchmarks/memory-domain" + str(s0.shape[1]) + "_rays-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
             jax.profiler.save_device_memory_profile(path)
             #os.system(f"~/go/bin/pprof -top {sys.executable} memory_{N}.prof")
-            #os.system(f"~/go/bin/pprof -top /bin/ls " + path)
+            os.system(f"~/go/bin/pprof -top /bin/ls " + path)
+            #os.system(f"~/go/bin/pprof --web " + path)
 
         finish = time()
         self.duration = finish - start
@@ -302,7 +303,8 @@ class Propagator:
             '''
 
             #if sol.result == RESULTS.successful:
-            self.Beam.rf = sol.ys[:, -1, :].reshape(9, Np)# / scalar
+            #self.Beam.rf = sol.ys[:, -1, :].reshape(9, Np)# / scalar
+            self.Beam.rf = sol.ys[:, -1, :].T
 
             #self.Beam.rf = self.Beam.rf.at[:, :].set(self.Beam.rf[:, :] * (1e-3) / c)
 
