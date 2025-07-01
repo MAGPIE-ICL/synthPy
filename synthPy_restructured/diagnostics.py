@@ -175,9 +175,9 @@ def circular_aperture(r, R, E = None):
     r = r.at[:, filt].set(jnp.nan)
 
     if E is not None:
-        E = jnp.array(E, dtype = object)
+        E = np.array(E, dtype = object)
         #E[:, jnp.array(r) == None] = None
-        E = E.at[:, filt].set(jnp.nan)
+        E[:, filt] = jnp.nan
 
         return r, E
 
@@ -307,7 +307,6 @@ class Diagnostic:
         y = self.rf[2, :]
 
         print("\nrf size expected: (", len(x), ", ", len(y), ")", sep='')
-        print('Final rays:', self.rf[:, 10])
 
         # means that jnp.isnan(a) returns True when a is not Nan
         # ensures that x & y are the same length, if output of either is Nan then will not try to render ray in histogram
@@ -453,12 +452,12 @@ class Refractometry(Diagnostic):
         r1 = distance(self.r0, 3 * self.L / 4 - self.focal_plane)
         # propagate E field
         self.propagate_E(r1, self.r0)
-        r2 = circular_aperture(self.r0, self.R, E = self.Jf)      # cut off
+        r2, self.Jf = circular_aperture(self.r0, self.R, E = self.Jf)      # cut off
         r3 = sym_lens(r2, self.L/2)          # lens 1 - spherical
         self.propagate_E(r3, r2)
         r4 = distance(r3, 3*self.L/2)
         self.propagate_E(r4, r3)                 # displace rays to lens 2 - hybrid
-        r5 = circular_aperture(r4, self.R, E = self.Jf)      # cut off
+        r5, self.Jf = circular_aperture(r4, self.R, E = self.Jf)      # cut off
         r6 = lens(r5, self.L/3, self.L/2)       # lens 2 - hybrid lens
         self.propagate_E(r6, r5)
 
@@ -521,7 +520,7 @@ class Interferometry(Diagnostic):
 
         ref_beam = jnp.exp(2 * n_fringes / 3 * 1.0j * (x_weight * self.rf[0,:] + y_weight * self.rf[2,:]))
 
-        self.Jf[1,:] += ref_beam # assume ref_beam is polarised in y
+        self.Jf = self.Jf.at[1,:].set(self.Jf[1,:] + ref_beam) # assume ref_beam is polarised in y
     
     def bkg(self, domain_length, n_fringes, deg):
         rr0, E0 = ray_to_Jonesvector(self.Beam, self.Beam.s0)
@@ -534,13 +533,13 @@ class Interferometry(Diagnostic):
         r1 = distance(rr0, self.L + domain_length) #displace rays to lens. Accounts for object with depth
         # propagate E field
         self.propagate_E(r1, rr0)
-        r2 = circular_aperture(r1, self.R, E = self.Jf)    # cut off
+        r2, self.Jf = circular_aperture(r1, self.R, E = self.Jf)    # cut off
         r3 = sym_lens(r2, self.L/2)           # lens 1
         self.propagate_E(r3, r2)
 
         r4 = distance(r3, self.L*2)           # displace rays to lens 2.
         self.propagate_E(r4, r3)
-        r5 = circular_aperture(r4, self.R, E = self.Jf)    # cut off
+        r5, self.Jf = circular_aperture(r4, self.R, E = self.Jf)    # cut off
         r6 = sym_lens(r5, self.L/2)                             # lens 2
         self.propagate_E(r6, r5)
         
@@ -580,13 +579,13 @@ class Interferometry(Diagnostic):
         r1 = distance(self.r0, self.L - self.focal_plane) #displace rays to lens. Accounts for object with depth
         # propagate E field
         self.propagate_E(r1, self.r0)
-        r2 = circular_aperture(r1, self.R, E = self.Jf)    # cut off
+        r2, self.Jf = circular_aperture(r1, self.R, E = self.Jf)    # cut off
         r3 = sym_lens(r2, self.L/2)           # lens 1
         self.propagate_E(r3, r2)
 
         r4 = distance(r3, self.L*2)           # displace rays to lens 2.
         self.propagate_E(r4, r3)
-        r5 = circular_aperture(r4, self.R, E = self.Jf)    # cut off
+        r5, self.Jf = circular_aperture(r4, self.R, E = self.Jf)    # cut off
         r6 = sym_lens(r5, self.L/2)                             # lens 2
         self.propagate_E(r6, r5)
         

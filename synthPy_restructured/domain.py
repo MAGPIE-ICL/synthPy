@@ -1,6 +1,8 @@
 import numpy as np
 import jax.numpy as jnp
 
+from datetime import datetime
+
 class ScalarDomain:
     """
     A class to hold and generate scalar domains.
@@ -66,7 +68,8 @@ class ScalarDomain:
         self.ne = jnp.zeros_like(self.XX)
     
     def test_slab(self, s=1, n_e0=2e23):
-        """A slab with a linear gradient in x:
+        """
+        A slab with a linear gradient in x:
         n_e =  n_e0 * (1 + s*x/extent)
 
         Will cause a ray deflection in x

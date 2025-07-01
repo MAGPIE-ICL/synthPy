@@ -4,6 +4,7 @@ import optax
 import matplotlib.pyplot as plt
 import jax
 import jax.numpy as jnp
+import os
 
 # defaults float data types to 64-bit instead of 32 for greater precision
 jax.config.update('jax_enable_x64', True)
@@ -207,19 +208,16 @@ class Propagator:
             available_devices = jax.devices()
             print(f"\nAvailable devices: {available_devices}")
 
-            scalar = c / (1e-3)
+            norm_factor = np.max(t)
 
             # wrapper for same reason, diffrax.ODETerm instantiaties this and passes args (this will contain self)
             def dsdt_ODE(t, y, args):
-                return dsdt(t, y, args[0], args[1])
+                return dsdt(t, y, args[0], args[1]) * norm_factor
 
-            def diffrax_solve(dydt, t0, t1, Nt, rtol = 1e-5, atol = 1e-5):
+            def diffrax_solve(dydt, t0, t1, Nt, rtol = 1e-7, atol = 1e-9):
                 """
                 Here we wrap the diffrax diffeqsolve function such that we can easily parallelise it
                 """
-
-                t0 *= scalar
-                t1 *= scalar
 
                 # We convert our python function to a diffrax ODETerm
                 term = diffrax.ODETerm(dsdt_ODE)
@@ -247,7 +245,7 @@ class Propagator:
                 )
 
             # hardcode to normalise to 1 due to diffrax bug - how do we un-normalise after solving?, check aidrian's issue
-            ODE_solve = diffrax_solve(dsdt_ODE, t[0], t[-1], len(t))
+            ODE_solve = diffrax_solve(dsdt_ODE, t[0], t[-1] / norm_factor, len(t))
 
             if jitted:
                 start_comp = time()
@@ -276,7 +274,10 @@ class Propagator:
             # transposed as jax.vmap() expects form of [batch_idx, items] not [items, batch_idx]
             sol = jax.vmap(lambda s: ODE_solve(s, args))(s0.T)
 
-            jax.profiler.save_device_memory_profile(f"../../evaluation/memory_benchmarks/memory_{s0.shape[1]}_rays-{datetime.now().strftime("%Y%m%d-%H%M%S")}.prof")
+            path = "../../evaluation/memory_benchmarks/memory-domain" + str(s0.shape[1]) + "_rays-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
+            jax.profiler.save_device_memory_profile(path)
+            #os.system(f"~/go/bin/pprof -top {sys.executable} memory_{N}.prof")
+            #os.system(f"~/go/bin/pprof -top /bin/ls " + path)
 
         finish = time()
         self.duration = finish - start
@@ -301,7 +302,7 @@ class Propagator:
             '''
 
             #if sol.result == RESULTS.successful:
-            self.Beam.rf = sol.ys[:, -1, :].reshape(9, Np)
+            self.Beam.rf = sol.ys[:, -1, :].reshape(9, Np)# / scalar
 
             #self.Beam.rf = self.Beam.rf.at[:, :].set(self.Beam.rf[:, :] * (1e-3) / c)
 
@@ -311,13 +312,12 @@ class Propagator:
             print("\nWe reshape into the form:", sol.ys[:, -1, :].reshape(9, Np).shape, "to work with later code.")
             #else:
             #    print("Ray tracer failed. This could be a case of diffrax exceeding max steps again due to apparent 'strictness' compared to solve_ivp, check error log.")
-        '''
 
         x = self.Beam.rf[0, :]
         y = self.Beam.rf[2, :]
 
         print("\nx-y size expected: (", len(x), ", ", len(y), ")", sep='')
-        print('Final rays:', self.Beam.rf[:, :9])
+        print('Final rays:', self.Beam.rf[:, :])
 
         # means that jnp.isnan(a) returns True when a is not Nan
         # ensures that x & y are the same length, if output of either is Nan then will not try to render ray in histogram
@@ -327,10 +327,9 @@ class Propagator:
         y = y[mask]
 
         print("x-y after clearing nan's: (", len(x), ", ", len(y), ")", sep='')
-        '''
 
         self.Beam.rf, self.Beam.Jf = ray_to_Jonesvector(self.Beam.rf, self.extent, probing_direction = self.Beam.probing_direction)
-        print("Jonesvector's output as 2 array's of form's:", self.Beam.rf.shape, self.Beam.Jf.shape)
+        #print("\nJonesvector's output as 2 array's of form's:", self.Beam.rf.shape, self.Beam.Jf.shape)
 
         if return_E:
             return self.Beam.rf, self.Beam.Jf
