@@ -4,20 +4,19 @@ import optax
 import matplotlib.pyplot as plt
 import jax
 import jax.numpy as jnp
-import os
 
 # defaults float data types to 64-bit instead of 32 for greater precision
 jax.config.update('jax_enable_x64', True)
 jax.config.update('jax_captured_constants_report_frames', -1)
-jax.config.update('jax_captured_constants_warn_bytes', 256*1024**2)
+jax.config.update('jax_captured_constants_warn_bytes', 128*1024**2)
 
-#from scipy.interpolate import RegularGridInterpolator
 from scipy.integrate import odeint, solve_ivp
 from time import time
 from jax.scipy.interpolate import RegularGridInterpolator
 from equinox import filter_jit
 from datetime import datetime
 from jax.lib import xla_bridge
+from os import system as os_system
 
 from scipy.constants import c
 
@@ -302,9 +301,9 @@ class Propagator:
 
             path = "../../evaluation/memory_benchmarks/memory-domain" + str(self.ScalarDomain.dim[0]) + "_rays"+ str(s0.shape[1]) + "-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
             jax.profiler.save_device_memory_profile(path)
-            #os.system(f"~/go/bin/pprof -top {sys.executable} memory_{N}.prof")
-            os.system(f"~/go/bin/pprof -top /bin/ls " + path)
-            #os.system(f"~/go/bin/pprof --web " + path)
+            #os_system(f"~/go/bin/pprof -top {sys.executable} memory_{N}.prof")
+            os_system(f"~/go/bin/pprof -top /bin/ls " + path)
+            #os_system(f"~/go/bin/pprof --web " + path)
 
         finish = time()
         self.duration = finish - start

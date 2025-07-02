@@ -1,12 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import vtk
-from vtk.util import numpy_support as vtk_np
 import matplotlib.pyplot as plt
+import sys
 
-from sys import insert.path as insert_path
+from vtk.util import numpy_support as vtk_np
+#from sys import path.insert as insert_path
 
-insert_path(0, '/rds/general/user/sm5625/home/synthPy/synthPy_restructured')
+sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/synthPy_restructured')
 
 import beam as beam_initialiser
 import diagnostics as diag
