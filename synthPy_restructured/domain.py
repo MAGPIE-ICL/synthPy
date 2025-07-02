@@ -102,6 +102,7 @@ class ScalarDomain:
             s ([type], optional): scale of exponential growth. Defaults to 2e-3 m.
         """
 
+        # could we jax this calculation
         self.ne = n_e0*10**(self.XX/s)*(1+jnp.cos(2*jnp.pi*self.YY/Ly))
         
     def external_ne(self, ne):
