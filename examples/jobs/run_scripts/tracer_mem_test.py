@@ -4,15 +4,17 @@ import vtk
 from vtk.util import numpy_support as vtk_np
 import matplotlib.pyplot as plt
 
-import sys
+from sys import insert.path as insert_path
+
+insert_path(0, '/rds/general/user/sm5625/home/synthPy/synthPy_restructured')
 
 # cwd is set to synthPy acc. to hpc
 
-import synthPy_restructured.beam as beam_initialiser
-import synthPy_restructured.diagnostics as diag
-import synthPy_restructured.domain as d
-import synthPy_restructured.propagator as p
-import synthPy_restructured.utils
+import beam as beam_initialiser
+import diagnostics as diag
+import domain as d
+import propagator as p
+import utils
 
 extent_x = 5e-3
 extent_y = 5e-3
