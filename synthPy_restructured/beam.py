@@ -1,5 +1,7 @@
 import numpy as np
 
+import utils
+
 class Beam:
 # Initialise beam
     def __init__(self, Np, beam_size, divergence, ne_extent, probing_direction = 'z', wavelength = 450e-9, beam_type = 'circular'):
@@ -57,14 +59,14 @@ class Beam:
         s0 = np.zeros((9, Np))
         if(beam_type == 'circular'):
             # position, uniformly within a circle
-            t  = 2 * np.pi * np.random.rand(Np) #polar angle of position
+            t  = 2 * np.pi * random_array(Np) #polar angle of position
 
-            #u  = np.random.rand(Np)+np.random.rand(Np) # radial coordinate of position
+            #u  = random_array(Np)+random_array(Np) # radial coordinate of position
             #u[u > 1] = 2-u[u > 1]
-            u  = np.random.rand(Np) # radial coordinate of position
+            u  = random_array(Np) # radial coordinate of position
 
             # angle
-            ϕ = np.pi * np.random.rand(Np) #azimuthal angle of velocity
+            ϕ = np.pi * random_array(Np) #azimuthal angle of velocity
             χ = divergence *np .random.randn(Np) #polar angle of velocity
 
             if(probing_direction == 'x'):
@@ -100,11 +102,11 @@ class Beam:
                 s0[2,:] = beam_size * u * np.sin(t)
         elif(beam_type == 'square'):
             # position, uniformly within a square
-            t  = 2 * np.random.rand(Np) - 1.0
-            u  = 2 * np.random.rand(Np) - 1.0
+            t  = 2 * random_array(Np) - 1.0
+            u  = 2 * random_array(Np) - 1.0
 
             # angle
-            ϕ = np.pi * np.random.rand(Np) #azimuthal angle of velocity
+            ϕ = np.pi * random_array(Np) #azimuthal angle of velocity
             χ = divergence * np.random.randn(Np) #polar angle of velocity
 
             if(probing_direction == 'x'):
@@ -140,11 +142,11 @@ class Beam:
                 s0[2,:] = beam_size*t
         elif(beam_type == 'rectangular'):
             # position, uniformly within a square
-            t  = 2 * np.random.rand(Np) - 1.0
-            u  = 2 * np.random.rand(Np) - 1.0
+            t  = 2 * random_array(Np) - 1.0
+            u  = 2 * random_array(Np) - 1.0
 
             # angle
-            ϕ = np.pi * np.random.rand(Np) #azimuthal angle of velocity
+            ϕ = np.pi * random_array(Np) #azimuthal angle of velocity
             χ = divergence*np.random.randn(Np) #polar angle of velocity
 
             beam_size_1 = beam_size[0] #m
@@ -183,7 +185,7 @@ class Beam:
                 s0[2,:] = beam_size_2 * t
         elif(beam_type == 'linear'):
             # position, uniformly along a line - probing direction is defaulted z, solved in x,z plane
-            t  = 2 * np.random.rand(Np) - 1.0
+            t  = 2 * random_array(Np) - 1.0
             # angle
             χ = divergence * np.random.randn(Np) #polar angle of velocity
 
@@ -201,7 +203,7 @@ class Beam:
             Np = 3 * (num_of_circles + 1) * num_of_circles + 1 
 
             # angle
-            ϕ = np.pi * np.random.rand(Np) #azimuthal angle of velocity
+            ϕ = np.pi * random_array(Np) #azimuthal angle of velocity
             χ = divergence * np.random.randn(Np) #polar angle of velocity
 
             # position, uniformly within a circle
@@ -218,11 +220,11 @@ class Beam:
             # tracker_indices = np.random.choice(Np, N_trackers, replace=False)
 
             # position, uniformly within a square
-            t  = 2 * np.random.rand(Np) - 1.0
-            u  = 2 * np.random.rand(Np) - 1.0
+            t  = 2 * random_array(Np) - 1.0
+            u  = 2 * random_array(Np) - 1.0
 
             # angle
-            ϕ = np.pi * np.random.rand(Np) #azimuthal angle of velocity
+            ϕ = np.pi * random_array(Np) #azimuthal angle of velocity
             χ = divergence * np.random.randn(Np) #polar angle of velocity
 
             beam_size_1 = beam_size[0] #m

@@ -6,13 +6,13 @@ import matplotlib.pyplot as plt
 
 import sys
 
-sys.path.insert(0, '../../synthPy_restructured')
+# cwd is set to synthPy acc. to hpc
 
-import beam as beam_initialiser
-import diagnostics as diag
-import domain as d
-import propagator as p
-import utils
+import synthPy_restructured.beam as beam_initialiser
+import synthPy_restructured.diagnostics as diag
+import synthPy_restructured.domain as d
+import synthPy_restructured.propagator as p
+import synthPy_restructured.utils
 
 extent_x = 5e-3
 extent_y = 5e-3
@@ -28,7 +28,10 @@ beam_size = extent_x
 ne_extent = probing_extent
 beam_type = 'circular'
 
-for i in domains:
+parameters = np.array([128, 256, 512, 1024],
+                    [1, 100, 10e6, 10e8])
+
+for i in parameters[0, :]:
     x = np.linspace(-extent_x, extent_x, i)
     y = np.linspace(-extent_y, extent_y, i)
     z = np.linspace(-extent_z, extent_z, i)
@@ -39,7 +42,7 @@ for i in domains:
 
     domain.test_exponential_cos()
 
-    for j in photons:
+    for j in parameters[1, :]:
         initial_rays = beam_initialiser.Beam(j, beam_size, divergence, ne_extent, probing_direction, wl, beam_type)
 
         tracer = p.Propagator(domain, initial_rays, inv_brems = False, phaseshift = False)
