@@ -7,7 +7,7 @@ import sys
 from vtk.util import numpy_support as vtk_np
 #from sys import path.insert as insert_path
 
-sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/synthPy_restructured')
+sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/simulator')
 
 # cwd is set to synthPy acc. to hpc
 
@@ -31,8 +31,10 @@ beam_size = extent_x
 ne_extent = probing_extent
 beam_type = 'circular'
 
-parameters = np.array([128, 256, 512, 1024],
-                    [1, 100, 10e6, 10e8])
+parameters = np.array([
+    [128, 256, 512, 1024],
+    [1, 100, 1e6, 1e7]
+], dtype = np.int64)
 
 for i in parameters[0, :]:
     x = np.linspace(-extent_x, extent_x, i)

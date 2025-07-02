@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import skimage.transform as sk_t
+
 from skimage.measure import profile_line
- 
  
 class Image:
     '''Initialize Image class. Parameters:

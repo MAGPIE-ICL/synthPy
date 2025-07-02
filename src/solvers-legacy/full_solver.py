@@ -84,11 +84,11 @@ fig.tight_layout()
 """
 
 import numpy as np
+import scipy.constants as sc
+
 from scipy.integrate import odeint, solve_ivp
 from scipy.interpolate import RegularGridInterpolator
 from time import time
-import scipy.constants as sc
-
 
 c = sc.c # honestly, this could be 3e8 *shrugs*
 
@@ -98,8 +98,8 @@ class ScalarDomain:
     A class to hold and generate scalar domains.
     This contains also the method to propagate rays through the scara domain
     """
-    
-    def __init__(self, x, y, z, extent, B_on = False, inv_brems = False, phaseshift = False):
+
+    def __init__(self, x, y, z, extent, B_on = False, inv_brems = False, phaseshift = False, probing_direction = 'z'):
         """
         Example:
             N_V = 100
@@ -115,6 +115,7 @@ class ScalarDomain:
             z (float array): z coordinates, m
             extent (float): physical size, m
         """
+
         self.x, self.y, self.z = np.float32(x), np.float32(y), np.float32(z)
         self.XX, self.YY, self.ZZ = np.meshgrid(x, y, z, indexing='ij', copy = False)
 
@@ -446,6 +447,7 @@ class ScalarDomain:
             fname: str, file path and name to save under. A VTI pointed to by a PVTI file are saved in this location. If left blank, the name will default to:
                     ./plasma_PVTI_DD_MM_YYYY_HR_MIN
         '''
+
         import pyvista as pv
     
         if fname is None:
@@ -466,7 +468,7 @@ class ScalarDomain:
             except:
                 raise Exception('No electron density currently loaded!')
         
-            # Create the spatial reference  
+            # Create the spatial reference
             grid = pv.ImageData()
 
             # Set the grid dimensions: shape + 1 because we want to inject our values on
@@ -509,12 +511,6 @@ class ScalarDomain:
         with open(f'{fname}.pvti', 'w') as file:
             file.write(content)
         print(f'Scalar Domain electron density succesfully saved under {fname}.pvti !')
-
-
-
-
-
-
     
 # ODEs of photon paths
 def dsdt(t, s, ScalarDomain):
@@ -548,7 +544,8 @@ def dsdt(t, s, ScalarDomain):
     return sprime.flatten()
 
 # Initialise beam
-def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z'):
+def init_beam(Np, beam_size, divergence, ne_extent, beam_type, probing_direction = 'z'):
+    # beam_type was missing from init_beam originally - if ever legacy code is needed then this function's use will need updating
     """[summary]
 
     Args:
@@ -556,6 +553,7 @@ def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z'):
         beam_size (float): beam radius, m
         divergence (float): beam divergence, radians
         ne_extent (float): size of electron density cube, m. Used to back propagate the rays to the start
+        beam_type (string): defines the type of beam to initialise
         probing_direction (str): direction of probing. I suggest 'z', the best tested
 
     Returns:
