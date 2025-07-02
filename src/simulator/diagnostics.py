@@ -245,7 +245,7 @@ def clear_rays(self):
     '''
 
     self.r0 = None
-    self.rf = None
+    self.Beam.rf = None
 
 def ray(x, θ, y, ϕ):
     '''
@@ -263,7 +263,7 @@ class Diagnostic:
     Inheritable class for ray diagnostics.
     """
 
-    # this is in mm's not metres - self.rf is converted to mm's (not sure if everything else is covered though)
+    # this is in mm's not metres - self.Beam.rf is converted to mm's (not sure if everything else is covered though)
     def __init__(self, Beam, focal_plane = 0, L = 400, R = 25, Lx = 18, Ly = 13.5):
         """
         Initialise ray diagnostic.
@@ -278,9 +278,9 @@ class Diagnostic:
         """     
    
         self.Beam, self.focal_plane, self.L, self.R, self.Lx, self.Ly = Beam, focal_plane, L, R, Lx, Ly
-        self.rf = self.Beam.rf
-        self.Jf = self.Beam.Jf
-        self.r0 = m_to_mm(self.rf)
+        #self.rf = self.Beam.rf
+        #self.Jf = self.Beam.Jf
+        self.r0 = m_to_mm(self.Beam.rf)
 
     def propagate_E(self, r1, r0):
         lwl = self.Beam.wavelength
@@ -290,7 +290,7 @@ class Diagnostic:
 
         k = 2 * jnp.pi / lwl
 
-        self.Jf = self.Jf.at[:, :].set(self.Jf[:, :] * jnp.exp(1.0j * k * jnp.sqrt(dx ** 2 + dy ** 2)))
+        self.Beam.Jf = self.Beam.Jf.at[:, :].set(self.Beam.Jf[:, :] * jnp.exp(1.0j * k * jnp.sqrt(dx ** 2 + dy ** 2)))
 
     def histogram(self, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
         '''
@@ -303,8 +303,8 @@ class Diagnostic:
             pix_y (int, optional): number of y pixels in detector plane. Defaults to 2574.
         '''
     
-        x = self.rf[0, :]
-        y = self.rf[2, :]
+        x = self.Beam.rf[0, :]
+        y = self.Beam.rf[2, :]
 
         print("\nrf size expected: (", len(x), ", ", len(y), ")", sep='')
 
@@ -327,13 +327,13 @@ class Diagnostic:
         amplitude_x = jnp.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype=complex)
         amplitude_y = jnp.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype=complex)
 
-        x_indices = jnp.digitize(self.rf[0, :], x_bins) - 1
-        y_indices = jnp.digitize(self.rf[2, :], y_bins) - 1
+        x_indices = jnp.digitize(self.Beam.rf[0, :], x_bins) - 1
+        y_indices = jnp.digitize(self.Beam.rf[2, :], y_bins) - 1
 
-        for i in range(self.rf.shape[1]):
+        for i in range(self.Beam.rf.shape[1]):
             if 0 <= x_indices[i] < amplitude_x.shape[1] and 0 <= y_indices[i] < amplitude_x.shape[0]:
-                amplitude_x[y_indices[i], x_indices[i]] += self.Jf[0, i]
-                amplitude_y[y_indices[i], x_indices[i]] += self.Jf[1, i]
+                amplitude_x[y_indices[i], x_indices[i]] += self.Beam.Jf[0, i]
+                amplitude_y[y_indices[i], x_indices[i]] += self.Beam.Jf[1, i]
 
         amplitude = jnp.sqrt(jnp.real(amplitude_x)**2 + jnp.real(amplitude_y)**2)
 
@@ -364,7 +364,7 @@ class Shadowgraphy(Diagnostic):
         r2 = circular_aperture(r1, self.R)      # cut off
         r3 = sym_lens(r2, self.L / 2)             # lens 1
         r4 = distance(r3, 3*self.L / 2)           # detector
-        self.rf = r4
+        self.Beam.rf = r4
         
     def two_lens_solve(self):
         ## 2 lens telescope, M = 1
@@ -375,7 +375,7 @@ class Shadowgraphy(Diagnostic):
         r5 = circular_aperture(r4, self.R)    # cut off
         r6 = sym_lens(r5, self.L / 2)           # lens 2
         r7 = distance(r6, self.L)             # displace rays to detector
-        self.rf = r7
+        self.Beam.rf = r7
     
 class Schlieren(Diagnostic):
     """
@@ -399,7 +399,7 @@ class Schlieren(Diagnostic):
         r8=sym_lens(r7, self.L) #lens 2
 
         r9=distance(r8, self.L) #displace rays to detector
-        self.rf = r9
+        self.Beam.rf = r9
     
     """
     Example light field schlieren diagnostic. Inherits from Rays, has custom solve method.
@@ -422,7 +422,7 @@ class Schlieren(Diagnostic):
         r8 = sym_lens(r7, self.L) #lens 2
 
         r9 = distance(r8, self.L) #displace rays to detector
-        self.rf = r9
+        self.Beam.rf = r9
         
 class Refractometry(Diagnostic):
     '''
@@ -445,25 +445,25 @@ class Refractometry(Diagnostic):
         r6 = circular_aperture(r5, self.R)      # cut off
         r7 = lens(r6, self.L/3, self.L/2)       # lens 2 - hybrid lens
         r8 = distance(r7, self.L)               # displace rays to detector
-        self.rf = r8
+        self.Beam.rf = r8
 
     def coherent_solve(self):
         ## Imaging the spatial axis - M = 2 - Coherent Implementation of the Refractometer
         r1 = distance(self.r0, 3 * self.L / 4 - self.focal_plane)
         # propagate E field
         self.propagate_E(r1, self.r0)
-        r2, self.Jf = circular_aperture(self.r0, self.R, E = self.Jf)      # cut off
+        r2, self.Beam.Jf = circular_aperture(self.r0, self.R, E = self.Beam.Jf)      # cut off
         r3 = sym_lens(r2, self.L/2)          # lens 1 - spherical
         self.propagate_E(r3, r2)
         r4 = distance(r3, 3*self.L/2)
         self.propagate_E(r4, r3)                 # displace rays to lens 2 - hybrid
-        r5, self.Jf = circular_aperture(r4, self.R, E = self.Jf)      # cut off
+        r5, self.Beam.Jf = circular_aperture(r4, self.R, E = self.Beam.Jf)      # cut off
         r6 = lens(r5, self.L/3, self.L/2)       # lens 2 - hybrid lens
         self.propagate_E(r6, r5)
 
         r7 = distance(r6, self.L)               # displace rays to detector
         self.propagate_E(r7, r6)
-        self.rf = r7
+        self.Beam.rf = r7
     
     def refractogram(self, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
         """
@@ -476,8 +476,8 @@ class Refractometry(Diagnostic):
             pix_y (int, optional): number of y pixels in detector plane. Defaults to 2574.
         """
   
-        x = self.rf[0, :]
-        y = self.rf[2, :]
+        x = self.Beam.rf[0, :]
+        y = self.Beam.rf[2, :]
 
         x_bins = jnp.linspace(-self.Lx // 2, self.Lx // 2, pix_x // bin_scale)
         y_bins = jnp.linspace(-self.Ly // 2, self.Ly // 2 , pix_y // bin_scale)
@@ -485,13 +485,13 @@ class Refractometry(Diagnostic):
         amplitude_x = jnp.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype = complex)
         amplitude_y = jnp.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype = complex)
 
-        x_indices = jnp.digitize(self.rf[0,:], x_bins) - 1
-        y_indices = jnp.digitize(self.rf[2,:], y_bins) - 1
+        x_indices = jnp.digitize(self.Beam.rf[0,:], x_bins) - 1
+        y_indices = jnp.digitize(self.Beam.rf[2,:], y_bins) - 1
 
-        for i in range(self.rf.shape[1]):
+        for i in range(self.Beam.rf.shape[1]):
             if 0 <= x_indices[i] < amplitude_x.shape[1] and 0 <= y_indices[i] < amplitude_x.shape[0]:
-                amplitude_x[y_indices[i], x_indices[i]] += self.Jf[0, i]
-                amplitude_y[y_indices[i], x_indices[i]] += self.Jf[1, i]
+                amplitude_x[y_indices[i], x_indices[i]] += self.Beam.Jf[0, i]
+                amplitude_y[y_indices[i], x_indices[i]] += self.Beam.Jf[1, i]
 
         amplitude = jnp.sqrt(jnp.real(amplitude_x)**2 + jnp.real(amplitude_y)**2)
         # amplitude_normalised = (amplitude - amplitude.min()) / (amplitude.max() - amplitude.min()) # this line needs work and is currently causing problems
@@ -518,14 +518,14 @@ class Interferometry(Diagnostic):
         y_weight = jnp.arctan(rad) #take x_weight is 1
         x_weight = jnp.sqrt(1-y_weight**2)
 
-        ref_beam = jnp.exp(2 * n_fringes / 3 * 1.0j * (x_weight * self.rf[0,:] + y_weight * self.rf[2,:]))
+        ref_beam = jnp.exp(2 * n_fringes / 3 * 1.0j * (x_weight * self.Beam.rf[0,:] + y_weight * self.Beam.rf[2,:]))
 
-        self.Jf = self.Jf.at[1,:].set(self.Jf[1,:] + ref_beam) # assume ref_beam is polarised in y
+        self.Beam.Jf = self.Beam.Jf.at[1,:].set(self.Beam.Jf[1,:] + ref_beam) # assume ref_beam is polarised in y
     
     def bkg(self, domain_length, n_fringes, deg):
         rr0, E0 = ray_to_Jonesvector(self.Beam, self.Beam.s0)
-        E = self.Jf.copy() #temporarily store E field in another variable
-        self.Jf = E0
+        E = self.Beam.Jf.copy() #temporarily store E field in another variable
+        self.Beam.Jf = E0
 
         # assuming reference is recombined with the probe beam at the exit of the domain (should be changed)
         self.interfere_ref_beam(n_fringes, deg)
@@ -533,13 +533,13 @@ class Interferometry(Diagnostic):
         r1 = distance(rr0, self.L + domain_length) #displace rays to lens. Accounts for object with depth
         # propagate E field
         self.propagate_E(r1, rr0)
-        r2, self.Jf = circular_aperture(r1, self.R, E = self.Jf)    # cut off
+        r2, self.Beam.Jf = circular_aperture(r1, self.R, E = self.Beam.Jf)    # cut off
         r3 = sym_lens(r2, self.L/2)           # lens 1
         self.propagate_E(r3, r2)
 
         r4 = distance(r3, self.L*2)           # displace rays to lens 2.
         self.propagate_E(r4, r3)
-        r5, self.Jf = circular_aperture(r4, self.R, E = self.Jf)    # cut off
+        r5, self.Beam.Jf = circular_aperture(r4, self.R, E = self.Beam.Jf)    # cut off
         r6 = sym_lens(r5, self.L/2)                             # lens 2
         self.propagate_E(r6, r5)
         
@@ -557,20 +557,20 @@ class Interferometry(Diagnostic):
         amplitude_x = jnp.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype=complex)
         amplitude_y = jnp.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype=complex)
 
-        x_indices = jnp.digitize(self.rf[0,:], x_bins) - 1
-        y_indices = jnp.digitize(self.rf[2,:], y_bins) - 1
+        x_indices = jnp.digitize(self.Beam.rf[0,:], x_bins) - 1
+        y_indices = jnp.digitize(self.Beam.rf[2,:], y_bins) - 1
 
-        for i in range(self.rf.shape[1]):
+        for i in range(self.Beam.rf.shape[1]):
             if 0 <= x_indices[i] < amplitude_x.shape[1] and 0 <= y_indices[i] < amplitude_x.shape[0]:
-                amplitude_x[y_indices[i], x_indices[i]] += self.Jf[0, i]
-                amplitude_y[y_indices[i], x_indices[i]] += self.Jf[1, i]
+                amplitude_x[y_indices[i], x_indices[i]] += self.Beam.Jf[0, i]
+                amplitude_y[y_indices[i], x_indices[i]] += self.Beam.Jf[1, i]
 
         amplitude = jnp.sqrt(jnp.real(amplitude_x) ** 2 + jnp.real(amplitude_y) ** 2)
 
         # amplitude_normalised = (amplitude - amplitude.min()) / (amplitude.max() - amplitude.min()) # this line needs work and is currently causing problems
         self.bkg_signal = amplitude
 
-        self.Jf = E #restore E field
+        self.Beam.Jf = E #restore E field
 
     def two_lens_solve(self):
         # assuming reference is recombined with the probe beam at the exit of the domain (should be changed)
@@ -579,19 +579,19 @@ class Interferometry(Diagnostic):
         r1 = distance(self.r0, self.L - self.focal_plane) #displace rays to lens. Accounts for object with depth
         # propagate E field
         self.propagate_E(r1, self.r0)
-        r2, self.Jf = circular_aperture(r1, self.R, E = self.Jf)    # cut off
+        r2, self.Beam.Jf = circular_aperture(r1, self.R, E = self.Beam.Jf)    # cut off
         r3 = sym_lens(r2, self.L/2)           # lens 1
         self.propagate_E(r3, r2)
 
         r4 = distance(r3, self.L*2)           # displace rays to lens 2.
         self.propagate_E(r4, r3)
-        r5, self.Jf = circular_aperture(r4, self.R, E = self.Jf)    # cut off
+        r5, self.Beam.Jf = circular_aperture(r4, self.R, E = self.Beam.Jf)    # cut off
         r6 = sym_lens(r5, self.L/2)                             # lens 2
         self.propagate_E(r6, r5)
         
         r7 = distance(r6, self.L)             # displace rays to detector
         self.propagate_E(r7,r6)
-        self.rf = r7
+        self.Beam.rf = r7
 
     def interferogram(self, bin_scale=1, pix_x=3448, pix_y=2574, clear_mem=False):
         """Bin data into a histogram. Defaults are for a KAF-8300.
@@ -603,8 +603,8 @@ class Interferometry(Diagnostic):
             pix_y (int, optional): number of y pixels in detector plane. Defaults to 2574.
         """
     
-        x = self.rf[0,:]
-        y = self.rf[2,:]
+        x = self.Beam.rf[0,:]
+        y = self.Beam.rf[2,:]
 
         x_bins = jnp.linspace(-self.Lx // 2, self.Lx // 2, pix_x // bin_scale)
         y_bins = jnp.linspace(-self.Ly // 2, self.Ly // 2, pix_y // bin_scale)
@@ -612,13 +612,13 @@ class Interferometry(Diagnostic):
         amplitude_x = jnp.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype=complex)
         amplitude_y = jnp.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype=complex)
 
-        x_indices = jnp.digitize(self.rf[0,:], x_bins) - 1
-        y_indices = jnp.digitize(self.rf[2,:], y_bins) - 1
+        x_indices = jnp.digitize(self.Beam.rf[0,:], x_bins) - 1
+        y_indices = jnp.digitize(self.Beam.rf[2,:], y_bins) - 1
 
-        for i in range(self.rf.shape[1]):
+        for i in range(self.Beam.rf.shape[1]):
             if 0 <= x_indices[i] < amplitude_x.shape[1] and 0 <= y_indices[i] < amplitude_x.shape[0]:
-                amplitude_x[y_indices[i], x_indices[i]] += self.Jf[0, i]
-                amplitude_y[y_indices[i], x_indices[i]] += self.Jf[1, i]
+                amplitude_x[y_indices[i], x_indices[i]] += self.Beam.Jf[0, i]
+                amplitude_y[y_indices[i], x_indices[i]] += self.Beam.Jf[1, i]
 
         amplitude = jnp.sqrt(jnp.real(amplitude_x)**2 + jnp.real(amplitude_y)**2)
         
