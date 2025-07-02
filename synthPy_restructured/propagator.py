@@ -105,9 +105,9 @@ class Propagator:
 
     # Plasma refractive index
     def n_refrac(self):
-
         ne_cc = self.ScalarDomain.ne*1e-6
         o_pe  = omega_pe(ne_cc)
+
         return jnp.sqrt(1.0-(o_pe/self.omega)**2)
 
     def set_up_interps(self):
@@ -300,7 +300,7 @@ class Propagator:
 
             jax.debug.visualize_array_sharding(sol.ys[:, -1, :])
 
-            path = "../../evaluation/memory_benchmarks/memory-domain" + str(s0.shape[1]) + "_rays-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
+            path = "../../evaluation/memory_benchmarks/memory-domain" + str(self.ScalarDomain.dim[0]) + "_rays"+ str(s0.shape[1]) + "-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
             jax.profiler.save_device_memory_profile(path)
             #os.system(f"~/go/bin/pprof -top {sys.executable} memory_{N}.prof")
             os.system(f"~/go/bin/pprof -top /bin/ls " + path)
