@@ -292,8 +292,6 @@ class Beam:
         s0[8,:] = 0.0
 
         self.s0 = s0
-        #self.rf = s0
-
         del s0
 
     def save_rays_pos(self, fn = None):
@@ -312,4 +310,4 @@ class Beam:
         else:
             fn = '{}.npy'.format(fn)
         with open(fn,'wb') as f:
-            np.save(f, self.rf)
+            np.save(f, self.s0)

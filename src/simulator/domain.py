@@ -81,7 +81,7 @@ class ScalarDomain:
 
         self.ne = n_e0*(1.0+s*self.XX/self.x_length)
     
-    def test_linear_cos(self,s1=0.1,s2=0.1,n_e0=2e23,Ly=1):
+    def test_linear_cos(self, s1=0.1, s2=0.1, n_e0=2e23, Ly=1):
         """Linearly growing sinusoidal perturbation
 
         Args:

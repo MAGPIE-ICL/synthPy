@@ -9,7 +9,7 @@ import jax.numpy as jnp
 jax.config.update('jax_enable_x64', True)
 #jax.config.update('jax_captured_constants_report_frames', -1)
 #jax.config.update('jax_captured_constants_warn_bytes', 128*1024**2)
-jax.config.update('jax_traceback_filtering' off)
+jax.config.update("jax_traceback_filtering", "off")
 
 from scipy.integrate import odeint, solve_ivp
 from time import time
@@ -24,52 +24,55 @@ from scipy.constants import c
 def omega_pe(ne):
     '''Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28'''
 
-    return 5.64e4*jnp.sqrt(ne)
+    return 5.64e4 * jnp.sqrt(ne)
 
 class Propagator:
-    def __init__(self, ScalarDomain, Beam, inv_brems = False, phaseshift = False):
+    def __init__(self, ScalarDomain, s0, probing_direction, inv_brems = False, phaseshift = False):
         self.ScalarDomain = ScalarDomain
-        self.Beam = Beam
+
+        self.s0 = s0
+        self.probing_direction = probing_direction
+        #self.Beam = Beam
+
         self.inv_brems = inv_brems
         self.phaseshift = phaseshift
 
         # finish initialising the beam position using the scalardomain edge position
 
         #axes = ['x', 'y', 'z']
-        #print(jnp.asarray(axes == Beam.probing_direction).nonzero())
-        #print(jnp.where(axes == assert isinstance(Beam.probing_direction, str)))
-        #index = jnp.where(axes == Beam.probing_direction)[0]
+        #print(jnp.asarray(axes == self.probing_direction).nonzero())
+        #print(jnp.where(axes == assert isinstance(self.probing_direction, str)))
+        #index = jnp.where(axes == self.probing_direction)[0]
 
-        index = ['x', 'y', 'z'].index(Beam.probing_direction)
+        index = ['x', 'y', 'z'].index(self.probing_direction)
         self.integration_length = ScalarDomain.lengths[index]
         self.extent = self.integration_length / 2
 
         #Beam.init_beam(ne_extent)       # this is the second call instance for init_beam() stefano was referring too
 
 # The following functions are methods to be called by the solve()
-    def calc_dndr(self):
-        """Generate interpolators for derivatives.
+    def calc_dndr(self, lwl = 1064e-9):
+        """
+        Generate interpolators for derivatives.
 
         Args:
-            lwl (float, optional): laser wavelength. Defaults to 1053e-9 m.
+            lwl (float, optional): laser wavelength. Defaults to 1064e-9 m.
         """
 
-        lwl = self.Beam.wavelength
-
-        self.omega = 2*jnp.pi*(c/lwl)
-        nc = 3.14207787e-4*self.omega**2
+        self.omega = 2 * jnp.pi * c / lwl
+        nc = 3.14207787e-4 * self.omega ** 2
 
         # Find Faraday rotation constant http://farside.ph.utexas.edu/teaching/em/lectures/node101.html
         if (self.ScalarDomain.B_on):
-            self.VerdetConst = 2.62e-13*lwl**2 # radians per Tesla per m^2
+            self.VerdetConst = 2.62e-13 * lwl ** 2 # radians per Tesla per m^2
 
         self.ne_nc = jnp.array(self.ScalarDomain.ne / nc, dtype = jnp.float32) #normalise to critical density
         
         #More compact notation is possible here, but we are explicit
         # can we find a way to reduce ram allocation
-        self.dndx = -0.5 *c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.x, axis=0)
-        self.dndy = -0.5 *c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.y, axis=1)
-        self.dndz = -0.5 *c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.z, axis=2)
+        self.dndx = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.x, axis=0)
+        self.dndy = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.y, axis=1)
+        self.dndz = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.z, axis=2)
 
         self.dndx_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndx, bounds_error = False, fill_value = 0.0)
         self.dndy_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndy, bounds_error = False, fill_value = 0.0)
@@ -82,30 +85,30 @@ class Propagator:
         def v_the(Te):
             '''Calculate electron thermal speed. Provide Te in eV. Retrurns result in m/s'''
 
-            return 4.19e5*jnp.sqrt(Te)
+            return 4.19e5 * jnp.sqrt(Te)
 
         def V(ne, Te, Z, omega):
-            o_pe  = omega_pe(ne)
+            o_pe = omega_pe(ne)
             o_max = jnp.copy(o_pe)
             o_max[o_pe < omega] = omega
-            L_classical = Z*sc.e/Te
-            L_quantum = 2.760428269727312e-10/jnp.sqrt(Te) # sc.hbar/jnp.sqrt(sc.m_e*sc.e*Te)
+            L_classical = Z * sc.e / Te
+            L_quantum = 2.760428269727312e-10 / jnp.sqrt(Te) # sc.hbar/jnp.sqrt(sc.m_e*sc.e*Te)
             L_max = jnp.maximum(L_classical, L_quantum)
 
-            return o_max*L_max
+            return o_max * L_max
 
         def coloumbLog(ne, Te, Z, omega):
-            return jnp.maximum(2.0,jnp.log(v_the(Te)/V(ne, Te, Z, omega)))
+            return jnp.maximum(2.0, jnp.log(v_the(Te) / V(ne, Te, Z, omega)))
 
-        ne_cc = self.ScalarDomain.ne*1e-6
+        ne_cc = self.ScalarDomain.ne * 1e-6
         o_pe = omega_pe(ne_cc)
         CL = coloumbLog(ne_cc, self.ScalarDomain.Te, self.ScalarDomain.Z, self.omega)
 
-        return 3.1e-5*self.ScalarDomain.Z*c*jnp.power(ne_cc/self.omega,2)*CL*jnp.power(self.ScalarDomain.Te, -1.5) # 1/s
+        return 3.1e-5 * self.ScalarDomain.Z * c * jnp.power(ne_cc / self.omega, 2) * CL * jnp.power(self.ScalarDomain.Te, -1.5) # 1/s
 
     # Plasma refractive index
     def n_refrac(self):
-        ne_cc = self.ScalarDomain.ne*1e-6
+        ne_cc = self.ScalarDomain.ne * 1e-6
         o_pe  = omega_pe(ne_cc)
 
         return jnp.sqrt(1.0-(o_pe/self.omega)**2)
@@ -115,7 +118,7 @@ class Propagator:
         self.ne_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.ne, bounds_error = False, fill_value = 0.0)
 
         # Magnetic field
-        if(self.B_on):
+        if(self.ScalarDomain.B_on):
             self.Bx_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.B[:,:,:,0], bounds_error = False, fill_value = 0.0)
             self.By_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.B[:,:,:,1], bounds_error = False, fill_value = 0.0)
             self.Bz_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.B[:,:,:,2], bounds_error = False, fill_value = 0.0)
@@ -127,7 +130,7 @@ class Propagator:
         # Phase shift
         if(self.phaseshift):
             self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
-    
+
     def dndr(self, r):
         """
         Returns the gradient at the locations r
@@ -148,27 +151,27 @@ class Propagator:
         return grad
 
     # Attenuation due to inverse bremsstrahlung
-    def atten(self,x):
+    def atten(self, x):
         if(self.inv_brems):
             return self.kappa_interp(x.T)
         else:
             return 0.0
 
     # Phase shift introduced by refractive index
-    def phase(self,x):
+    def phase(self, x):
         if(self.phaseshift):
-            self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
-            return self.omega*(self.refractive_index_interp(x.T)-1.0)
+            #self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
+            return self.omega * (self.refractive_index_interp(x.T) - 1.0)
         else:
             return 0.0
     
-    def get_ne(self,x):
+    def get_ne(self, x):
         return self.ne_interp(x.T)
 
-    def get_B(self,x):
+    def get_B(self, x):
         return jnp.array([self.Bx_interp(x.T),self.By_interp(x.T),self.Bz_interp(x.T)])
 
-    def neB(self,x,v):
+    def neB(self, x, v):
         """
         Returns the VerdetConst ne B.v
 
@@ -194,7 +197,7 @@ class Propagator:
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
 
-        s0 = self.Beam.s0
+        s0 = self.s0
 
         # 8.0^0.5 is an arbritrary factor to ensure rays have enough time to escape the box
         # think we should change this???
@@ -225,6 +228,11 @@ class Propagator:
                 """
 
                 # We convert our python function to a diffrax ODETerm
+
+                ###
+                ### ODETerm(vector_field=<function Propagator.solve.<locals>.dsdt_ODE>)
+                ###
+
                 term = diffrax.ODETerm(dsdt_ODE)
                 # We chose a solver (time-stepping) method from within diffrax library
                 solver = diffrax.Tsit5() # (RK45 - closest I could find to solve_ivp's default method)
@@ -313,7 +321,7 @@ class Propagator:
 
         Np = s0.size // 9
         if not parallelise:
-            self.Beam.rf = sol.y[:,-1].reshape(9, Np)
+            self.rf = sol.y[:,-1].reshape(9, Np)
         else:
             '''
             #for i in enumerate(sol.result):
@@ -331,10 +339,10 @@ class Propagator:
             '''
 
             #if sol.result == RESULTS.successful:
-            #self.Beam.rf = sol.ys[:, -1, :].reshape(9, Np)# / scalar
-            self.Beam.rf = sol.ys[:, -1, :].T
+            #self.rf = sol.ys[:, -1, :].reshape(9, Np)# / scalar
+            self.rf = sol.ys[:, -1, :].T
 
-            #self.Beam.rf = self.Beam.rf.at[:, :].set(self.Beam.rf[:, :] * (1e-3) / c)
+            #self.rf = self.rf.at[:, :].set(self.rf[:, :] * (1e-3) / c)
 
             print("\nParallelised output has resulting 3D matrix of form: [batch_count, 2, 9]:", sol.ys.shape)
             print("\t2 to account for the start and end results")
@@ -343,11 +351,11 @@ class Propagator:
             #else:
             #    print("Ray tracer failed. This could be a case of diffrax exceeding max steps again due to apparent 'strictness' compared to solve_ivp, check error log.")
 
-        x = self.Beam.rf[0, :]
-        y = self.Beam.rf[2, :]
+        x = self.rf[0, :]
+        y = self.rf[2, :]
 
         print("\nx-y size expected: (", len(x), ", ", len(y), ")", sep='')
-        print('Final rays:', self.Beam.rf[:, :])
+        print('Final rays:', self.rf[:, :])
 
         # means that jnp.isnan(a) returns True when a is not Nan
         # ensures that x & y are the same length, if output of either is Nan then will not try to render ray in histogram
@@ -358,13 +366,18 @@ class Propagator:
 
         print("x-y after clearing nan's: (", len(x), ", ", len(y), ")", sep='')
 
-        self.Beam.rf, self.Beam.Jf = ray_to_Jonesvector(self.Beam.rf, self.extent, probing_direction = self.Beam.probing_direction)
-        #print("\nJonesvector's output as 2 array's of form's:", self.Beam.rf.shape, self.Beam.Jf.shape)
+        self.rf, self.Jf = ray_to_Jonesvector(self.rf, self.extent, probing_direction = self.probing_direction, return_E = return_E)
+
+        print("\nJonesvector's output as 2 array's of form's:", self.rf.shape, end = '')
+        if self.Jf is not None:
+            print(self.Jf.shape)
 
         if return_E:
-            return self.Beam.rf, self.Beam.Jf
+            print("self.Jf returned as return_E = True")
+            #return self.rf, self.Jf
         else:
-            return self.Beam.rf
+            print("2nd array is of this shape as return_E = False")
+            #return self.rf
 
     def solve_at_depth(self, z):
         '''
@@ -378,7 +391,7 @@ class Propagator:
         length = self.extent + z
         t = jnp.linspace(0.0, length / c, 2)
 
-        s0 = self.Beam.s0
+        s0 = self.s0
         s0 = s0.flatten() #odeint insists
 
         print("\nStarting ray trace.")
@@ -393,10 +406,7 @@ class Propagator:
 
         print("\nRay trace completed in:\t", self.duration, "s")
 
-        Np = s0.size//9
-        self.Beam.sf = sol.y[:,-1].reshape(9,Np)
-
-        self.Beam.rf, _ = ray_to_Jonesvector(self.Beam.sf, self.extent, probing_direction = self.Beam.probing_direction)
+        self.rf, _ = ray_to_Jonesvector(sol.y[:,-1].reshape(9, s0.size // 9), self.extent, probing_direction = self.probing_direction)
 
     def clear_memory(self):
         """
@@ -411,11 +421,12 @@ class Propagator:
         self.ScalarDomain.ne = None
         self.ne_nc = None
         self.Beam.sf = None
-        self.Beam.rf = None
+        self.rf = None
 
 # ODEs of photon paths, standalone function to support the solve()
 def dsdt(t, s, Propagator, parallelise):
-    """Returns an array with the gradients and velocity per ray for ode_int
+    """
+    Returns an array with the gradients and velocity per ray for ode_int
 
     Args:
         t (float array): I think this is a dummy variable for ode_int - our problem is time invarient
@@ -440,10 +451,7 @@ def dsdt(t, s, Propagator, parallelise):
     sprime = jnp.zeros_like(s)
 
     # Position and velocity
-    # needs to be before the reshape to avoid indexing errors
-    x = s[:3, :]
-    v = s[3:6, :]
-
+    # needs to be before the reshape to avoid indexing errorsphase
     # Amplitude, phase and polarisation
     a = s[6, :]
     #p = s[7,:]
@@ -463,7 +471,9 @@ def dsdt(t, s, Propagator, parallelise):
     return sprime.flatten()
 
 # Need to backproject to ne volume, then find angles
-def ray_to_Jonesvector(rays, ne_extent, probing_direction, keep_current_plane = False):
+def ray_to_Jonesvector(rays, ne_extent, probing_direction, *, keep_current_plane = False, return_E = False):
+    # * forces keep_current_plane and return_E to be keyword-only arguments
+    # meaning .. return_E = True (missing out keep_current_plane) will work as it will not rely on position
     """
     Takes the output from the 9D solver and returns 6D rays for ray-transfer matrix techniques.
     Effectively finds how far the ray is from the end of the volume, returns it to the end of the volume.
@@ -549,25 +559,29 @@ def ray_to_Jonesvector(rays, ne_extent, probing_direction, keep_current_plane = 
     del vy
     del vz
 
-    # Resolve Jones vectors
-    amp, phase, pol = rays[6], rays[7], rays[8]
+    if return_E:
+        # Resolve Jones vectors
+        amp, phase, pol = rays[6], rays[7], rays[8]
 
-    # Assume initially polarised along y
-    E_x_init = np.zeros(Np)
-    E_y_init = np.ones(Np)
+        # Assume initially polarised along y
+        E_x_init = np.zeros(Np)
+        E_y_init = np.ones(Np)
+
+        # Perform rotation for polarisation, multiplication for amplitude, and complex rotation for phase
+        ray_J[0] = amp * (np.cos(phase) + 1.0j * np.sin(phase)) * (np.cos(pol) * E_x_init - np.sin(pol) * E_y_init)
+        ray_J[1] = amp * (np.cos(phase) + 1.0j * np.sin(phase)) * (np.sin(pol) * E_x_init + np.cos(pol) * E_y_init)
+
+        del amp
+        del phase
+        del pol
+
+        del E_x_init
+        del E_y_init
 
     del Np
 
-    # Perform rotation for polarisation, multiplication for amplitude, and complex rotation for phase
-    ray_J[0] = amp * (np.cos(phase) + 1.0j * np.sin(phase)) * (np.cos(pol) * E_x_init - np.sin(pol) * E_y_init)
-    ray_J[1] = amp * (np.cos(phase) + 1.0j * np.sin(phase)) * (np.sin(pol) * E_x_init + np.cos(pol) * E_y_init)
-
-    del amp
-    del phase
-    del pol
-
-    del E_x_init
-    del E_y_init
-
     # ray_p [x, phi, y, theta], ray_J [E_x, E_y]
-    return jnp.array(ray_p), jnp.array(ray_J)
+    if return_E:
+        return jnp.array(ray_p), jnp.array(ray_J)
+
+    return jnp.array(ray_p), None

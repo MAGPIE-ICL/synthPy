@@ -269,7 +269,7 @@ class Diagnostic:
     """
 
     # this is in mm's not metres - self.rf is converted to mm's (not sure if everything else is covered though)
-    def __init__(self, Beam, focal_plane = 0, L = 400, R = 25, Lx = 18, Ly = 13.5):
+    def __init__(self, wavelength, focal_plane = 0, L = 400, R = 25, Lx = 18, Ly = 13.5):
         """
         Initialise ray diagnostic.
 
@@ -281,23 +281,25 @@ class Diagnostic:
             Lx (int, optional): Detector size in x. Defaults to 18.
             Ly (float, optional): Detector size in y. Defaults to 13.5.
         """     
-   
-        self.Beam, self.focal_plane, self.L, self.R, self.Lx, self.Ly = Beam, focal_plane, L, R, Lx, Ly
+
+        self.wavelength, self.focal_plane, self.L, self.R, self.Lx, self.Ly = wavelength, focal_plane, L, R, Lx, Ly
 
         # these HAVE to stay... for some reason - not entirely sure why you can't just reference self.Beam.r_ directly
         # if you can make it without the memory duplication work please do, else DON'T REMOVE!
-        self.rf = self.Beam.rf
-        self.Jf = self.Beam.Jf
+
+        #self.rf = self.Beam.rf
+        #self.Jf = self.Beam.Jf
+
+        # however, doesn't have to be done manually now as already sorted in propagator.py, therefore no more duplication
+        # still odd though... (hence the keeping of the comment)
 
         self.r0 = m_to_mm(self.rf)
 
     def propagate_E(self, r1, r0):
-        lwl = self.Beam.wavelength
-
         dx = r1[0, :] - r0[0, :]
         dy = r1[2, :] - r0[2, :]
 
-        k = 2 * jnp.pi / lwl
+        k = 2 * jnp.pi / self.wavelength
 
         self.Jf = self.Jf.at[:, :].set(self.Jf[:, :] * jnp.exp(1.0j * k * jnp.sqrt(dx ** 2 + dy ** 2)))
 
