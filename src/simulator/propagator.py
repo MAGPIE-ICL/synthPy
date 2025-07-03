@@ -7,8 +7,8 @@ import jax.numpy as jnp
 
 # defaults float data types to 64-bit instead of 32 for greater precision
 jax.config.update('jax_enable_x64', True)
-jax.config.update('jax_captured_constants_report_frames', -1)
-jax.config.update('jax_captured_constants_warn_bytes', 128*1024**2)
+#jax.config.update('jax_captured_constants_report_frames', -1)
+#jax.config.update('jax_captured_constants_warn_bytes', 128*1024**2)
 
 from scipy.integrate import odeint, solve_ivp
 from time import time

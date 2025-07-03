@@ -7,7 +7,7 @@ import sys
 from vtk.util import numpy_support as vtk_np
 #from sys import path.insert as insert_path
 
-sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/synthPy_restructured')
+sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/simulator')
 
 import beam as beam_initialiser
 import diagnostics as diag
@@ -79,6 +79,7 @@ for i in parameters[0, :]:
             print("Difference between solve_ivp and diffrax results (+ means solve_ivp > diffrax):")
             print(diff)
 
+            '''
             schlierener_serialised = diag.Schlieren(tracer_serialised.Beam)
             schlierener_serialised.DF_solve()
             schlierener_serialised.histogram(bin_scale = 1, clear_mem = True)
@@ -90,6 +91,7 @@ for i in parameters[0, :]:
             plt.imshow(schlierener_serialised.H, cmap = 'hot', interpolation = 'nearest', clim = (0.5, 1))
 
             plt.imshow(schlierener_parallelised.H, cmap = 'hot', interpolation = 'nearest', clim = (0.5, 1))
+            '''
         except:
             continue
 
