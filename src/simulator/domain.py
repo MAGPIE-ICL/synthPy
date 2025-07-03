@@ -162,7 +162,7 @@ class ScalarDomain:
         '''
 
         import pyvista as pv
-    
+
         if fname is None:
             import datetime as dt
             year = dt.datetime.now().year
