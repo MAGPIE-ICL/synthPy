@@ -9,6 +9,7 @@ import jax.numpy as jnp
 jax.config.update('jax_enable_x64', True)
 #jax.config.update('jax_captured_constants_report_frames', -1)
 #jax.config.update('jax_captured_constants_warn_bytes', 128*1024**2)
+jax.config.update('jax_traceback_filtering' off)
 
 from scipy.integrate import odeint, solve_ivp
 from time import time
@@ -462,28 +463,30 @@ def dsdt(t, s, Propagator, parallelise):
     return sprime.flatten()
 
 # Need to backproject to ne volume, then find angles
-def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction):
+def ray_to_Jonesvector(rays, ne_extent, probing_direction, keep_current_plane = False):
     """
     Takes the output from the 9D solver and returns 6D rays for ray-transfer matrix techniques.
     Effectively finds how far the ray is from the end of the volume, returns it to the end of the volume.
 
     Gives position (and angles) in other axes at point where ray is in end plane of its extent in the probing axis
+    (if keep_current_plane is set to True, it does not return the rays to the end of volume - just returns current 2D slice position)
 
     Args:
-        ode_sol (6xN float): N rays in (x,y,z,vx,vy,vz) format, m and m/s and amplitude, phase and polarisation
+        rays (6xN float): N rays in (x,y,z,vx,vy,vz) format, m and m/s and amplitude, phase and polarisation
         ne_extent (float): edge length of shape (cuboid) in probing direction, m
         probing_direction (str): x, y or z.
+        keep_current_plane (boolean): flag to enable compatability (via True) with use in diagnostics.py, defaults to False
 
     Returns:
         [type]: [description]
     """
 
-    Np = ode_sol.shape[1] # number of photons
+    Np = rays.shape[1] # number of photons
 
     ray_p = np.zeros((4, Np))
     ray_J = np.zeros((2, Np), dtype = complex)
 
-    x, y, z, vx, vy, vz = ode_sol[0], ode_sol[1], ode_sol[2], ode_sol[3], ode_sol[4], ode_sol[5]
+    x, y, z, vx, vy, vz = rays[0], rays[1], rays[2], rays[3], rays[4], rays[5]
 
     # Resolve distances and angles
     # YZ plane
@@ -491,8 +494,12 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction):
         t_bp = (x - ne_extent) / vx
 
         # Positions on plane
-        ray_p[0] = y - vy * t_bp
-        ray_p[2] = z - vz * t_bp
+        if not keep_current_plane:
+            ray_p[0] = y - vy * t_bp
+            ray_p[2] = z - vz * t_bp
+        else:
+            ray_p[0] = y
+            ray_p[2] = z
 
         # Angles to plane
         ray_p[1] = np.arctan(vy / vx)
@@ -501,20 +508,33 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction):
     elif(probing_direction == 'y'):
         t_bp = (y - ne_extent) / vy
 
+        #
+        # I have switched x & z for the sake of consistent ordering of the axes
+        # Standardised in keeping with positive 'forward' notation, etc. x * y = z but don't do y * x = -z
+        #
+
         # Positions on plane
-        ray_p[0] = x - vx * t_bp
-        ray_p[2] = z - vz * t_bp
+        if not keep_current_plane:
+            ray_p[0] = z - vz * t_bp
+            ray_p[2] = x - vx * t_bp
+        else:
+            ray_p[0] = z
+            ray_p[2] = x
 
         # Angles to plane
-        ray_p[1] = np.arctan(vx / vy)
-        ray_p[3] = np.arctan(vz / vy)
+        ray_p[1] = np.arctan(vz / vy)
+        ray_p[3] = np.arctan(vx / vy)
     # XY plane
     elif(probing_direction == 'z'):
         t_bp = (z - ne_extent) / vz
 
         # Positions on plane
-        ray_p[0] = x - vx * t_bp
-        ray_p[2] = y - vy * t_bp
+        if not keep_current_plane:
+            ray_p[0] = x - vx * t_bp
+            ray_p[2] = y - vy * t_bp
+        else:
+            ray_p[0] = x
+            ray_p[2] = y
 
         # Angles to plane
         ray_p[1] = np.arctan(vx / vz)
@@ -530,7 +550,7 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction):
     del vz
 
     # Resolve Jones vectors
-    amp, phase, pol = ode_sol[6], ode_sol[7], ode_sol[8]
+    amp, phase, pol = rays[6], rays[7], rays[8]
 
     # Assume initially polarised along y
     E_x_init = np.zeros(Np)

@@ -4,7 +4,7 @@ import matplotlib as mpl
 import jax
 import jax.numpy as jnp
 
-#from propagator import ray_to_Jonesvector
+from propagator import ray_to_Jonesvector
 
 #jax.tree_util.tree_leaves(x, is_leaf = lambda x: x is None)
 
@@ -565,72 +565,3 @@ class Interferometry(Diagnostic):
 
     def interferogram(self, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
         self.histogram_legacy(bin_scale = bin_scale, pix_x = pix_x, pix_y = pix_y, clear_mem = clear_mem)
-
-def ray_to_Jonesvector(Beam):
-    """
-    Takes the output from the 9D solver and returns 6D rays for ray-transfer matrix techniques.
-    Effectively finds how far the ray is from the end of the volume, returns it to the end of the volume.
-
-    Args:
-        Beam (object): instance of class Beam that information about the rays is taken from
-
-    Returns:
-        [type]: [description]
-    """
-
-    # this version does calculations and changes formatting assuming an input that has already had ray_to_Jonesvector(...) applied to it in propagator.py?
-
-    Np = Beam.Np
-    ray_p = jnp.zeros((4,Np))
-    ray_J = jnp.zeros((2,Np),dtype=complex)
-
-    s0 = self.Beam.s0
-    x, y, z, vx, vy, vz = s0[0], s0[1], s0[2], s0[3], s0[4], s0[5]
-
-    probing_direction = Beam.probing_direction
-
-    # Resolve distances and angles
-    # YZ plane
-    if(probing_direction == 'x'):
-        # Positions on plane
-        ray_p[0] = y
-        ray_p[2] = z
-        # Angles to plane
-        ray_p[1] = jnp.arctan(vy/vx)
-        ray_p[3] = jnp.arctan(vz/vx)
-    # XZ plane
-    elif(probing_direction == 'y'):
-        # Positions on plane
-        ray_p[0] = x
-        ray_p[2] = z
-        # Angles to plane
-        ray_p[1] = jnp.arctan(vx/vy)
-        ray_p[3] = jnp.arctan(vz/vy)
-    # XY plane
-    elif(probing_direction == 'z'):
-        # Positions on plane
-        ray_p[0] = x
-        ray_p[2] = y
-        # Angles to plane
-        ray_p[1] = jnp.arctan(vx/vz)
-        ray_p[3] = jnp.arctan(vy/vz)
-    
-    del x
-    del y
-    del z
-    del vx
-    del vy
-    del vz
-
-    # Resolve Jones vectors
-    amp,phase,pol = s0[6], s0[7], s0[8]
-    # Assume initially polarised along y
-    E_x_init = jnp.zeros(Np)
-    E_y_init = jnp.ones(Np)
-    # Perform rotation for polarisation, multiplication for amplitude, and complex rotation for phase
-    ray_J[0] = amp*(jnp.cos(phase)+1.0j*jnp.sin(phase))*(jnp.cos(pol)*E_x_init-jnp.sin(pol)*E_y_init)
-    ray_J[1] = amp*(jnp.cos(phase)+1.0j*jnp.sin(phase))*(jnp.sin(pol)*E_x_init+jnp.cos(pol)*E_y_init)
-
-    # ray_p [x,phi,y,theta], ray_J [E_x,E_y]
-
-    return ray_p,ray_J
