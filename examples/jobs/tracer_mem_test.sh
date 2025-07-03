@@ -17,4 +17,4 @@ echo 'packages loaded successfully'
 
 echo 'starting job'
 
-python examples/jobs/run_scripts/tracer_mem_test.py
+python -u examples/jobs/run_scripts/tracer_mem_test.py

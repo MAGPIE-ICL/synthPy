@@ -14,4 +14,4 @@ echo 'packages loaded successfully'
 
 echo 'starting job'
 
-python examples/jobs/run_scripts/solver_comparisons.py
+python -u examples/jobs/run_scripts/solver_comparisons.py
