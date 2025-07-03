@@ -1,32 +1,32 @@
 .vs
 .DS_Store
 
-simulator/solvers-legacy/__pycache__
-simulator/solvers-legacy/__pycache__/full_solver.cpython-313.pyc
-simulator/solvers-legacy/__pycache__/minimal_solver.cpython-313.pyc
-simulator/solvers-legacy/__pycache__/rtm_solver.cpython-313.pyc
-simulator/solvers-legacy/__pycache__/*
+src/solvers-legacy/__pycache__
+src/solvers-legacy/__pycache__/full_solver.cpython-313.pyc
+src/solvers-legacy/__pycache__/minimal_solver.cpython-313.pyc
+src/solvers-legacy/__pycache__/rtm_solver.cpython-313.pyc
+src/solvers-legacy/__pycache__/*
 
-simulator/utils/__pycache__
-simulator/utils/__pycache__/eos_opacity.cpython-313.pyc
-simulator/utils/__pycache__/handle_filetypes.cpython-313.pyc
-simulator/utils/__pycache__/integral_quantities.cpython-313.pyc
-simulator/utils/__pycache__/power_spectrum.cpython-313.pyc
-simulator/utils/__pycache__/*
+src/utils/__pycache__
+src/utils/__pycache__/eos_opacity.cpython-313.pyc
+src/utils/__pycache__/handle_filetypes.cpython-313.pyc
+src/utils/__pycache__/integral_quantities.cpython-313.pyc
+src/utils/__pycache__/power_spectrum.cpython-313.pyc
+src/utils/__pycache__/*
 
-simulator/synthPy/__pycache__
-simulator/synthPy/__pycache__/beam.cpython-313.pyc
-simulator/synthPy/__pycache__/diagnostics.cpython-313.pyc
-simulator/synthPy/__pycache__/domain.cpython-313.pyc
-simulator/synthPy/__pycache__/propagator.cpython-313.pyc
-simulator/synthPy/__pycache__/utils.cpython-313.pyc
-simulator/synthPy/__pycache__/*
+src/simulator/__pycache__
+src/simulator/__pycache__/beam.cpython-313.pyc
+src/simulator/__pycache__/diagnostics.cpython-313.pyc
+src/simulator/__pycache__/domain.cpython-313.pyc
+src/simulator/__pycache__/propagator.cpython-313.pyc
+src/simulator/__pycache__/utils.cpython-313.pyc
+src/simulator/__pycache__/*
 
-simulator/field_generator/__pycache__
-simulator/field_generator/__pycache__/gaussian1D.cpython-313.pyc
-simulator/field_generator/__pycache__/gaussian2D.cpython-313.pyc
-simulator/field_generator/__pycache__/gaussian3D.cpython-313.pyc
-simulator/field_generator/__pycache__/*
+src/field_generator/__pycache__
+src/field_generator/__pycache__/gaussian1D.cpython-313.pyc
+src/field_generator/__pycache__/gaussian2D.cpython-313.pyc
+src/field_generator/__pycache__/gaussian3D.cpython-313.pyc
+src/field_generator/__pycache__/*
 
 examples/notebooks/.ipynb_checkpoints
 examples/notebooks/.ipynb_checkpoints/test_SynthRayTracer-checkpoint.ipynb
@@ -35,11 +35,10 @@ examples/notebooks/.ipynb_checkpoints/*
 evaluation/memory_benchmarks
 evaluation/memory_benchmarks/*
 
-examples/interferometry_testing/.ipynb_checkpoints
-examples/interferometry_testing/.ipynb_checkpoints/*
+evaluation/interferometry_testing/.ipynb_checkpoints
+evaluation/interferometry_testing/.ipynb_checkpoints/*
 
 examples/jobs/run_scripts/.ipynb_checkpoints
 examples/jobs/run_scripts/.ipynb_checkpoints/*
 
-examples/magPyImaging/__pycache__
-examples/magPyImaging/__pycache__/*
+**/__pycache__/

@@ -25,12 +25,11 @@ class Beam:
         self.probing_direction = probing_direction
         self.beam_type = beam_type
         self.wavelength = wavelength
-        self.seeded = seeded
 
         #calls actual initialisation of beam automatically, first function just initialises variables
-        Beam.init_beam(self, ne_extent)
+        Beam.init_beam(self, ne_extent, seeded)
 
-    def init_beam(self, ne_extent):
+    def init_beam(self, ne_extent, seeded):
         """
         function designed to be called by the propagtor class during propagator init to complete the construction of the beam using parameters about the scalar domain
         [summary]
@@ -61,15 +60,15 @@ class Beam:
         s0 = np.zeros((9, Np))
         if(beam_type == 'circular'):
             # position, uniformly within a circle
-            t  = 2 * np.pi * utils.random_array(Np, self.seeded) #polar angle of position
+            t  = 2 * np.pi * utils.random_array(Np, seeded) #polar angle of position
 
             #u  = utils.random_array(Np)+utils.random_array(Np) # radial coordinate of position
             #u[u > 1] = 2-u[u > 1]
-            u  = utils.random_array(Np, self.seeded) # radial coordinate of position
+            u  = utils.random_array(Np, seeded) # radial coordinate of position
 
             # angle
             ϕ = np.pi * utils.random_array(Np) #azimuthal angle of velocity
-            χ = divergence * utils.random_array_n(Np, self.seeded) #polar angle of velocity
+            χ = divergence * utils.random_array_n(Np, seeded) #polar angle of velocity
 
             if(probing_direction == 'x'):
                 # Initial velocity
@@ -104,12 +103,12 @@ class Beam:
                 s0[2,:] = beam_size * u * np.sin(t)
         elif(beam_type == 'square'):
             # position, uniformly within a square
-            t  = 2 * utils.random_array(Np, self.seeded) - 1.0
-            u  = 2 * utils.random_array(Np, self.seeded) - 1.0
+            t  = 2 * utils.random_array(Np, seeded) - 1.0
+            u  = 2 * utils.random_array(Np, seeded) - 1.0
 
             # angle
-            ϕ = np.pi * utils.random_array(Np, self.seeded) #azimuthal angle of velocity
-            χ = divergence * utils.random_array_n(Np, self.seeded) #polar angle of velocity
+            ϕ = np.pi * utils.random_array(Np, seeded) #azimuthal angle of velocity
+            χ = divergence * utils.random_array_n(Np, seeded) #polar angle of velocity
 
             if(probing_direction == 'x'):
                 # Initial velocity
@@ -144,12 +143,12 @@ class Beam:
                 s0[2,:] = beam_size*t
         elif(beam_type == 'rectangular'):
             # position, uniformly within a square
-            t  = 2 * utils.random_array(Np, self.seeded) - 1.0
-            u  = 2 * utils.random_array(Np, self.seeded) - 1.0
+            t  = 2 * utils.random_array(Np, seeded) - 1.0
+            u  = 2 * utils.random_array(Np, seeded) - 1.0
 
             # angle
-            ϕ = np.pi * utils.random_array(Np, self.seeded) #azimuthal angle of velocity
-            χ = divergence * utils.random_array_n(Np, self.seeded) #polar angle of velocity
+            ϕ = np.pi * utils.random_array(Np, seeded) #azimuthal angle of velocity
+            χ = divergence * utils.random_array_n(Np, seeded) #polar angle of velocity
 
             beam_size_1 = beam_size[0] #m
             beam_size_2 = beam_size[1] #m
@@ -185,11 +184,14 @@ class Beam:
                 s0[0,:] = beam_size_1 * u
                 s0[1,:] = -ne_extent
                 s0[2,:] = beam_size_2 * t
+            
+            del beam_size_1
+            del beam_size_2
         elif(beam_type == 'linear'):
             # position, uniformly along a line - probing direction is defaulted z, solved in x,z plane
-            t  = 2 * utils.random_array(Np, self.seeded) - 1.0
+            t  = 2 * utils.random_array(Np, seeded) - 1.0
             # angle
-            χ = divergence * utils.random_array_n(Np, self.seeded) #polar angle of velocity
+            χ = divergence * utils.random_array_n(Np, seeded) #polar angle of velocity
 
             # Initial velocity
             s0[3,:] = c * np.sin(χ)
@@ -205,8 +207,8 @@ class Beam:
             Np = 3 * (num_of_circles + 1) * num_of_circles + 1 
 
             # angle
-            ϕ = np.pi * utils.random_array(Np, self.seeded) #azimuthal angle of velocity
-            χ = divergence * utils.random_array_n(Np, self.seeded) #polar angle of velocity
+            ϕ = np.pi * utils.random_array(Np, seeded) #azimuthal angle of velocity
+            χ = divergence * utils.random_array_n(Np, seeded) #polar angle of velocity
 
             # position, uniformly within a circle
             t = [0]
@@ -222,12 +224,12 @@ class Beam:
             # tracker_indices = np.random.choice(Np, N_trackers, replace=False)
 
             # position, uniformly within a square
-            t  = 2 * utils.random_array(Np, self.seeded) - 1.0
-            u  = 2 * utils.random_array(Np, self.seeded) - 1.0
+            t  = 2 * utils.random_array(Np, seeded) - 1.0
+            u  = 2 * utils.random_array(Np, seeded) - 1.0
 
             # angle
-            ϕ = np.pi * utils.random_array(Np, self.seeded) #azimuthal angle of velocity
-            χ = divergence * utils.random_array_n(Np, self.seeded) #polar angle of velocity
+            ϕ = np.pi * utils.random_array(Np, seeded) #azimuthal angle of velocity
+            χ = divergence * utils.random_array_n(Np, seeded) #polar angle of velocity
 
             beam_size_1 = beam_size[0] #m
             beam_size_2 = beam_size[1] #m
@@ -273,8 +275,16 @@ class Beam:
                 s0[0,:] = beam_size_1 * u
                 s0[1,:] = -ne_extent
                 s0[2,:] = beam_size_2 * t
+            
+            del beam_size_1
+            del beam_size_2
         else:
             print("beam_type unrecognised! Accepted args: circular, square, rectangular, linear")
+        
+        del t
+        del u
+        del ϕ
+        del χ
 
         # Initialise amplitude, phase and polarisation
         s0[6,:] = 1.0
@@ -282,7 +292,9 @@ class Beam:
         s0[8,:] = 0.0
 
         self.s0 = s0
-        self.rf = s0
+        #self.rf = s0
+
+        del s0
 
     def save_rays_pos(self, fn = None):
         '''

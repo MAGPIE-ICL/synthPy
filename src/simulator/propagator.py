@@ -97,8 +97,8 @@ class Propagator:
             return jnp.maximum(2.0,jnp.log(v_the(Te)/V(ne, Te, Z, omega)))
 
         ne_cc = self.ScalarDomain.ne*1e-6
-        o_pe  = omega_pe(ne_cc)
-        CL    = coloumbLog(ne_cc, self.ScalarDomain.Te, self.ScalarDomain.Z, self.omega)
+        o_pe = omega_pe(ne_cc)
+        CL = coloumbLog(ne_cc, self.ScalarDomain.Te, self.ScalarDomain.Z, self.omega)
 
         return 3.1e-5*self.ScalarDomain.Z*c*jnp.power(ne_cc/self.omega,2)*CL*jnp.power(self.ScalarDomain.Te, -1.5) # 1/s
 
@@ -128,7 +128,8 @@ class Propagator:
             self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
     
     def dndr(self, r):
-        """returns the gradient at the locations r
+        """
+        Returns the gradient at the locations r
 
         Args:
             r (3xN float): N [x, y, z] locations
@@ -167,7 +168,8 @@ class Propagator:
         return jnp.array([self.Bx_interp(x.T),self.By_interp(x.T),self.Bz_interp(x.T)])
 
     def neB(self,x,v):
-        """returns the VerdetConst ne B.v
+        """
+        Returns the VerdetConst ne B.v
 
         Args:
             x (3xN float): N [x,y,z] locations
@@ -429,6 +431,9 @@ def dsdt(t, s, Propagator, parallelise):
     else:
         # forces s to be a matrix even if has the indexes of a 1d array such that dsdt() can be generalised
         s = jnp.reshape(s, (9, 1))  # one ray per vmap iteration if parallelised
+    
+    # unsure as jax array - also passed not created, should be a copy anyway no?
+    #del s
 
     #sprime = jnp.zeros_like(s.reshape(9, s.size // 9))
     sprime = jnp.zeros_like(s)
@@ -449,6 +454,10 @@ def dsdt(t, s, Propagator, parallelise):
     sprime = sprime.at[6, :].set(Propagator.atten(x) * a)
     sprime = sprime.at[7, :].set(Propagator.phase(x))
     sprime = sprime.at[8, :].set(Propagator.neB(x, v))
+
+    del x
+    del v
+    del a
 
     return sprime.flatten()
 
@@ -512,18 +521,33 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction):
         ray_p[3] = np.arctan(vy / vz)
     else:
         print("\nIncorrect probing direction. Use: x, y or z.")
+    
+    del x
+    del y
+    del z
+    del vx
+    del vy
+    del vz
 
     # Resolve Jones vectors
-    amp,phase,pol = ode_sol[6], ode_sol[7], ode_sol[8]
+    amp, phase, pol = ode_sol[6], ode_sol[7], ode_sol[8]
 
     # Assume initially polarised along y
     E_x_init = np.zeros(Np)
     E_y_init = np.ones(Np)
 
+    del Np
+
     # Perform rotation for polarisation, multiplication for amplitude, and complex rotation for phase
     ray_J[0] = amp * (np.cos(phase) + 1.0j * np.sin(phase)) * (np.cos(pol) * E_x_init - np.sin(pol) * E_y_init)
     ray_J[1] = amp * (np.cos(phase) + 1.0j * np.sin(phase)) * (np.sin(pol) * E_x_init + np.cos(pol) * E_y_init)
 
-    # ray_p [x,phi,y,theta], ray_J [E_x,E_y]
+    del amp
+    del phase
+    del pol
 
+    del E_x_init
+    del E_y_init
+
+    # ray_p [x, phi, y, theta], ray_J [E_x, E_y]
     return jnp.array(ray_p), jnp.array(ray_J)
