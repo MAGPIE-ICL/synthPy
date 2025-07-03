@@ -409,19 +409,20 @@ class Propagator:
         self.rf, _ = ray_to_Jonesvector(sol.y[:,-1].reshape(9, s0.size // 9), self.extent, probing_direction = self.probing_direction)
 
     def clear_memory(self):
-        """
+        '''
         Clears variables not needed by solve method, saving memory
 
         Can also use after calling solve to clear ray positions - important when running large number of rays
-        """
+        '''
 
         self.dndx = None
         self.dndy = None
         self.dndz = None
         self.ScalarDomain.ne = None
         self.ne_nc = None
-        self.Beam.sf = None
+        self.s0 = None
         self.rf = None
+-       self.Jf = None
 
 # ODEs of photon paths, standalone function to support the solve()
 def dsdt(t, s, Propagator, parallelise):
