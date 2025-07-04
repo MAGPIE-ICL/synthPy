@@ -440,7 +440,7 @@ class Propagator:
         self.Jf = None
 
 # ODEs of photon paths, standalone function to support the solve()
-def dsdt(t, s, Propagator, parallelise):
+def dsdt(t, s, propagator, parallelise):
     """
     Returns an array with the gradients and velocity per ray for ode_int
 
@@ -476,12 +476,12 @@ def dsdt(t, s, Propagator, parallelise):
     #p = s[7,:]
     #r = s[8,:]
 
-    sprime = sprime.at[3:6, :].set(Propagator.dndr(x))
+    sprime = sprime.at[3:6, :].set(propagator.dndr(x))
     sprime = sprime.at[:3, :].set(v)
 
-    sprime = sprime.at[6, :].set(Propagator.atten(x) * a)
-    sprime = sprime.at[7, :].set(Propagator.phase(x))
-    sprime = sprime.at[8, :].set(Propagator.neB(x, v))
+    sprime = sprime.at[6, :].set(propagator.atten(x) * a)
+    sprime = sprime.at[7, :].set(propagator.phase(x))
+    sprime = sprime.at[8, :].set(propagator.neB(x, v))
 
     del x
     del v
