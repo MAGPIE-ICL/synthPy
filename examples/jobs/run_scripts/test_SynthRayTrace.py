@@ -8,7 +8,7 @@ import gc
 import sys
 
 #add path
-sys.path.insert(0, '../../src/simulator')     # import path/to/synthpy
+sys.path.insert(0, '../../../src/simulator')     # import path/to/synthpy
 
 import beam as beam_initialiser
 import diagnostics as diag

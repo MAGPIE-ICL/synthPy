@@ -353,9 +353,9 @@ class Propagator:
 
         self.rf, self.Jf = ray_to_Jonesvector(self.rf, self.extent, probing_direction = self.probing_direction, return_E = return_E)
 
-        print("\nJonesvector's output as 2 array's of form's:", self.rf.shape, end = '')
+        print("\nJonesvector's output as 2 array's of form's:", self.rf.shape, end = ',')
         if self.Jf is not None:
-            print(self.Jf.shape)
+            print(self.Jf.shape, end = ' - ')
 
         if return_E:
             print("self.Jf returned as return_E = True")

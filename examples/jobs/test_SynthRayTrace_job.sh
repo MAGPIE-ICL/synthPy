@@ -14,4 +14,4 @@ echo 'packages loaded successfully'
 
 echo 'starting job'
 
-python examples/jobs/run_scripts/test_SynthRayTrace.py &> test_SynthRayTrace_output.txt
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py

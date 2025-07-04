@@ -17,5 +17,8 @@ echo 'packages loaded successfully'
 
 echo 'starting job'
 
-# -u to prevent line buffering?
-python examples/jobs/run_scripts/tracer_mem_test.py &> tracer_mem_test_output.txt
+#python examples/jobs/run_scripts/tracer_mem_test.py
+#python examples/jobs/run_scripts/tracer_mem_test.py &> tracer_mem_test_output.txt
+#python -u examples/jobs/run_scripts/tracer_mem_test.py &> tracer_mem_test_output.txt
+#python -u examples/jobs/run_scripts/tracer_mem_test.py | tee tracer_mem_test_output.txt
+python -u examples/jobs/run_scripts/tracer_mem_test.py

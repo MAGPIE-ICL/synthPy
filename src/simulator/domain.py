@@ -26,8 +26,10 @@ class ScalarDomain:
             extent (float): physical size, m
         """
 
+        valid_types = (int, float, np.int64)
+
         # if 1 length given, assumes all are the same
-        if isinstance(lengths, (float, int)):
+        if isinstance(lengths, valid_types):
             self.x_length, self.y_length, self.z_length = lengths, lengths, lengths
             self.lengths = jnp.array([lengths, lengths, lengths])
         # if array given, checks len = 3 and assigns accordingly
@@ -37,10 +39,12 @@ class ScalarDomain:
 
             self.x_length, self.y_length, self.z_length = lengths[0], lengths[1], lengths[2]
             self.lengths = jnp.array(lengths)
+
+        del lengths
         
         #likewise for dim
         self.dim = dim
-        if isinstance(dim, (int, float)):
+        if isinstance(dim, valid_types):
             self.x_n, self.y_n, self.z_n = dim, dim, dim
             self.dim = jnp.array([dim, dim, dim])
         else:
@@ -49,6 +53,10 @@ class ScalarDomain:
 
             self.x_n, self.y_n, self.z_n = dim[0], dim[1], dim[2]
             self.dim = jnp.array(dim)
+
+        del dim
+
+        del valid_types
 
         # define coordinate space
         self.x = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))

@@ -29,8 +29,10 @@ beam_size = extent_x
 ne_extent = probing_extent
 beam_type = 'circular'
 
-parameters = np.array([128, 256, 512, 1024],
-                    [1, 100, 10e6, 10e8])
+parameters = np.array([
+    [128, 256, 512, 1024],
+    [1, 100, 1e6, 1e8]
+], dtype = np.int64)
 
 runtime = np.array((2, len(parameters[0, :]), len(parameters[1, :])))
 

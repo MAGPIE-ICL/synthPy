@@ -75,7 +75,7 @@ for i in parameters[0, :]:
 
     lengths = 2 * np.array([extent_x, extent_y, extent_z])
 
-    domain = d.ScalarDomain(lengths, i)
+    domain = d.ScalarDomain(lengths, np.array([i, i, i]))
 
     snapshot = tracemalloc.take_snapshot()
     display_top(snapshot)
