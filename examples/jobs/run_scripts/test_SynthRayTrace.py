@@ -28,7 +28,7 @@ extent_x = 5e-3
 extent_y = 5e-3
 extent_z = 10e-3
 
-n_cells = 128
+n_cells = 512
 
 probing_extent = extent_z
 probing_direction = 'z'
@@ -42,7 +42,7 @@ domain.test_exponential_cos()
 lwl = 1064e-9 #define laser wavelength
 
 # initialise beam
-Np = 1000    # number of photons
+Np = 1e9    # number of photons
 divergence = 5e-5   # realistic divergence value
 beam_size = extent_x    # beam radius
 ne_extent = probing_extent  # so the beam knows where to initialise initial positions
