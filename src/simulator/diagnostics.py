@@ -269,7 +269,7 @@ class Diagnostic:
     """
 
     # this is in mm's not metres - self.rf is converted to mm's (not sure if everything else is covered though)
-    def __init__(self, wavelength, focal_plane = 0, L = 400, R = 25, Lx = 18, Ly = 13.5):
+    def __init__(self, wavelength, Beam, focal_plane = 0, L = 400, R = 25, Lx = 18, Ly = 13.5):
         """
         Initialise ray diagnostic.
 
@@ -287,8 +287,8 @@ class Diagnostic:
         # these HAVE to stay... for some reason - not entirely sure why you can't just reference self.Beam.r_ directly
         # if you can make it without the memory duplication work please do, else DON'T REMOVE!
 
-        #self.rf = self.Beam.rf
-        #self.Jf = self.Beam.Jf
+        self.rf = Beam.rf
+        self.Jf = Beam.Jf
 
         # however, doesn't have to be done manually now as already sorted in propagator.py, therefore no more duplication
         # still odd though... (hence the keeping of the comment)
@@ -508,9 +508,21 @@ class Interferometry(Diagnostic):
         ref_beam = jnp.exp(2 * n_fringes / 3 * 1.0j * (x_weight * self.rf[0,:] + y_weight * self.rf[2,:]))
 
         self.Jf = self.Jf.at[1,:].set(self.Jf[1,:] + ref_beam) # assume ref_beam is polarised in y
-    
+
     def bkg(self, domain_length, n_fringes, deg):
+
+        ###
+        ###
+        ###
+
+        # need to pass correct info for this to work
         rr0, E0 = ray_to_Jonesvector(self.Beam)
+        #rays, ne_extent, probing_direction, *, keep_current_plane = False, return_E = False
+
+        ###
+        ###
+        ###
+
         E = self.Jf.copy() #temporarily store E field in another variable
         self.Jf = E0
 

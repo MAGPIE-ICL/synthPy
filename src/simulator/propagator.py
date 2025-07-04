@@ -29,8 +29,6 @@ def omega_pe(ne):
 class Propagator:
     def __init__(self, ScalarDomain, s0, probing_direction, inv_brems = False, phaseshift = False):
         self.ScalarDomain = ScalarDomain
-        self.integration_length = ScalarDomain.lengths[['x', 'y', 'z'].index(self.probing_direction)]
-        self.extent = self.integration_length / 2
 
         self.s0 = s0
 
@@ -38,6 +36,9 @@ class Propagator:
 
         self.inv_brems = inv_brems
         self.phaseshift = phaseshift
+
+        self.integration_length = ScalarDomain.lengths[['x', 'y', 'z'].index(self.probing_direction)]
+        self.extent = self.integration_length / 2
 
 # The following functions are methods to be called by the solve()
     def calc_dndr(self, lwl = 1064e-9):
