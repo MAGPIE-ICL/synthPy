@@ -9,7 +9,7 @@ import jax.numpy as jnp
 jax.config.update('jax_enable_x64', True)
 #jax.config.update('jax_captured_constants_report_frames', -1)
 #jax.config.update('jax_captured_constants_warn_bytes', 128*1024**2)
-jax.config.update("jax_traceback_filtering", "off")
+jax.config.update('jax_traceback_filtering', 'off')
 
 from scipy.integrate import odeint, solve_ivp
 from time import time
@@ -22,33 +22,22 @@ from os import system as os_system
 from scipy.constants import c
 
 def omega_pe(ne):
-    '''Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28'''
+    """Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28"""
 
     return 5.64e4 * jnp.sqrt(ne)
 
 class Propagator:
     def __init__(self, ScalarDomain, s0, probing_direction, inv_brems = False, phaseshift = False):
         self.ScalarDomain = ScalarDomain
+        self.integration_length = ScalarDomain.lengths[['x', 'y', 'z'].index(self.probing_direction)]
+        self.extent = self.integration_length / 2
 
         self.s0 = s0
+
         self.probing_direction = probing_direction
-        #self.Beam = Beam
 
         self.inv_brems = inv_brems
         self.phaseshift = phaseshift
-
-        # finish initialising the beam position using the scalardomain edge position
-
-        #axes = ['x', 'y', 'z']
-        #print(jnp.asarray(axes == self.probing_direction).nonzero())
-        #print(jnp.where(axes == assert isinstance(self.probing_direction, str)))
-        #index = jnp.where(axes == self.probing_direction)[0]
-
-        index = ['x', 'y', 'z'].index(self.probing_direction)
-        self.integration_length = ScalarDomain.lengths[index]
-        self.extent = self.integration_length / 2
-
-        #Beam.init_beam(ne_extent)       # this is the second call instance for init_beam() stefano was referring too
 
 # The following functions are methods to be called by the solve()
     def calc_dndr(self, lwl = 1064e-9):
@@ -83,7 +72,7 @@ class Propagator:
     def kappa(self):
         # Useful subroutines
         def v_the(Te):
-            '''Calculate electron thermal speed. Provide Te in eV. Retrurns result in m/s'''
+            """Calculate electron thermal speed. Provide Te in eV. Retrurns result in m/s"""
 
             return 4.19e5 * jnp.sqrt(Te)
 
@@ -92,7 +81,7 @@ class Propagator:
             o_max = jnp.copy(o_pe)
             o_max[o_pe < omega] = omega
             L_classical = Z * sc.e / Te
-            L_quantum = 2.760428269727312e-10 / jnp.sqrt(Te) # sc.hbar/jnp.sqrt(sc.m_e*sc.e*Te)
+            L_quantum = 2.760428269727312e-10 / jnp.sqrt(Te) # sc.hbar / jnp.sqrt(sc.m_e * sc.e * Te)
             L_max = jnp.maximum(L_classical, L_quantum)
 
             return o_max * L_max
@@ -228,11 +217,6 @@ class Propagator:
                 """
 
                 # We convert our python function to a diffrax ODETerm
-
-                ###
-                ### ODETerm(vector_field=<function Propagator.solve.<locals>.dsdt_ODE>)
-                ###
-
                 term = diffrax.ODETerm(dsdt_ODE)
                 # We chose a solver (time-stepping) method from within diffrax library
                 solver = diffrax.Tsit5() # (RK45 - closest I could find to solve_ivp's default method)
@@ -279,7 +263,7 @@ class Propagator:
                 core_count = cpu_count()
                 print(", with:", core_count, "cores.")
 
-                '''
+                """
                 from jax.sharding import PartitionSpec as P, NamedSharding
 
                 # Create a Sharding object to distribute a value across devices:
@@ -290,7 +274,7 @@ class Propagator:
                 # and use jax.device_put to distribute it across devices:
                 y = jax.device_put(x, NamedSharding(mesh, P('x', 'y')))
                 jax.debug.visualize_array_sharding(y)
-                '''
+                """
             elif running_device == 'gpu':
                 pass
             elif running_device == 'tpu':
@@ -323,7 +307,7 @@ class Propagator:
         if not parallelise:
             self.rf = sol.y[:,-1].reshape(9, Np)
         else:
-            '''
+            """
             #for i in enumerate(sol.result):
             #    print(i)
             for idx, result in enumerate(sol.result):
@@ -336,7 +320,7 @@ class Propagator:
             #print(next(sol.result))
             #print(next(sol.result))
             #print(type(sol.result[0]))  # Check the type of results
-            '''
+            """
 
             #if sol.result == RESULTS.successful:
             #self.rf = sol.ys[:, -1, :].reshape(9, Np)# / scalar
@@ -380,9 +364,9 @@ class Propagator:
             #return self.rf
 
     def solve_at_depth(self, z):
-        '''
+        """
         Solve intial rays up until a given depth, z
-        '''
+        """
 
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
@@ -409,11 +393,11 @@ class Propagator:
         self.rf, _ = ray_to_Jonesvector(sol.y[:,-1].reshape(9, s0.size // 9), self.extent, probing_direction = self.probing_direction)
 
     def clear_memory(self):
-        '''
+        """
         Clears variables not needed by solve method, saving memory
 
         Can also use after calling solve to clear ray positions - important when running large number of rays
-        '''
+        """
 
         self.dndx = None
         self.dndy = None
@@ -453,6 +437,9 @@ def dsdt(t, s, Propagator, parallelise):
 
     # Position and velocity
     # needs to be before the reshape to avoid indexing errors
+    x = s[:3, :]
+    v = s[3:6, :]
+
     # Amplitude, phase and polarisation
     a = s[6, :]
     #p = s[7,:]
@@ -522,6 +509,8 @@ def ray_to_Jonesvector(rays, ne_extent, probing_direction, *, keep_current_plane
         #
         # I have switched x & z for the sake of consistent ordering of the axes
         # Standardised in keeping with positive 'forward' notation, etc. x * y = z but don't do y * x = -z
+        # If memory is not a concern then will instead create a class to cover directions
+        # This would entail both the array and a self.dir parameter of type char - containing 'x', 'y' or 'z'
         #
 
         # Positions on plane

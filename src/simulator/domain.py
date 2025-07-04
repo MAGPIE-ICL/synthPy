@@ -50,12 +50,11 @@ class ScalarDomain:
             self.x_n, self.y_n, self.z_n = dim[0], dim[1], dim[2]
             self.dim = jnp.array(dim)
 
-
         # define coordinate space
-        self.x = jnp.float32(jnp.linspace(-self.x_length/2, self.x_length/2, self.x_n))
-        self.y = jnp.float32(jnp.linspace(-self.y_length/2, self.y_length/2, self.y_n))
-        self.z = jnp.float32(jnp.linspace(-self.z_length/2, self.z_length/2, self.z_n))
-        self.XX, self.YY, self.ZZ = np.meshgrid(self.x, self.y, self.z, indexing='ij', copy = False)
+        self.x = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
+        self.y = jnp.float32(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n))
+        self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
+        self.XX, self.YY, self.ZZ = np.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = False)
 
         # Logical switches
         self.B_on = B_on
@@ -67,7 +66,7 @@ class ScalarDomain:
 
         self.ne = jnp.zeros_like(self.XX)
     
-    def test_slab(self, s=1, n_e0=2e23):
+    def test_slab(self, s = 1, n_e0 = 2e23):
         """
         A slab with a linear gradient in x:
         n_e =  n_e0 * (1 + s*x/extent)
@@ -79,9 +78,9 @@ class ScalarDomain:
             n_e0 ([type], optional): mean density. Defaults to 2e23 m^-3.
         """
 
-        self.ne = n_e0*(1.0+s*self.XX/self.x_length)
+        self.ne = n_e0 * (1.0 + s * self.XX / self.x_length)
     
-    def test_linear_cos(self, s1=0.1, s2=0.1, n_e0=2e23, Ly=1):
+    def test_linear_cos(self, s1 = 0.1, s2 = 0.1, n_e0 = 2e23, Ly = 1):
         """Linearly growing sinusoidal perturbation
 
         Args:
@@ -91,7 +90,7 @@ class ScalarDomain:
             Ly (int, optional): spatial scale of sinusoidal perturbation. Defaults to 1.
         """
 
-        self.ne = n_e0*(1.0+s1*self.XX/self.x_length)*(1+s2*jnp.cos(2*jnp.pi*self.YY/Ly))
+        self.ne = n_e0 * (1.0 + s1 * self.XX / self.x_length) * (1 + s2 * jnp.cos(2 * jnp.pi * self.YY / Ly))
     
     def test_exponential_cos(self, n_e0=1e24, Ly=1e-3, s=2e-3):
         """Exponentially growing sinusoidal perturbation
