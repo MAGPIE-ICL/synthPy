@@ -18,6 +18,7 @@ from equinox import filter_jit
 from datetime import datetime
 from jax.lib import xla_bridge
 from os import system as os_system
+from sys import getsizeof
 
 from scipy.constants import c
 from scipy.constants import e
@@ -191,6 +192,7 @@ class Propagator:
         # Then can backproject to surface of volume
 
         s0 = self.s0
+        print("Size in memory of initial rays:", getsizeof(s0))
 
         # 8.0^0.5 is an arbritrary factor to ensure rays have enough time to escape the box
         # think we should change this???
@@ -296,13 +298,32 @@ class Propagator:
             # remove unnecessary static arguments to increase speed and reduce likelihood of unexpected behaviours
             sol = jax.vmap(lambda s: ODE_solve(s, args))(s0.T)
 
-            jax.debug.visualize_array_sharding(sol.ys[:, -1, :])
+            memory_debug = True
+            if memory_debug:
+                jax.debug.visualize_array_sharding(sol.ys[:, -1, :])
 
-            path = "../../evaluation/memory_benchmarks/memory-domain" + str(self.ScalarDomain.dim[0]) + "_rays"+ str(s0.shape[1]) + "-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
-            jax.profiler.save_device_memory_profile(path)
-            #os_system(f"~/go/bin/pprof -top {sys.executable} memory_{N}.prof")
-            os_system(f"~/go/bin/pprof -top /bin/ls " + path)
-            #os_system(f"~/go/bin/pprof --web " + path)
+                getsizeof("Size in memory of initial rays:", getsizeof(s0))
+                getsizeof("Size in memory of solution:", getsizeof(sol))
+                getsizeof("Size in memory of propagator class:", getsizeof(sol))
+
+                folder = "abc"
+                os.chdir(".")
+                print("current dir is: %s" % ())
+
+                folder_name = "memory_benchmarks/"
+                rel_path_to_folder = "../../evaluation/"
+                if os.path.isdir(getcwd() + folder):
+                    path = rel_path_to_folder
+                else:
+                    os.mkdir(folder_name)
+                    path = folder_name
+
+                path += "memory-domain" + str(self.ScalarDomain.dim[0]) + "_rays"+ str(s0.shape[1]) + "-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
+                jax.profiler.save_device_memory_profile(path)
+
+                #os_system(f"~/go/bin/pprof -top {sys.executable} memory_{N}.prof")
+                os_system(f"~/go/bin/pprof -top /bin/ls " + path)
+                #os_system(f"~/go/bin/pprof --web " + path)
 
         finish = time()
         self.duration = finish - start

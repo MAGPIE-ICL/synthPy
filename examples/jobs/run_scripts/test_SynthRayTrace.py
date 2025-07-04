@@ -42,7 +42,8 @@ domain.test_exponential_cos()
 lwl = 1064e-9 #define laser wavelength
 
 # initialise beam
-Np = 1e9    # number of photons
+# force to interpret as 64 bit integer instead of float - should adjust code to convert it to an integer if not already
+Np = np.int64(1e9)    # number of photons
 divergence = 5e-5   # realistic divergence value
 beam_size = extent_x    # beam radius
 ne_extent = probing_extent  # so the beam knows where to initialise initial positions
