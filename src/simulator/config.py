@@ -29,11 +29,19 @@ class flags:
                 )
             )
 
-            'JITTED': ValueHolder(
+            'PARALLELISED': ValueHolder(
                 name = 'jitted',
                 default = True,
                 help = (
-                    'Setting this to false disables jax.jit of previously implicated functions.'
+                    'Setting this to false switches from diffrax to solve_ivp and disables parallelisation.'
+                )
+            )
+
+            'SEEDED': ValueHolder(
+                name = 'seeded',
+                default = False,
+                help = (
+                    'Setting this to true seeds all random functions, useful for consistent benchmarking.'
                 )
             )
         }

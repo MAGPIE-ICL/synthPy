@@ -4,6 +4,7 @@ import optax
 import matplotlib.pyplot as plt
 import jax
 import jax.numpy as jnp
+import os
 
 # defaults float data types to 64-bit instead of 32 for greater precision
 jax.config.update('jax_enable_x64', True)
@@ -67,7 +68,10 @@ class Propagator:
         self.dndy_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndy, bounds_error = False, fill_value = 0.0)
         self.dndz_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndz, bounds_error = False, fill_value = 0.0)
 
-    def omega_pe(ne):
+        # for some reason this was never being called and errors where thrown when interps were called
+        self.set_up_interps()
+
+    def omega_pe(self, ne):
         """Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28"""
 
         return 5.64e4 * jnp.sqrt(ne)
@@ -105,7 +109,7 @@ class Propagator:
         ne_cc = self.ScalarDomain.ne * 1e-6
         o_pe = self.omega_pe(ne_cc)
 
-        return jnp.sqrt(1.0-(o_pe/self.omega)**2)
+        return jnp.sqrt(1.0 - (o_pe / self.omega) ** 2)
 
     def set_up_interps(self):
         # Electron density
@@ -186,7 +190,7 @@ class Propagator:
 
         return pol
 
-    def solve(self, return_E = False, parallelise = True, jitted = True):
+    def solve(self, *, return_E = False, parallelise = True, jitted = True, save_steps = 2):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
@@ -240,15 +244,15 @@ class Propagator:
                     args = args,
                     t0 = t0,
                     t1 = t1,
-                    dt0 = (t1 - t0) * norm_factor**2 / Nt,
+                    dt0 = (t1 - t0) * norm_factor ** 2 / Nt,
                     saveat = saveat,
                     stepsize_controller = stepsize_controller,
                     # set max steps to no. of cells x100
                     max_steps = self.ScalarDomain.x_n * self.ScalarDomain.y_n * self.ScalarDomain.z_n * 100 #10000 - default for solve_ivp?????
                 )
 
-            # hardcode to normalise to 1 due to diffrax bug - how do we un-normalise after solving?, check aidrian's issue
-            ODE_solve = diffrax_solve(dsdt_ODE, t[0], t[-1] / norm_factor, len(t))
+            # hardcode to normalise to 1 due to diffrax bug
+            ODE_solve = diffrax_solve(dsdt_ODE, t[0], t[-1] / norm_factor, save_steps)
 
             if jitted:
                 start_comp = time()
@@ -266,6 +270,7 @@ class Propagator:
 
             if running_device == 'cpu':
                 from multiprocessing import cpu_count
+
                 core_count = cpu_count()
                 print(", with:", core_count, "cores.")
 
@@ -302,19 +307,16 @@ class Propagator:
             if memory_debug:
                 jax.debug.visualize_array_sharding(sol.ys[:, -1, :])
 
-                getsizeof("Size in memory of initial rays:", getsizeof(s0))
+                getsizeof("\nSize in memory of initial rays:", getsizeof(s0))
                 getsizeof("Size in memory of solution:", getsizeof(sol))
                 getsizeof("Size in memory of propagator class:", getsizeof(sol))
 
-                folder = "abc"
-                os.chdir(".")
-                print("current dir is: %s" % ())
-
                 folder_name = "memory_benchmarks/"
                 rel_path_to_folder = "../../evaluation/"
-                if os.path.isdir(getcwd() + folder):
-                    path = rel_path_to_folder
-                else:
+
+                path = rel_path_to_folder + folder_name
+
+                if not os.path.isdir(os.getcwd() + "/" + path):
                     os.mkdir(folder_name)
                     path = folder_name
 
@@ -377,7 +379,7 @@ class Propagator:
         print("x-y after clearing nan's: (", len(x), ", ", len(y), ")", sep='')
         """
 
-        self.rf, self.Jf = ray_to_Jonesvector(self.rf, self.extent, probing_direction = self.probing_direction, return_E = return_E)
+        return ray_to_Jonesvector(self.rf, self.extent, probing_direction = self.probing_direction, return_E = return_E)
 
         """
         print("\nJonesvector's output as 2 array's of form's:", self.rf.shape, end = ',')
@@ -488,7 +490,7 @@ def dsdt(t, s, Propagator, parallelise):
     return sprime.flatten()
 
 # Need to backproject to ne volume, then find angles
-def ray_to_Jonesvector(rays, ne_extent, probing_direction, *, keep_current_plane = False, return_E = False):
+def ray_to_Jonesvector(rays, ne_extent, *, probing_direction = 'z', keep_current_plane = False, return_E = False):
     # * forces keep_current_plane and return_E to be keyword-only arguments
     # meaning .. return_E = True (missing out keep_current_plane) will work as it will not rely on position
     """
