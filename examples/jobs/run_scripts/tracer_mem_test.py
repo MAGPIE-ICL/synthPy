@@ -56,7 +56,7 @@ extent_z = 10e-3
 probing_extent = extent_z
 probing_direction = 'z'
 
-wl = 1064e-9
+lwl = 1064e-9
 
 divergence = 5e-5
 beam_size = extent_x
@@ -92,17 +92,17 @@ for i in parameters[0, :]:
         snapshot = tracemalloc.take_snapshot()
         display_top(snapshot)
 
-        initial_rays = beam_initialiser.Beam(j, beam_size, divergence, ne_extent, probing_direction, wl, beam_type)
+        beam = beam_initialiser.Beam(j, beam_size, divergence, ne_extent, probing_direction = probing_direction, wavelength = lwl, beam_type = beam_type)
 
         snapshot = tracemalloc.take_snapshot()
         display_top(snapshot)
 
-        tracer = p.Propagator(domain, initial_rays, inv_brems = False, phaseshift = False)
+        tracer = p.Propagator(domain, beam.s0, probing_direction = probing_direction, inv_brems = False, phaseshift = False)
 
         snapshot = tracemalloc.take_snapshot()
         display_top(snapshot)
 
-        tracer.calc_dndr()
+        tracer.calc_dndr(lwl)
 
         snapshot = tracemalloc.take_snapshot()
         display_top(snapshot)

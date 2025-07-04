@@ -50,33 +50,33 @@ for i in parameters[0, :]:
     domain.test_exponential_cos()
 
     for j in parameters[1, :]:
-        initial_rays = beam_initialiser.Beam(j, beam_size, divergence, ne_extent, probing_direction, wl, beam_type)
+        beam = beam_initialiser.Beam(j, beam_size, divergence, ne_extent, probing_direction = probing_direction, wavelength = lwl, beam_type = beam_type)
 
-        tracer_serialised = p.Propagator(domain, initial_rays, inv_brems = False, phaseshift = False)
-        tracer_serialised.calc_dndr()
+        tracer_serialised = p.Propagator(domain, beam.s0, probing_direction = probing_direction, inv_brems = False, phaseshift = False)
+        tracer_serialised.calc_dndr(lwl)
 
-        tracer_parallelised = p.Propagator(domain, initial_rays, inv_brems = False, phaseshift = False)
-        tracer_parallelised.calc_dndr()
+        tracer_parallelised = p.Propagator(domain, beam.s0, probing_direction = probing_direction, inv_brems = False, phaseshift = False)
+        tracer_parallelised.calc_dndr(lwl)
 
         try:
-            final_rays_serialised = tracer_serialised.solve(parallelise = False, jitted = False)
+            tracer_serialised.solve(parallelise = False, jitted = False)
 
             runtime[0, i, j] = tracer_serialised.duration
             print("\nCompleted serialised ray trace in", np.round(tracer_serialised.duration, 3), "seconds.")
 
-            final_rays_parallelised = tracer_parallelised.solve(parallelise = True, jitted = True)
+            tracer_parallelised.solve(parallelise = True, jitted = True)
 
             runtime[1, i, j] = tracer_serialised.duration
             print("\nCompleted parallelised ray trace in", np.round(tracer_parallelised.duration, 3), "seconds.")
 
-            results_count[0, i, j] = tracer_serialised.Beam.rf[0, :].size
-            results_count[1, i, j] = tracer_parallelised.Beam.rf[0, :].size
+            results_count[0, i, j] = tracer_serialised.rf[0, :].size
+            results_count[1, i, j] = tracer_parallelised.rf[0, :].size
 
             print("Expected", parameters[1, j], "rays, ended up with:")
             print("solve_ivp result:", results_count[0, i, j])
             print("diffrax result:", results_count[1, i, j])
 
-            diff = np.array(tracer_serialised.Beam.rf[:, :] - tracer_parallelised.Beam.rf[0, :])
+            diff = np.array(tracer_serialised.rf[:, :] - tracer_parallelised.rf[0, :])
             diff[diff < 1e-7] = None
             print("Difference between solve_ivp and diffrax results (+ means solve_ivp > diffrax):")
             print(diff)
