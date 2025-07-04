@@ -29,7 +29,7 @@ def display_top(snapshot, key_type='lineno', limit=3):
     ))
     top_stats = snapshot.statistics(key_type)
 
-    print("Top %s lines" % limit)
+    print("\n\nTop %s lines" % limit)
     for index, stat in enumerate(top_stats[:limit], 1):
         frame = stat.traceback[0]
         # replace "/path/to/module/file.py" with "module/file.py"
@@ -43,9 +43,9 @@ def display_top(snapshot, key_type='lineno', limit=3):
     other = top_stats[limit:]
     if other:
         size = sum(stat.size for stat in other)
-        print("%s other: %.1f KiB" % (len(other), size / 1024))
+        print("\n %s other: %.1f KiB" % (len(other), size / 1024))
     total = sum(stat.size for stat in top_stats)
-    print("Total allocated size: %.1f KiB" % (total / 1024))
+    print("Total allocated size: %.1f KiB" % (total / 1024), end = "\n")
 
 tracemalloc.start()
 
@@ -68,7 +68,10 @@ parameters = np.array([
     [1, 100, 1e6, 1e7]
 ], dtype = np.int64)
 
+count = 0
 for i in parameters[0, :]:
+    print("\n\n\n", ++count, "th trial:\n")#
+
     x = np.linspace(-extent_x, extent_x, i)
     y = np.linspace(-extent_y, extent_y, i)
     z = np.linspace(-extent_z, extent_z, i)
@@ -76,9 +79,6 @@ for i in parameters[0, :]:
     lengths = 2 * np.array([extent_x, extent_y, extent_z])
 
     domain = d.ScalarDomain(lengths, np.array([i, i, i]))
-
-    snapshot = tracemalloc.take_snapshot()
-    display_top(snapshot)
 
     domain.test_exponential_cos()
 
@@ -88,9 +88,6 @@ for i in parameters[0, :]:
     for j in parameters[1, :]:
         print("\n\n\n")
         print("Attempting:", i, "domain indices and", j, "rays.")
-
-        snapshot = tracemalloc.take_snapshot()
-        display_top(snapshot)
 
         beam = beam_initialiser.Beam(j, beam_size, divergence, ne_extent, probing_direction = probing_direction, wavelength = lwl, beam_type = beam_type)
 

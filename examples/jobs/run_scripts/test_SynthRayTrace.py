@@ -48,9 +48,9 @@ beam_size = extent_x    # beam radius
 ne_extent = probing_extent  # so the beam knows where to initialise initial positions
 beam_type = 'circular'
 
-beam_definition = beam_initialiser.Beam(Np, beam_size, divergence, ne_extent, probing_direction, lwl, beam_type)
+beam_definition = beam_initialiser.Beam(Np, beam_size, divergence, ne_extent, probing_direction = probing_direction, wavelength = lwl, beam_type = beam_type)
 
-tracer = p.Propagator(domain, beam_definition.s0, probing_direction, inv_brems = False, phaseshift = False)
+tracer = p.Propagator(domain, beam_definition.s0, probing_direction = probing_direction, inv_brems = False, phaseshift = False)
 
 # solve ray trace
 tracer.calc_dndr(lwl)

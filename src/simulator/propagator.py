@@ -24,13 +24,8 @@ from scipy.constants import e
 #from scipy.constants import hbar
 #from scipy.constants import m_e
 
-def omega_pe(ne):
-    """Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28"""
-
-    return 5.64e4 * jnp.sqrt(ne)
-
 class Propagator:
-    def __init__(self, ScalarDomain, s0, probing_direction = 'z', inv_brems = False, phaseshift = False):
+    def __init__(self, ScalarDomain, s0, *, probing_direction = 'z', inv_brems = False, phaseshift = False):
         self.ScalarDomain = ScalarDomain
 
         self.s0 = s0
@@ -71,6 +66,11 @@ class Propagator:
         self.dndy_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndy, bounds_error = False, fill_value = 0.0)
         self.dndz_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndz, bounds_error = False, fill_value = 0.0)
 
+    def omega_pe(ne):
+        """Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28"""
+
+        return 5.64e4 * jnp.sqrt(ne)
+
     # NRL formulary inverse brems - cheers Jack Halliday for coding in Python
     # Converted to rate coefficient by multiplying by group velocity in plasma
     def kappa(self):
@@ -81,7 +81,7 @@ class Propagator:
             return 4.19e5 * jnp.sqrt(Te)
 
         def V(ne, Te, Z, omega):
-            o_pe = omega_pe(ne)
+            o_pe = self.omega_pe(ne)
             o_max = jnp.copy(o_pe)
             o_max[o_pe < omega] = omega
             L_classical = Z * e / Te
@@ -94,7 +94,7 @@ class Propagator:
             return jnp.maximum(2.0, jnp.log(v_the(Te) / V(ne, Te, Z, omega)))
 
         ne_cc = self.ScalarDomain.ne * 1e-6
-        o_pe = omega_pe(ne_cc)
+        o_pe = self.omega_pe(ne_cc)
         CL = coloumbLog(ne_cc, self.ScalarDomain.Te, self.ScalarDomain.Z, self.omega)
 
         return 3.1e-5 * self.ScalarDomain.Z * c * jnp.power(ne_cc / self.omega, 2) * CL * jnp.power(self.ScalarDomain.Te, -1.5) # 1/s
@@ -102,7 +102,7 @@ class Propagator:
     # Plasma refractive index
     def n_refrac(self):
         ne_cc = self.ScalarDomain.ne * 1e-6
-        o_pe  = omega_pe(ne_cc)
+        o_pe = self.omega_pe(ne_cc)
 
         return jnp.sqrt(1.0-(o_pe/self.omega)**2)
 
@@ -280,9 +280,9 @@ class Propagator:
                 jax.debug.visualize_array_sharding(y)
                 """
             elif running_device == 'gpu':
-                pass
+                print("\n")
             elif running_device == 'tpu':
-                pass
+                print("\n")
             else:
                 print("No suitable device detected!")
 

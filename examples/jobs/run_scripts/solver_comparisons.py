@@ -22,7 +22,7 @@ extent_z = 10e-3
 probing_extent = extent_z
 probing_direction = 'z'
 
-wl = 1064e-9
+lwl = 1064e-9
 
 divergence = 5e-5
 beam_size = extent_x
