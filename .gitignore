@@ -2,27 +2,19 @@
 .DS_Store
 
 src/solvers-legacy/__pycache__
-src/solvers-legacy/__pycache__/*
 
 src/utils/__pycache__
-src/utils/__pycache__/*
 
 src/simulator/__pycache__
-src/simulator/__pycache__/*
 
 src/field_generator/__pycache__
-src/field_generator/__pycache__/*
 
 examples/notebooks/.ipynb_checkpoints
-examples/notebooks/.ipynb_checkpoints/*
 
-evaluation/memory_benchmarks
-evaluation/memory_benchmarks/*
+evaluation/memory_benchmarks/memory-*
 
 evaluation/interferometry_testing/.ipynb_checkpoints
-evaluation/interferometry_testing/.ipynb_checkpoints/*
 
 examples/jobs/run_scripts/.ipynb_checkpoints
-examples/jobs/run_scripts/.ipynb_checkpoints/*
 
 **/__pycache__/

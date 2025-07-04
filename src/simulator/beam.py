@@ -4,7 +4,7 @@ import utils
 
 class Beam:
 # Initialise beam
-    def __init__(self, Np, beam_size, divergence, ne_extent, probing_direction = 'z', wavelength = 450e-9, beam_type = 'circular', seeded = False):
+    def __init__(self, Np, beam_size, divergence, ne_extent, *, probing_direction = 'z', wavelength = 1064e-9, beam_type = 'circular', seeded = False):
         """
         [summary]
 

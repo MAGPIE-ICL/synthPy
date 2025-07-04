@@ -20,6 +20,9 @@ from jax.lib import xla_bridge
 from os import system as os_system
 
 from scipy.constants import c
+from scipy.constants import e
+#from scipy.constants import hbar
+#from scipy.constants import m_e
 
 def omega_pe(ne):
     """Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28"""
@@ -27,7 +30,7 @@ def omega_pe(ne):
     return 5.64e4 * jnp.sqrt(ne)
 
 class Propagator:
-    def __init__(self, ScalarDomain, s0, probing_direction, inv_brems = False, phaseshift = False):
+    def __init__(self, ScalarDomain, s0, probing_direction = 'z', inv_brems = False, phaseshift = False):
         self.ScalarDomain = ScalarDomain
 
         self.s0 = s0
@@ -81,8 +84,8 @@ class Propagator:
             o_pe = omega_pe(ne)
             o_max = jnp.copy(o_pe)
             o_max[o_pe < omega] = omega
-            L_classical = Z * sc.e / Te
-            L_quantum = 2.760428269727312e-10 / jnp.sqrt(Te) # sc.hbar / jnp.sqrt(sc.m_e * sc.e * Te)
+            L_classical = Z * e / Te
+            L_quantum = 2.760428269727312e-10 / jnp.sqrt(Te) # hbar / jnp.sqrt(m_e * e * Te)
             L_max = jnp.maximum(L_classical, L_quantum)
 
             return o_max * L_max
@@ -175,8 +178,8 @@ class Propagator:
 
         if(self.ScalarDomain.B_on):
             ne_N = self.get_ne(x)
-            Bv_N = jnp.sum(self.get_B(x)*v,axis=0)
-            pol  = self.VerdetConst*ne_N*Bv_N
+            Bv_N = jnp.sum(self.get_B(x) * v, axis = 0)
+            pol = self.VerdetConst * ne_N * Bv_N
         else:
             pol = 0.0
 
