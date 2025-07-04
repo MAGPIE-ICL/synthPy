@@ -2,15 +2,8 @@ import numpy as np
 import diffrax
 import optax
 import matplotlib.pyplot as plt
-import jax
 import jax.numpy as jnp
 import os
-
-# defaults float data types to 64-bit instead of 32 for greater precision
-jax.config.update('jax_enable_x64', True)
-#jax.config.update('jax_captured_constants_report_frames', -1)
-#jax.config.update('jax_captured_constants_warn_bytes', 128*1024**2)
-jax.config.update('jax_traceback_filtering', 'off')
 
 from scipy.integrate import odeint, solve_ivp
 from time import time
@@ -19,12 +12,13 @@ from equinox import filter_jit
 from datetime import datetime
 from jax.lib import xla_bridge
 from os import system as os_system
-from sys import getsizeof
 
 from scipy.constants import c
 from scipy.constants import e
 #from scipy.constants import hbar
 #from scipy.constants import m_e
+
+from utils import getsizeof
 
 class Propagator:
     def __init__(self, ScalarDomain, s0, *, probing_direction = 'z', inv_brems = False, phaseshift = False):
@@ -196,7 +190,9 @@ class Propagator:
         # Then can backproject to surface of volume
 
         s0 = self.s0
-        print("Size in memory of initial rays:", getsizeof(s0))
+
+        # make a wrapper function for getsizeof in utilities that outputs more meaningful information
+        print("\nSize in memory of initial rays:", getsizeof(s0))
 
         # 8.0^0.5 is an arbritrary factor to ensure rays have enough time to escape the box
         # think we should change this???
@@ -212,8 +208,51 @@ class Propagator:
             dsdt_ODE = lambda t, y: dsdt(t, y, self, parallelise)
             sol = solve_ivp(dsdt_ODE, [0, t[-1]], s0, t_eval = t)
         else:
+            import jax
+
+            # defaults float data types to 64-bit instead of 32 for greater precision
+            jax.config.update('jax_enable_x64', True)
+            jax.config.update('jax_captured_constants_report_frames', -1)
+            jax.config.update('jax_captured_constants_warn_bytes', 128 * 1024 ** 2)
+            jax.config.update('jax_traceback_filtering', 'off')
+            # https://docs.jax.dev/en/latest/gpu_memory_allocation.html
+            #jax.config.update('xla_python_client_allocator', '\"platform\"')
+            # can't set via jax.config.update for some reason
+            os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = '\"platform\"'
+
+            # look further into what this actually means...
+            print("\nDefault jax backend:", jax.default_backend())
+
             available_devices = jax.devices()
-            print(f"\nAvailable devices: {available_devices}")
+            print(f"Available devices: {available_devices}")
+
+            running_device = xla_bridge.get_backend().platform
+            print("Running device:", running_device, end='')
+
+            if running_device == 'cpu':
+                from multiprocessing import cpu_count
+
+                core_count = cpu_count()
+                print(", with:", core_count, "cores.")
+
+                """
+                from jax.sharding import PartitionSpec as P, NamedSharding
+
+                # Create a Sharding object to distribute a value across devices:
+                mesh = jax.make_mesh((4, 2), ('x', 'y'))
+
+                # Create an array of random values:
+                x = jax.random.normal(jax.random.key(0), (8192, 8192))
+                # and use jax.device_put to distribute it across devices:
+                y = jax.device_put(x, NamedSharding(mesh, P('x', 'y')))
+                jax.debug.visualize_array_sharding(y)
+                """
+            elif running_device == 'gpu':
+                print("\n")
+            elif running_device == 'tpu':
+                print("\n")
+            else:
+                print("No suitable device detected!")
 
             norm_factor = np.max(t)
 
@@ -265,34 +304,6 @@ class Propagator:
                 finish_comp = time()
                 print("\njax compilation of solver took:", finish_comp - start_comp)
 
-            running_device = xla_bridge.get_backend().platform
-            print("Running device:", running_device, end='')
-
-            if running_device == 'cpu':
-                from multiprocessing import cpu_count
-
-                core_count = cpu_count()
-                print(", with:", core_count, "cores.")
-
-                """
-                from jax.sharding import PartitionSpec as P, NamedSharding
-
-                # Create a Sharding object to distribute a value across devices:
-                mesh = jax.make_mesh((4, 2), ('x', 'y'))
-
-                # Create an array of random values:
-                x = jax.random.normal(jax.random.key(0), (8192, 8192))
-                # and use jax.device_put to distribute it across devices:
-                y = jax.device_put(x, NamedSharding(mesh, P('x', 'y')))
-                jax.debug.visualize_array_sharding(y)
-                """
-            elif running_device == 'gpu':
-                print("\n")
-            elif running_device == 'tpu':
-                print("\n")
-            else:
-                print("No suitable device detected!")
-
             # Solve for specific s0 intial values
             #args = {'self': self, 'parallelise': parallelise}
             #args = [self, parallelise]
@@ -307,9 +318,9 @@ class Propagator:
             if memory_debug:
                 jax.debug.visualize_array_sharding(sol.ys[:, -1, :])
 
-                getsizeof("\nSize in memory of initial rays:", getsizeof(s0))
-                getsizeof("Size in memory of solution:", getsizeof(sol))
-                getsizeof("Size in memory of propagator class:", getsizeof(sol))
+                print("\nSize in memory of initial rays:", getsizeof(s0))
+                print("Size in memory of solution:", getsizeof(sol))
+                print("Size in memory of propagator class:", getsizeof(sol))
 
                 folder_name = "memory_benchmarks/"
                 rel_path_to_folder = "../../evaluation/"

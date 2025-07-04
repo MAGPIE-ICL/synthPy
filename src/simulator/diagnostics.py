@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-import jax
+#import jax
 import jax.numpy as jnp
 
 from propagator import ray_to_Jonesvector

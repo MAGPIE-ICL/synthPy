@@ -19,7 +19,7 @@ class Beam:
             s0, 9 x N float: N rays with (x, y, z, vx, vy, vz) in m, m/s and amplitude, phase and polarisation (a, p, r) 
         """
 
-        self.Np = Np
+        self.Np = np.int64(Np)
         self.beam_size = beam_size
         self.divergence = divergence
         self.probing_direction = probing_direction
