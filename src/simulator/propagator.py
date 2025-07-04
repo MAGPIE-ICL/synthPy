@@ -422,7 +422,7 @@ class Propagator:
         self.ne_nc = None
         self.s0 = None
         self.rf = None
--       self.Jf = None
+        self.Jf = None
 
 # ODEs of photon paths, standalone function to support the solve()
 def dsdt(t, s, Propagator, parallelise):
@@ -452,7 +452,7 @@ def dsdt(t, s, Propagator, parallelise):
     sprime = jnp.zeros_like(s)
 
     # Position and velocity
-    # needs to be before the reshape to avoid indexing errorsphase
+    # needs to be before the reshape to avoid indexing errors
     # Amplitude, phase and polarisation
     a = s[6, :]
     #p = s[7,:]
