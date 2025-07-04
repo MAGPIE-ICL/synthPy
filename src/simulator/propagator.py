@@ -360,6 +360,7 @@ class Propagator:
             #else:
             #    print("Ray tracer failed. This could be a case of diffrax exceeding max steps again due to apparent 'strictness' compared to solve_ivp, check error log.")
 
+        """
         x = self.rf[0, :]
         y = self.rf[2, :]
 
@@ -374,9 +375,11 @@ class Propagator:
         y = y[mask]
 
         print("x-y after clearing nan's: (", len(x), ", ", len(y), ")", sep='')
+        """
 
         self.rf, self.Jf = ray_to_Jonesvector(self.rf, self.extent, probing_direction = self.probing_direction, return_E = return_E)
 
+        """
         print("\nJonesvector's output as 2 array's of form's:", self.rf.shape, end = ',')
         if self.Jf is not None:
             print(self.Jf.shape, end = ' - ')
@@ -387,6 +390,7 @@ class Propagator:
         else:
             print("2nd array is of this shape as return_E = False")
             #return self.rf
+        """
 
     def solve_at_depth(self, z):
         """
