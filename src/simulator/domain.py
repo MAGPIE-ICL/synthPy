@@ -152,13 +152,13 @@ class ScalarDomain:
         self.B[:,:,:,2] = Bmax*self.XX/self.x_length
 
     def export_scalar_field(self, property: str = 'ne', fname: str = None):
-        '''
+        """
         Export the current scalar electron density profile as a pvti file format, property added for future scalability to export temperature, B-field, etc.
         Args:
             property: str, 'ne': export the electron density (default)
             fname: str, file path and name to save under. A VTI pointed to by a PVTI file are saved in this location. If left blank, the name will default to:
                     ./plasma_PVTI_DD_MM_YYYY_HR_MIN
-        '''
+        """
 
         import pyvista as pv
 
@@ -208,7 +208,7 @@ class ScalarDomain:
         spacing_x = (2*jnp.max(self.x))/jnp.shape(self.x)[0]
         spacing_y = (2*jnp.max(self.y))/jnp.shape(self.y)[0]
         spacing_z = (2*jnp.max(self.z))/jnp.shape(self.z)[0]
-        content = f'''<?xml version="1.0"?>
+        content = f"""<?xml version="1.0"?>
                         <VTKFile type="PImageData" version="0.1" byte_order="LittleEndian" header_type="UInt32" compressor="vtkZLibDataCompressor">
                             <PImageData WholeExtent="0 {jnp.shape(self.ne)[0]} 0 {jnp.shape(self.ne)[1]} 0 {jnp.shape(self.ne)[2]}" GhostLevel="0" Origin="0 0 0" Spacing="{spacing_x} {spacing_y} {spacing_z}">
                                 <PCellData Scalars="rnec">
@@ -217,7 +217,7 @@ class ScalarDomain:
                                 </PCellData>
                                 <Piece Extent="0 {jnp.shape(self.ne)[0]} 0 {jnp.shape(self.ne)[1]} 0 {jnp.shape(self.ne)[2]}" Source="{relative_fname}.vti"/>
                             </PImageData>
-                        </VTKFile>'''
+                        </VTKFile>"""
     
         # write file
         with open(f'{fname}.pvti', 'w') as file:

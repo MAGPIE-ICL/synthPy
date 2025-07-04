@@ -8,7 +8,7 @@ from propagator import ray_to_Jonesvector
 
 #jax.tree_util.tree_leaves(x, is_leaf = lambda x: x is None)
 
-'''
+"""
 (rtm_solver)
 Ray Transfer Matrix Solver - Modified from Jack Hare's Version
 Example:
@@ -114,7 +114,7 @@ b.plot(axs[2], clim=clim, cmap=cm)
 for ax in axs:
     ax.axis('off')
 fig.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0.1, hspace=None)
-'''
+"""
 
 def m_to_mm(r):
     rr = jnp.copy(r)
@@ -129,10 +129,10 @@ def mm_to_m(r):
     return rr
 
 def lens(r, f1, f2):
-    '''
+    """
     4x4 matrix for a thin lens, focal lengths f1 and f2 in orthogonal axes
     See: https://en.wikipedia.org/wiki/Ray_transfer_matrix_analysis
-    '''
+    """
 
     l1 = np.array([[1, 0],
             [-1 / f1, 1]])
@@ -146,16 +146,16 @@ def lens(r, f1, f2):
     return jnp.matmul(L, r)
 
 def sym_lens(r, f):
-    '''
+    """
     Helper function to create an axisymmetryic lens
-    '''
+    """
 
     return lens(r, f, f)
 
 def distance(r, d):
-    '''4x4 matrix  matrix for travelling a distance d
+    """4x4 matrix  matrix for travelling a distance d
     See: https://en.wikipedia.org/wiki/Ray_transfer_matrix_analysis
-    '''
+    """
 
     d = np.array([[1, d],
                   [0, 1]])
@@ -168,9 +168,9 @@ def distance(r, d):
     return jnp.matmul(L, r)
 
 def circular_aperture(r, R, E = None):
-    '''
+    """
     Rejects rays outside radius R
-    '''
+    """
 
     filt = r[0, :] ** 2 + r[2, :] ** 2 > R ** 2
     # if you want to reject rays outside of the radius, then when filt is true you should set equal to None
@@ -186,9 +186,9 @@ def circular_aperture(r, R, E = None):
     return r
 
 def circular_stop(r, R):
-    '''
+    """
     Rejects rays inside a radius R
-    '''
+    """
 
     filt = r[0, :] ** 2 + r[2,:] ** 2 < R ** 2
     r = r.at[:, filt].set(jnp.nan)
@@ -196,9 +196,9 @@ def circular_stop(r, R):
     return r
 
 def annular_stop(r, R1, R2):
-    '''
+    """
     Rejects rays which fall between R1 and R2
-    '''
+    """
 
     filt1 = (r[0,:]**2+r[2,:]**2 > R1**2)
     filt2 = (r[0,:]**2+r[2,:]**2 < R2**2)
@@ -207,9 +207,9 @@ def annular_stop(r, R1, R2):
     return filt
 
 def rect_aperture(r, Lx, Ly):
-    '''
+    """
     Rejects rays outside a rectangular aperture, total size 2*Lx x 2*Ly
-    '''
+    """
 
     filt1 = (r[0, :] ** 2 > Lx ** 2)
     filt2 = (r[2, :] ** 2 > Ly ** 2)
@@ -220,10 +220,10 @@ def rect_aperture(r, Lx, Ly):
     return r
 
 def knife_edge(r, offset, axis, direction):
-    '''
+    """
     Filters rays using a knife edge.
     Default is a knife edge in y, can also do a knife edge in x.
-    '''
+    """
 
     if axis == 'y':
         a = 2
@@ -242,9 +242,9 @@ def knife_edge(r, offset, axis, direction):
     return r
 
 def clear_rays(self):
-    '''
+    """
     Clears the r0, rf and Jf variables to save memory
-    '''
+    """
     # does this actually save memory in the best way?
     # would it be better to del self.r_ instead?
 
@@ -253,9 +253,9 @@ def clear_rays(self):
     self.Jf = None
 
 def ray(x, θ, y, ϕ):
-    '''
+    """
     Returns a 4x1 matrix representing a ray. Spatial units must be consistent, angular units in radians.
-    '''
+    """
 
     return sym.Matrix([x, θ, y, ϕ])
 
@@ -304,7 +304,7 @@ class Diagnostic:
         self.Jf = self.Jf.at[:, :].set(self.Jf[:, :] * jnp.exp(1.0j * k * jnp.sqrt(dx ** 2 + dy ** 2)))
 
     def histogram(self, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
-        '''
+        """
         Bin data into a histogram. Defaults are for a KAF-8300.
         Outputs are H, the histogram, and xedges and yedges, the bin edges.
 
@@ -312,7 +312,7 @@ class Diagnostic:
             bin_scale (int, optional): bin size, same in x and y. Defaults to 1.
             pix_x (int, optional): number of x pixels in detector plane. Defaults to 3448.
             pix_y (int, optional): number of y pixels in detector plane. Defaults to 2574.
-        '''
+        """
     
         x = self.rf[0, :]
         y = self.rf[2, :]
@@ -441,11 +441,11 @@ class Schlieren(Diagnostic):
         self.rf = r9
         
 class Refractometry(Diagnostic):
-    '''
+    """
     Example of Imaging Refractometer. Inherits from Rays, has custom solve method.
     Implements a spherical lens with focal length f1 = L/2 and M = 2 for the spatial axis and a cylindrical lens
     with focal length f1 and f2.
-    '''
+    """
 
     def incoherent_solve(self):
         ##
@@ -485,18 +485,18 @@ class Refractometry(Diagnostic):
         self.histogram_legacy(bin_scale = bin_scale, pix_x = pix_x, pix_y = pix_y, clear_mem = clear_mem)
 
 class Interferometry(Diagnostic):
-    '''
+    """
     Simple class to keep all the ray properties together
-    '''
+    """
 
     def interfere_ref_beam(self, n_fringes, deg):
-        '''
+        """
         Input beam ray positions and electric field component, and desired angle of evenly spaced background fringes. 
         Deg is angle in degrees from the vertical axis
 
         Returns:
             'Interfered with' E field
-        '''
+        """
 
         if deg >= 45:
             deg = - jnp.abs(deg - 90)

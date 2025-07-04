@@ -20,4 +20,4 @@ echo 'packages loaded successfully'
 
 echo 'starting job'
 
-jupyter nbconvert --execute --to test_SynthRayTrace_job_output.ipynb examples/notebooks/test_SynthRayTracer.ipynb
+python examples/jobs/run_scripts/test_SynthRayTrace.py &> test_SynthRayTrace_output.txt

@@ -4,6 +4,11 @@ import vtk
 import matplotlib.pyplot as plt
 import sys
 
+from collections import Counter
+import linecache
+import os
+import tracemalloc
+
 from vtk.util import numpy_support as vtk_np
 #from sys import path.insert as insert_path
 
@@ -16,6 +21,33 @@ import diagnostics as diag
 import domain as d
 import propagator as p
 import utils
+
+def display_top(snapshot, key_type='lineno', limit=3):
+    snapshot = snapshot.filter_traces((
+        tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
+        tracemalloc.Filter(False, "<unknown>"),
+    ))
+    top_stats = snapshot.statistics(key_type)
+
+    print("Top %s lines" % limit)
+    for index, stat in enumerate(top_stats[:limit], 1):
+        frame = stat.traceback[0]
+        # replace "/path/to/module/file.py" with "module/file.py"
+        filename = os.sep.join(frame.filename.split(os.sep)[-2:])
+        print("#%s: %s:%s: %.1f KiB"
+              % (index, filename, frame.lineno, stat.size / 1024))
+        line = linecache.getline(frame.filename, frame.lineno).strip()
+        if line:
+            print('    %s' % line)
+
+    other = top_stats[limit:]
+    if other:
+        size = sum(stat.size for stat in other)
+        print("%s other: %.1f KiB" % (len(other), size / 1024))
+    total = sum(stat.size for stat in top_stats)
+    print("Total allocated size: %.1f KiB" % (total / 1024))
+
+tracemalloc.start()
 
 extent_x = 5e-3
 extent_y = 5e-3
@@ -45,22 +77,43 @@ for i in parameters[0, :]:
 
     domain = d.ScalarDomain(lengths, i)
 
+    snapshot = tracemalloc.take_snapshot()
+    display_top(snapshot)
+
     domain.test_exponential_cos()
+
+    snapshot = tracemalloc.take_snapshot()
+    display_top(snapshot)
 
     for j in parameters[1, :]:
         print("\n\n\n")
         print("Attempting:", i, "domain indices and", j, "rays.")
 
+        snapshot = tracemalloc.take_snapshot()
+        display_top(snapshot)
+
         initial_rays = beam_initialiser.Beam(j, beam_size, divergence, ne_extent, probing_direction, wl, beam_type)
+
+        snapshot = tracemalloc.take_snapshot()
+        display_top(snapshot)
 
         tracer = p.Propagator(domain, initial_rays, inv_brems = False, phaseshift = False)
 
+        snapshot = tracemalloc.take_snapshot()
+        display_top(snapshot)
+
         tracer.calc_dndr()
+
+        snapshot = tracemalloc.take_snapshot()
+        display_top(snapshot)
 
         try:
             final_rays = tracer.solve(parallelise = True, jitted = True)
 
             print("\nCompleted ray trace in", np.round(tracer.duration, 3), "seconds.")
+
+            snapshot = tracemalloc.take_snapshot()
+            display_top(snapshot)
 
             '''
             schlierener = diag.Schlieren(tracer.Beam)

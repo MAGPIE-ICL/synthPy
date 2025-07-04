@@ -20,4 +20,4 @@ echo 'packages loaded successfully'
 
 echo 'starting job'
 
-python -u examples/jobs/run_scripts/solver_comparisons.py &> solver_comparisons_output.txt
+python examples/jobs/run_scripts/solver_comparisons.py &> solver_comparisons_output.txt
