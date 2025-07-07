@@ -1,16 +1,12 @@
 import numpy as np
-import diffrax
-import optax
 import matplotlib.pyplot as plt
-import jax.numpy as jnp
 import os
+import sys
+from importlib import import_module
 
 from scipy.integrate import odeint, solve_ivp
 from time import time
-from jax.scipy.interpolate import RegularGridInterpolator
-from equinox import filter_jit
 from datetime import datetime
-from jax.lib import xla_bridge
 from os import system as os_system
 
 from scipy.constants import c
@@ -21,7 +17,7 @@ from scipy.constants import e
 from utils import getsizeof
 
 class Propagator:
-    def __init__(self, ScalarDomain, s0, *, probing_direction = 'z', inv_brems = False, phaseshift = False):
+    def __init__(self, ScalarDomain, s0, *, probing_direction = 'z', inv_brems = False, phaseshift = False, parallelise = True):
         self.ScalarDomain = ScalarDomain
 
         self.s0 = s0
@@ -33,6 +29,55 @@ class Propagator:
 
         self.integration_length = ScalarDomain.lengths[['x', 'y', 'z'].index(self.probing_direction)]
         self.extent = self.integration_length / 2
+
+        # set parallelise here so we can use it here to help init jax
+        self.parallelise = True
+
+        if self.parallelise:
+            print("\nInitialising jax...")
+
+            # set this to be a global flag in config to avoid issues of re-initialising jax if already done properly
+            jax_initialised = False
+            if not jax_initialised:
+                from multiprocessing import cpu_count
+                self.core_count = cpu_count()
+
+                ### THIS NEEDS TO BE SET BEFORE JAX IS INITIALISED IN ANY WAY, INCLUDING IMPORTING
+                # - XLA_FLAGS are read WHEN jax is IMPORTED
+
+                assert "jax" not in sys.modules, "jax already imported: you must restart your runtime"
+                # bring up issue to see if it can be made a on the run configurable variable
+                #jax.config.update('xla_force_host_platform_device_count', self.core_count)
+                os.environ['XLA_FLAGS'] = "--xla_force_host_platform_device_count=" + str(self.core_count)
+
+                # currently this setup means domain is converted back to numpy - benchmark and see which to use
+                # as not parallelisable I suspect we should use numpy anyway
+
+                global jax
+                jax = import_module('jax')
+
+                # defaults float data types to 64-bit instead of 32 for greater precision
+                jax.config.update('jax_enable_x64', True)
+                jax.config.update('jax_captured_constants_report_frames', -1)
+                jax.config.update('jax_captured_constants_warn_bytes', 128 * 1024 ** 2)
+                jax.config.update('jax_traceback_filtering', 'off')
+                # https://docs.jax.dev/en/latest/gpu_memory_allocation.html
+                #jax.config.update('xla_python_client_allocator', '\"platform\"')
+                # can't set via jax.config.update for some reason
+                os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = '\"platform\"'
+
+                # look further into what this actually means...
+                print("\nDefault jax backend:", jax.default_backend())
+
+                available_devices = jax.devices()
+                print(f"Available devices: {available_devices}")
+
+        global jnp
+        jnp = import_module('jax.numpy')
+
+        global RegularGridInterpolator
+        RegularGridInterpolator = getattr(import_module('jax.scipy.interpolate'), 'RegularGridInterpolator')
+        #del module
 
 # The following functions are methods to be called by the solve()
     def calc_dndr(self, lwl = 1064e-9):
@@ -51,7 +96,7 @@ class Propagator:
             self.VerdetConst = 2.62e-13 * lwl ** 2 # radians per Tesla per m^2
 
         self.ne_nc = jnp.array(self.ScalarDomain.ne / nc, dtype = jnp.float32) #normalise to critical density
-        
+
         #More compact notation is possible here, but we are explicit
         # can we find a way to reduce ram allocation
         self.dndx = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.x, axis=0)
@@ -184,15 +229,17 @@ class Propagator:
 
         return pol
 
-    def solve(self, *, return_E = False, parallelise = True, jitted = True, save_steps = 2):
+    def solve(self, *, return_E = False, jitted = True, save_steps = 2):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
 
         s0 = self.s0
+        Np = s0.shape[1]
 
         # make a wrapper function for getsizeof in utilities that outputs more meaningful information
         print("\nSize in memory of initial rays:", getsizeof(s0))
+        print("Predicted size in memory of domain:", self.ScalarDomain.dim[0] * self.ScalarDomain.dim[1] * self.ScalarDomain.dim[2] * 4 / 1024 ** 2, "MB")
 
         # 8.0^0.5 is an arbritrary factor to ensure rays have enough time to escape the box
         # think we should change this???
@@ -200,53 +247,35 @@ class Propagator:
 
         start = time()
 
-        if not parallelise:
+        if not self.parallelise:
             s0 = s0.flatten() #odeint insists
-            #s0 = jnp.array(s0) #for diffrax
 
             # wrapper allows dummy variables t & y to be used by solve_ivp(), self is required by dsdt
-            dsdt_ODE = lambda t, y: dsdt(t, y, self, parallelise)
+            dsdt_ODE = lambda t, y: dsdt(t, y, self)
             sol = solve_ivp(dsdt_ODE, [0, t[-1]], s0, t_eval = t)
         else:
-            import jax
-
-            # defaults float data types to 64-bit instead of 32 for greater precision
-            jax.config.update('jax_enable_x64', True)
-            jax.config.update('jax_captured_constants_report_frames', -1)
-            jax.config.update('jax_captured_constants_warn_bytes', 128 * 1024 ** 2)
-            jax.config.update('jax_traceback_filtering', 'off')
-            # https://docs.jax.dev/en/latest/gpu_memory_allocation.html
-            #jax.config.update('xla_python_client_allocator', '\"platform\"')
-            # can't set via jax.config.update for some reason
-            os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = '\"platform\"'
-
-            # look further into what this actually means...
-            print("\nDefault jax backend:", jax.default_backend())
-
-            available_devices = jax.devices()
-            print(f"Available devices: {available_devices}")
-
+            from jax.lib import xla_bridge
             running_device = xla_bridge.get_backend().platform
-            print("Running device:", running_device, end='')
+            print("\nRunning device:", running_device, end='')
 
             if running_device == 'cpu':
-                from multiprocessing import cpu_count
+                print(", with:", self.core_count, "cores.")
 
-                core_count = cpu_count()
-                print(", with:", core_count, "cores.")
-
-                """
                 from jax.sharding import PartitionSpec as P, NamedSharding
 
                 # Create a Sharding object to distribute a value across devices:
-                mesh = jax.make_mesh((4, 2), ('x', 'y'))
+                # Assume self.core_count is the no. of core devices available
+                mesh = jax.make_mesh((self.core_count,), ('cols',))  # 1D mesh for columns
 
-                # Create an array of random values:
-                x = jax.random.normal(jax.random.key(0), (8192, 8192))
+                # Specify sharding: don't split axis 0 (rows), split axis 1 (columns) across devices
+                # then apply sharding to rewrite s0 as a sharded array from it's original matrix
                 # and use jax.device_put to distribute it across devices:
-                y = jax.device_put(x, NamedSharding(mesh, P('x', 'y')))
-                jax.debug.visualize_array_sharding(y)
-                """
+                Np = ((Np // self.core_count) * self.core_count)
+                s0 = jax.device_put(s0[:, 0:Np], NamedSharding(mesh, P(None, 'cols')))  # 'None' means don't shard axis 0
+
+                print(s0.sharding)            # See the sharding spec
+                #print(s0.addressable_shards)  # Check each device's shard
+                #jax.debug.visualize_array_sharding(s0)
             elif running_device == 'gpu':
                 print("\n")
             elif running_device == 'tpu':
@@ -258,7 +287,10 @@ class Propagator:
 
             # wrapper for same reason, diffrax.ODETerm instantiaties this and passes args (this will contain self)
             def dsdt_ODE(t, y, args):
-                return dsdt(t, y, args[0], args[1]) * norm_factor
+                return dsdt(t, y, args[0]) * norm_factor
+
+            import diffrax
+            #import optax
 
             def diffrax_solve(dydt, t0, t1, Nt, rtol = 1e-7, atol = 1e-9):
                 """
@@ -283,7 +315,7 @@ class Propagator:
                     args = args,
                     t0 = t0,
                     t1 = t1,
-                    dt0 = (t1 - t0) * norm_factor ** 2 / Nt,
+                    dt0 = (t1 - t0) * norm_factor / Nt,
                     saveat = saveat,
                     stepsize_controller = stepsize_controller,
                     # set max steps to no. of cells x100
@@ -296,18 +328,17 @@ class Propagator:
             if jitted:
                 start_comp = time()
 
+                from equinox import filter_jit
                 # equinox.filter_jit() (imported as filter_jit()) provides debugging info unlike jax.jit() - it does not like static args though so sticking with jit for now
-                #ODE_solve = jax.jit(ODE_solve, static_argnums = 1, device = available_devices[0])
-                ODE_solve = filter_jit(ODE_solve, device = available_devices[0])
+                #ODE_solve = jax.jit(ODE_solve, static_argnums = 1)#, device = available_devices[0])
+                ODE_solve = filter_jit(ODE_solve)#, device = available_devices[0])
                 # not sure about the performance of non-static specified arguments with filter_jit() - only use for debugging not in 'production'
 
                 finish_comp = time()
-                print("\njax compilation of solver took:", finish_comp - start_comp)
+                print("\njax compilation of solver took:", finish_comp - start_comp, "seconds")
 
             # Solve for specific s0 intial values
-            #args = {'self': self, 'parallelise': parallelise}
-            #args = [self, parallelise]
-            args = (self, parallelise) # passed args must be hashable to be made static for jax.jit, tuple is hashable, array & dict are not
+            args = (self, ) # passed args must be hashable to be made static for jax.jit, tuple is hashable, array & dict are not
 
             # pass s0[:, i] for each ray via a jax.vmap for parallelisation
             # transposed as jax.vmap() expects form of [batch_idx, items] not [items, batch_idx]
@@ -341,8 +372,7 @@ class Propagator:
         finish = time()
         self.duration = finish - start
 
-        Np = s0.size // 9
-        if not parallelise:
+        if not self.parallelise:
             self.rf = sol.y[:,-1].reshape(9, Np)
         else:
             """
@@ -364,46 +394,15 @@ class Propagator:
             #self.rf = sol.ys[:, -1, :].reshape(9, Np)# / scalar
             self.rf = sol.ys[:, -1, :].T
 
-            #self.rf = self.rf.at[:, :].set(self.rf[:, :] * (1e-3) / c)
-
             print("\nParallelised output has resulting 3D matrix of form: [batch_count, 2, 9]:", sol.ys.shape)
             print("\t2 to account for the start and end results")
             print("\t9 containing the 3 position and velocity components, amplitude, phase and polarisation")
-            print("\nWe slice the end result and transpose into the form:", sol.ys[:, -1, :].reshape(9, Np).shape, "to work with later code.")
+            print("\tIf batch_count is lower than expected, this is likely due to jax's forced integer batch sharding when parallelising over cpu cores.")
+            print("\nWe slice the end result and transpose into the form:", self.rf.shape, "to work with later code.")
             #else:
             #    print("Ray tracer failed. This could be a case of diffrax exceeding max steps again due to apparent 'strictness' compared to solve_ivp, check error log.")
 
-        """
-        x = self.rf[0, :]
-        y = self.rf[2, :]
-
-        print("\nx-y size expected: (", len(x), ", ", len(y), ")", sep='')
-        print('Final rays:', self.rf[:, :])
-
-        # means that jnp.isnan(a) returns True when a is not Nan
-        # ensures that x & y are the same length, if output of either is Nan then will not try to render ray in histogram
-        mask = ~jnp.isnan(x) & ~jnp.isnan(y)
-
-        x = x[mask]
-        y = y[mask]
-
-        print("x-y after clearing nan's: (", len(x), ", ", len(y), ")", sep='')
-        """
-
         return ray_to_Jonesvector(self.rf, self.extent, probing_direction = self.probing_direction, return_E = return_E)
-
-        """
-        print("\nJonesvector's output as 2 array's of form's:", self.rf.shape, end = ',')
-        if self.Jf is not None:
-            print(self.Jf.shape, end = ' - ')
-
-        if return_E:
-            print("self.Jf returned as return_E = True")
-            #return self.rf, self.Jf
-        else:
-            print("2nd array is of this shape as return_E = False")
-            #return self.rf
-        """
 
     def solve_at_depth(self, z):
         """
@@ -424,7 +423,8 @@ class Propagator:
 
         start = time()
 
-        dsdt_ODE = lambda t, y: dsdt(t, y, self, parallelise = False)
+        self.parallelise = False
+        dsdt_ODE = lambda t, y: dsdt(t, y, self)
         sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t)
 
         finish = time()
@@ -451,7 +451,7 @@ class Propagator:
         self.Jf = None
 
 # ODEs of photon paths, standalone function to support the solve()
-def dsdt(t, s, propagator, parallelise):
+def dsdt(t, s, propagator):
     """
     Returns an array with the gradients and velocity per ray for ode_int
 
@@ -464,7 +464,7 @@ def dsdt(t, s, propagator, parallelise):
         9N float array: flattened array for ode_int
     """
 
-    if not parallelise:
+    if not propagator.parallelise:
         # jnp.reshape() auto converts to a jax array rather than having to do after a numpy reshape
         s = jnp.reshape(s, (9, s.size // 9))
     else:
