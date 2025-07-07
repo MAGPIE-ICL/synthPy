@@ -51,9 +51,9 @@ beam_type = 'circular'
 
 beam_definition = beam_initialiser.Beam(Np, beam_size, divergence, ne_extent, probing_direction = probing_direction, wavelength = lwl, beam_type = beam_type)
 
-tracer = p.Propagator(domain, beam_definition.s0, probing_direction = probing_direction, inv_brems = False, phaseshift = False)
+tracer = p.Propagator(domain, beam_definition.s0, probing_direction = probing_direction, inv_brems = False, phaseshift = False, parallelise = True)
 
 # solve ray trace
 tracer.calc_dndr(lwl)
-tracer.solve(parallelise = True, jitted = True)
+tracer.solve(jitted = True)
 print("\nCompleted ray trace in", np.round(tracer.duration, 3), "seconds.")

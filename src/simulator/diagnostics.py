@@ -1,4 +1,4 @@
-import numpy as np
+#import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 #import jax
@@ -134,14 +134,14 @@ def lens(r, f1, f2):
     See: https://en.wikipedia.org/wiki/Ray_transfer_matrix_analysis
     """
 
-    l1 = np.array([[1, 0],
+    l1 = jnp.array([[1, 0],
             [-1 / f1, 1]])
-    l2 = np.array([[1, 0],
+    l2 = jnp.array([[1, 0],
             [-1 / f2, 1]])
 
-    L = np.zeros((4, 4))
-    L[:2, :2] = l1
-    L[2:, 2:] = l2
+    L = jnp.zeros((4, 4))
+    L = L.at[:2, :2].set(l1)
+    L = L.at[2:, 2:].set(l2)
 
     return jnp.matmul(L, r)
 
@@ -157,13 +157,13 @@ def distance(r, d):
     See: https://en.wikipedia.org/wiki/Ray_transfer_matrix_analysis
     """
 
-    d = np.array([[1, d],
+    d = jnp.array([[1, d],
                   [0, 1]])
 
-    L = np.zeros((4, 4))
+    L = jnp.zeros((4, 4))
 
-    L[:2, :2] = d
-    L[2:, 2:] = d
+    L = L.at[:2, :2].set(d)
+    L = L.at[2:, 2:].set(d)
 
     return jnp.matmul(L, r)
 

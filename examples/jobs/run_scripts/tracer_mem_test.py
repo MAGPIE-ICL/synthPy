@@ -94,7 +94,7 @@ for i in parameters[0, :]:
         snapshot = tracemalloc.take_snapshot()
         display_top(snapshot)
 
-        tracer = p.Propagator(domain, beam.s0, probing_direction = probing_direction, inv_brems = False, phaseshift = False)
+        tracer = p.Propagator(domain, beam.s0, probing_direction = probing_direction, inv_brems = False, phaseshift = False, parallelise = True)
 
         snapshot = tracemalloc.take_snapshot()
         display_top(snapshot)
@@ -105,7 +105,7 @@ for i in parameters[0, :]:
         display_top(snapshot)
 
         try:
-            final_rays = tracer.solve(parallelise = True, jitted = True)
+            final_rays = tracer.solve(jitted = True)
 
             print("\nCompleted ray trace in", np.round(tracer.duration, 3), "seconds.")
 

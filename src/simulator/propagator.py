@@ -1,13 +1,13 @@
-import numpy as np
+#import numpy as np
 import matplotlib.pyplot as plt
 import os
 import sys
-from importlib import import_module
 
 from scipy.integrate import odeint, solve_ivp
 from time import time
 from datetime import datetime
 from os import system as os_system
+from importlib import import_module
 
 from scipy.constants import c
 from scipy.constants import e
@@ -31,7 +31,7 @@ class Propagator:
         self.extent = self.integration_length / 2
 
         # set parallelise here so we can use it here to help init jax
-        self.parallelise = True
+        self.parallelise = parallelise
 
         if self.parallelise:
             print("\nInitialising jax...")
@@ -69,8 +69,8 @@ class Propagator:
                 # look further into what this actually means...
                 print("\nDefault jax backend:", jax.default_backend())
 
-                available_devices = jax.devices()
-                print(f"Available devices: {available_devices}")
+                self.available_devices = jax.devices()
+                print(f"Available devices: {self.available_devices}")
 
         global jnp
         jnp = import_module('jax.numpy')
@@ -234,21 +234,21 @@ class Propagator:
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
 
-        s0 = self.s0
-        Np = s0.shape[1]
+        s0_import = self.s0
+        Np = s0_import.shape[1]
 
         # make a wrapper function for getsizeof in utilities that outputs more meaningful information
-        print("\nSize in memory of initial rays:", getsizeof(s0))
+        print("\nSize in memory of initial rays:", getsizeof(s0_import))
         print("Predicted size in memory of domain:", self.ScalarDomain.dim[0] * self.ScalarDomain.dim[1] * self.ScalarDomain.dim[2] * 4 / 1024 ** 2, "MB")
 
         # 8.0^0.5 is an arbritrary factor to ensure rays have enough time to escape the box
         # think we should change this???
-        t = jnp.linspace(0.0, np.sqrt(8.0) * self.extent / c, 2)
+        t = jnp.linspace(0.0, jnp.sqrt(8.0) * self.extent / c, 2)
 
         start = time()
 
         if not self.parallelise:
-            s0 = s0.flatten() #odeint insists
+            s0 = s0_import.flatten() #odeint insists
 
             # wrapper allows dummy variables t & y to be used by solve_ivp(), self is required by dsdt
             dsdt_ODE = lambda t, y: dsdt(t, y, self)
@@ -271,19 +271,24 @@ class Propagator:
                 # then apply sharding to rewrite s0 as a sharded array from it's original matrix
                 # and use jax.device_put to distribute it across devices:
                 Np = ((Np // self.core_count) * self.core_count)
-                s0 = jax.device_put(s0[:, 0:Np], NamedSharding(mesh, P(None, 'cols')))  # 'None' means don't shard axis 0
+                s0 = jax.device_put(s0_import[:, 0:Np], NamedSharding(mesh, P(None, 'cols')))  # 'None' means don't shard axis 0
 
                 print(s0.sharding)            # See the sharding spec
                 #print(s0.addressable_shards)  # Check each device's shard
                 #jax.debug.visualize_array_sharding(s0)
             elif running_device == 'gpu':
+                gpu_devices = [d for d in self.available_devices if d.device_kind == 'gpu']
+                if gpu_devices:
+                    s0 = jax.device_put(s0_import, gpu_devices[0])
                 print("\n")
             elif running_device == 'tpu':
                 print("\n")
             else:
                 print("No suitable device detected!")
 
-            norm_factor = np.max(t)
+            del s0_import
+
+            norm_factor = jnp.max(t)
 
             # wrapper for same reason, diffrax.ODETerm instantiaties this and passes args (this will contain self)
             def dsdt_ODE(t, y, args):
@@ -365,6 +370,7 @@ class Propagator:
                 path += "memory-domain" + str(self.ScalarDomain.dim[0]) + "_rays"+ str(s0.shape[1]) + "-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
                 jax.profiler.save_device_memory_profile(path)
 
+                print("\n", end = '')
                 #os_system(f"~/go/bin/pprof -top {sys.executable} memory_{N}.prof")
                 os_system(f"~/go/bin/pprof -top /bin/ls " + path)
                 #os_system(f"~/go/bin/pprof --web " + path)
@@ -523,8 +529,8 @@ def ray_to_Jonesvector(rays, ne_extent, *, probing_direction = 'z', keep_current
 
     Np = rays.shape[1] # number of photons
 
-    ray_p = np.zeros((4, Np))
-    ray_J = np.zeros((2, Np), dtype = complex)
+    ray_p = jnp.zeros((4, Np))
+    ray_J = jnp.zeros((2, Np), dtype = complex)
 
     x, y, z, vx, vy, vz = rays[0], rays[1], rays[2], rays[3], rays[4], rays[5]
 
@@ -535,15 +541,15 @@ def ray_to_Jonesvector(rays, ne_extent, *, probing_direction = 'z', keep_current
 
         # Positions on plane
         if not keep_current_plane:
-            ray_p[0] = y - vy * t_bp
-            ray_p[2] = z - vz * t_bp
+            ray_p = ray_p.at[0].set(y - vy * t_bp)
+            ray_p = ray_p.at[2].set(z - vz * t_bp)
         else:
-            ray_p[0] = y
-            ray_p[2] = z
+            ray_p = ray_p.at[0].set(y)
+            ray_p = ray_p.at[2].set(z)
 
         # Angles to plane
-        ray_p[1] = np.arctan(vy / vx)
-        ray_p[3] = np.arctan(vz / vx)
+        ray_p = ray_p.at[1].set(jnp.arctan(vy / vx))
+        ray_p = ray_p.at[3].set(jnp.arctan(vz / vx))
     # XZ plane
     elif(probing_direction == 'y'):
         t_bp = (y - ne_extent) / vy
@@ -557,30 +563,30 @@ def ray_to_Jonesvector(rays, ne_extent, *, probing_direction = 'z', keep_current
 
         # Positions on plane
         if not keep_current_plane:
-            ray_p[0] = z - vz * t_bp
-            ray_p[2] = x - vx * t_bp
+            ray_p = ray_p.at[0].set(z - vz * t_bp)
+            ray_p = ray_p.at[2].set(x - vx * t_bp)
         else:
-            ray_p[0] = z
-            ray_p[2] = x
+            ray_p = ray_p.at[0].set(z)
+            ray_p = ray_p.at[2].set(x)
 
         # Angles to plane
-        ray_p[1] = np.arctan(vz / vy)
-        ray_p[3] = np.arctan(vx / vy)
+        ray_p = ray_p.at[1].set(jnp.arctan(vz / vy))
+        ray_p = ray_p.at[3].set(jnp.arctan(vx / vy))
     # XY plane
     elif(probing_direction == 'z'):
         t_bp = (z - ne_extent) / vz
 
         # Positions on plane
         if not keep_current_plane:
-            ray_p[0] = x - vx * t_bp
-            ray_p[2] = y - vy * t_bp
+            ray_p = ray_p.at[0].set(x - vx * t_bp)
+            ray_p = ray_p.at[2].set(y - vy * t_bp)
         else:
-            ray_p[0] = x
-            ray_p[2] = y
+            ray_p = ray_p.at[0].set(x)
+            ray_p = ray_p.at[2].set(y)
 
         # Angles to plane
-        ray_p[1] = np.arctan(vx / vz)
-        ray_p[3] = np.arctan(vy / vz)
+        ray_p = ray_p.at[1].set(jnp.arctan(vx / vz))
+        ray_p = ray_p.at[3].set(jnp.arctan(vy / vz))
     else:
         print("\nIncorrect probing direction. Use: x, y or z.")
     
@@ -596,12 +602,12 @@ def ray_to_Jonesvector(rays, ne_extent, *, probing_direction = 'z', keep_current
         amp, phase, pol = rays[6], rays[7], rays[8]
 
         # Assume initially polarised along y
-        E_x_init = np.zeros(Np)
-        E_y_init = np.ones(Np)
+        E_x_init = jnp.zeros(Np)
+        E_y_init = jnp.ones(Np)
 
         # Perform rotation for polarisation, multiplication for amplitude, and complex rotation for phase
-        ray_J[0] = amp * (np.cos(phase) + 1.0j * np.sin(phase)) * (np.cos(pol) * E_x_init - np.sin(pol) * E_y_init)
-        ray_J[1] = amp * (np.cos(phase) + 1.0j * np.sin(phase)) * (np.sin(pol) * E_x_init + np.cos(pol) * E_y_init)
+        ray_J[0] = amp * (jnp.cos(phase) + 1.0j * jnp.sin(phase)) * (jnp.cos(pol) * E_x_init - jnp.sin(pol) * E_y_init)
+        ray_J[1] = amp * (jnp.cos(phase) + 1.0j * jnp.sin(phase)) * (jnp.sin(pol) * E_x_init + jnp.cos(pol) * E_y_init)
 
         del amp
         del phase

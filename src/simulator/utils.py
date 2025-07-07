@@ -20,7 +20,8 @@ def count_nans(matrix, axes = [0, 2]):
         y = r2[2, :]
 
         print("\nrf size expected: (", len(x), ", ", len(y), ")", sep='')
-        mask = ~jnp.isnan(x) & ~jnp.isnan(y)
+        mask = ~np.isnan(x) & ~np.isnan(y)
+
         x = x[mask]
         y = y[mask]
 
