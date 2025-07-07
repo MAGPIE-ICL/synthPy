@@ -69,3 +69,56 @@ class flags:
     def reset_all(self):
         for i, (k, v) in enumerate(self.value_holders):
             self.value_holders[k].value = self.value_holders[k].default
+
+def jax_init():
+    import sys
+    import os
+
+    from multiprocessing import cpu_count
+
+    print("\nInitialising jax...")
+
+    ### THIS NEEDS TO BE SET BEFORE JAX IS INITIALISED IN ANY WAY, INCLUDING IMPORTING
+    # - XLA_FLAGS are read WHEN jax is IMPORTED
+
+    assert "jax" not in sys.modules, "jax already imported: you must restart your runtime - DO NOT RUN THIS FUNCTION TWICE"
+    # bring up issue to see if it can be made a on the run configurable variable
+    #jax.config.update('xla_force_host_platform_device_count', self.core_count)
+    os.environ['XLA_FLAGS'] = "--xla_force_host_platform_device_count=" + str(cpu_count())
+
+    '''
+    from importlib import import_module
+
+    global jax
+    jax = import_module('jax')
+    '''
+
+    import jax
+
+    # defaults float data types to 64-bit instead of 32 for greater precision
+    jax.config.update('jax_enable_x64', True)
+    # HPC doesn't recognise this config option
+    #jax.config.update('jax_captured_constants_report_frames', -1)
+    jax.config.update('jax_captured_constants_warn_bytes', 128 * 1024 ** 2)
+    jax.config.update('jax_traceback_filtering', 'off')
+    # https://docs.jax.dev/en/latest/gpu_memory_allocation.html
+    #jax.config.update('xla_python_client_allocator', '\"platform\"')
+    # can't set via jax.config.update for some reason
+    os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = '\"platform\"'
+
+    # look further into what this actually means...
+    print("\nDefault jax backend:", jax.default_backend())
+
+    available_devices = jax.devices()
+    print(f"Available devices: {available_devices}")
+
+    '''
+    global jnp
+    jnp = import_module('jax.numpy')
+
+    global RegularGridInterpolator
+    RegularGridInterpolator = getattr(import_module('jax.scipy.interpolate'), 'RegularGridInterpolator')
+    #del module
+    '''
+
+    #return jax

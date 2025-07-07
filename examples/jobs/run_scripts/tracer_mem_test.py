@@ -14,6 +14,9 @@ from vtk.util import numpy_support as vtk_np
 
 sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/simulator')
 
+import config
+config.jax_init()
+
 # cwd is set to synthPy acc. to hpc
 
 import beam as beam_initialiser
@@ -95,7 +98,7 @@ for i in parameters[0, :]:
         snapshot = tracemalloc.take_snapshot()
         display_top(snapshot)
 
-        tracer = p.Propagator(domain, beam.s0, probing_direction = probing_direction, inv_brems = False, phaseshift = False, parallelise = True)
+        tracer = p.Propagator(domain, beam.s0, probing_direction = probing_direction, inv_brems = False, phaseshift = False)
 
         snapshot = tracemalloc.take_snapshot()
         display_top(snapshot)

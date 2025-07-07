@@ -9,6 +9,9 @@ from vtk.util import numpy_support as vtk_np
 
 sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/simulator')
 
+import config
+config.jax_init()
+
 import beam as beam_initialiser
 import diagnostics as diag
 import domain as d
@@ -52,10 +55,10 @@ for i in parameters[0, :]:
     for j in parameters[1, :]:
         beam = beam_initialiser.Beam(j, beam_size, divergence, ne_extent, probing_direction = probing_direction, wavelength = lwl, beam_type = beam_type)
 
-        tracer_serialised = p.Propagator(domain, beam.s0, probing_direction = probing_direction, inv_brems = False, phaseshift = False, parallelise = True)
+        tracer_serialised = p.Propagator(domain, beam.s0, probing_direction = probing_direction, inv_brems = False, phaseshift = False)
         tracer_serialised.calc_dndr(lwl)
 
-        tracer_parallelised = p.Propagator(domain, beam.s0, probing_direction = probing_direction, inv_brems = False, phaseshift = False, parallelise = True)
+        tracer_parallelised = p.Propagator(domain, beam.s0, probing_direction = probing_direction, inv_brems = False, phaseshift = False)
         tracer_parallelised.calc_dndr(lwl)
 
         try:
