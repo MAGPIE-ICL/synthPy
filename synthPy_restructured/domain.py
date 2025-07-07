@@ -3,7 +3,7 @@ import numpy as np
 class ScalarDomain:
     """
     A class to hold and generate scalar domains.
-    This contains also the method to propagate rays through the scara domain
+    This contains also the method to propagate rays through the scalar domain
     """
 
     def __init__(self, lengths, dim, B_on = False):
@@ -126,6 +126,16 @@ class ScalarDomain:
         """
 
         self.Te = np.maximum(Te_min,Te)
+        
+
+
+    def external_mass_density(self, rho):
+        """Load external mass density field. To be used for opacity calculations
+
+        Args:: MxMxM grid of the mass density in kg/m^3
+            rho (array)
+        """
+        self.rho = rho
 
     def external_Z(self, Z):
         """Load externally generated grid

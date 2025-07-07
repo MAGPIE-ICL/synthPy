@@ -4,14 +4,18 @@ import optax
 import matplotlib.pyplot as plt
 import jax.numpy as jnp
 import jax
+import sys
+import os
 
-#from scipy.interpolate import RegularGridInterpolator
+sys.path.append('../../utils')
+
 from scipy.integrate import odeint, solve_ivp
 from time import time
 from jax.scipy.interpolate import RegularGridInterpolator
+from scipy.interpolate import RegularGridInterpolator as RGI
 from equinox import filter_jit
-
-from scipy.constants import c
+from SpK_reader import open_emi_files
+from scipy.constants import c, e
 
 def omega_pe(ne):
     '''Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28'''
@@ -19,11 +23,12 @@ def omega_pe(ne):
     return 5.64e4*np.sqrt(ne)
 
 class Propagator:
-    def __init__(self, ScalarDomain, Beam, inv_brems = False, phaseshift = False):
+    def __init__(self, ScalarDomain, Beam, inv_brems = False, x_ray = True, phaseshift = False):
         self.ScalarDomain = ScalarDomain
         self.Beam = Beam
         self.inv_brems = inv_brems
         self.phaseshift = phaseshift
+        self.x_ray = x_ray
 
         # finish initialising the beam position using the scalardomain edge position
 
@@ -80,7 +85,7 @@ class Propagator:
             o_pe  = omega_pe(ne)
             o_max = np.copy(o_pe)
             o_max[o_pe < omega] = omega
-            L_classical = Z*sc.e/Te
+            L_classical = Z*e/Te
             L_quantum = 2.760428269727312e-10/np.sqrt(Te) # sc.hbar/np.sqrt(sc.m_e*sc.e*Te)
             L_max = np.maximum(L_classical, L_quantum)
 
@@ -91,9 +96,9 @@ class Propagator:
 
         ne_cc = self.ScalarDomain.ne*1e-6
         o_pe  = omega_pe(ne_cc)
-        CL    = coloumbLog(ne_cc, self.ScalarDomain.Te, self.ScalarDomain.Z, self.omega)
+        CL    = coloumbLog(ne_cc, self.ScalarDomain.Te, self.ScalarDomain.z, self.omega)
 
-        return 3.1e-5*self.ScalarDomain.Z*c*np.power(ne_cc/self.omega,2)*CL*np.power(self.ScalarDomain.Te, -1.5) # 1/s
+        return 3.1e-5*self.ScalarDomain.z*c*np.power(ne_cc/self.omega,2)*CL*np.power(self.ScalarDomain.Te, -1.5) # 1/s
 
     # Plasma refractive index
     def n_refrac(self):
@@ -107,7 +112,7 @@ class Propagator:
         self.ne_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.ne, bounds_error = False, fill_value = 0.0)
 
         # Magnetic field
-        if(self.B_on):
+        if(self.ScalarDomain.B_on):
             self.Bx_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.B[:,:,:,0], bounds_error = False, fill_value = 0.0)
             self.By_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.B[:,:,:,1], bounds_error = False, fill_value = 0.0)
             self.Bz_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.B[:,:,:,2], bounds_error = False, fill_value = 0.0)
@@ -115,7 +120,15 @@ class Propagator:
         # Inverse Bremsstrahlung
         if(self.inv_brems):
             self.kappa_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.kappa(), bounds_error = False, fill_value = 0.0)
-
+        
+        #Opacity, Temperature, and Mass Density
+        if(self.x_ray):
+            grp_centres, grps, rho, Te, opa_data = open_emi_files("../../opa_multi_planck_CH_LTE_210506_Hydra_ColdOpa.spk")
+            opa_data_capped=np.minimum(100, opa_data)
+            self.opacity_interp = RegularGridInterpolator((grp_centres, rho, Te), opa_data_capped, bounds_error = False, fill_value = 0.0)
+            self.Te_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.Te, bounds_error = False, fill_value = 0.0)
+            self.rho_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.rho, bounds_error = False, fill_value = 0.0)
+        
         # Phase shift
         if(self.phaseshift):
             self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
@@ -144,6 +157,7 @@ class Propagator:
             return self.kappa_interp(x.T)
         else:
             return 0.0
+
 
     # Phase shift introduced by refractive index
     def phase(self,x):
@@ -198,12 +212,14 @@ class Propagator:
             # wrapper allows dummy variables t & y to be used by solve_ivp(), self is required by dsdt
             dsdt_ODE = lambda t, y: dsdt(t, y, self, parallelise)
             sol = solve_ivp(dsdt_ODE, [0, t[-1]], s0, t_eval = t)
+            print(sol)
         else:
+            norm_factor = np.max(t)
             # wrapper for same reason, diffrax.ODETerm instantiaties this and passes args (this will contain self)
             def dsdt_ODE(t, y, args):
-                return dsdt(t, y, args[0], args[1])
+                return dsdt(t, y, args[0], args[1]) * norm_factor
 
-            def diffrax_solve(dydt, t0, t1, Nt, rtol=1e-5, atol=1e-5):
+            def diffrax_solve(dydt, t0, t1, Nt, rtol=1e-5, atol=1e-7):
                 """
                 Here we wrap the diffrax diffeqsolve function such that we can easily parallelise it
                 """
@@ -217,7 +233,7 @@ class Propagator:
                 saveat = diffrax.SaveAt(ts = jnp.linspace(t0, t1, Nt))
                 # Diffrax uses adaptive time stepping to gain accuracy within certain tolerances
                 # had to reduce relative tolerance to 1 to get it to run, need to compare to see the consequences of this
-                stepsize_controller = diffrax.PIDController(rtol = 1, atol = 1e-5)
+                stepsize_controller = diffrax.PIDController(rtol = rtol, atol = atol)
 
                 return lambda s0, args : diffrax.diffeqsolve(
                     term,
@@ -226,18 +242,20 @@ class Propagator:
                     args = args,
                     t0 = t0,
                     t1 = t1,
-                    dt0 = (t1 - t0) / Nt,
+                    dt0 = (t1 - t0) * norm_factor ** 2 / Nt,
                     saveat = saveat,
-                    stepsize_controller = stepsize_controller
+                    stepsize_controller = stepsize_controller,
+                    max_steps = (self.ScalarDomain.x_n ** 3) * 100
                 )
 
-            ODE_solve = diffrax_solve(dsdt_ODE, t[0], t[-1], len(t))
+            ODE_solve = diffrax_solve(dsdt_ODE, t[0], t[-1] / norm_factor, len(t))
 
             if jitted:
                 start_comp = time()
 
                 # equinox.filter_jit() (imported as filter_jit()) provides debugging info unlike jax.jit() - it does not like static args though so sticking with jit for now
-                ODE_solve = jax.jit(ODE_solve, static_argnums = 1)
+                #ODE_solve = jax.jit(ODE_solve, static_argnums = 1)
+                ODE_solve = filter_jit(ODE_solve)
 
                 finish_comp = time()
                 print("jax compilation of solver took:", finish_comp - start_comp)
@@ -370,11 +388,26 @@ def dsdt(t, s, Propagator, parallelise):
     a = s[6, :]
     #p = s[7,:]
     #r = s[8,:]
-
+  
     sprime = sprime.at[3:6, :].set(Propagator.dndr(x))
     sprime = sprime.at[:3, :].set(v)
-
-    sprime = sprime.at[6, :].set(Propagator.atten(x) * a)
+    energy_eV = 6.63e-34*c/(Propagator.Beam.wavelength*1.6e-19)
+    energy_eV_array = jnp.full((np.size(x, axis=1)), energy_eV)
+    rho = Propagator.rho_interp(x.T)
+    Te = Propagator.Te_interp(x.T)
+    opacity = Propagator.opacity_interp((energy_eV_array, rho, Te))
+    #speed = jnp.sqrt(jnp.sum(v*v, axis=0))
+    #print('rho=', rho)
+    #print("inv_brem =",  Propagator.atten(x))
+    # print(rho.shape)
+    # print("Te=", Te)
+    #print("opacity=", opacity)
+    # print("speed=", speed)
+    #print("opa=", -opacity*speed)
+    #sprime = sprime.at[6, :].set(Propagator.atten(x)*a)
+    #sprime = sprime.at[6, :].set(-1e10*a)
+    #print(a)
+    sprime = sprime.at[6, :].set((Propagator.atten(x)-opacity*c)*a) #add inverse bremsstrahlung and opacity
     sprime = sprime.at[7, :].set(Propagator.phase(x))
     sprime = sprime.at[8, :].set(Propagator.neB(x, v))
 
@@ -419,7 +452,7 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction):
     # XZ plane
     elif(probing_direction == 'y'):
         t_bp = (y - ne_extent) / vy
-
+ 
         # Positions on plane
         ray_p[0] = x - vx * t_bp
         ray_p[2] = z - vz * t_bp

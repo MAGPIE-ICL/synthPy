@@ -1,0 +1,43 @@
+import sys
+sys.path.insert(0, 'synthPy_restructured')
+import numpy as np
+import matplotlib.pyplot as plt
+import beam as b
+import jax.numpy as jnp
+from scipy.interpolate import RegularGridInterpolator
+radius=5
+Np=1000
+beamtest=b.Beam(Np=Np,beam_size=radius,divergence=0,ne_extent=0, beam_type='circular')
+# circle_ang=np.linspace(0,2*np.pi, 1000)
+# x_circle=radius*np.cos(circle_ang)
+# y_circle=radius*np.sin(circle_ang)
+# plt.plot(x_circle, y_circle, c="k")
+#plt.plot(beamtest.s0[0,:], beamtest.s0[1,:], ".")
+# plt.grid()
+#plt.show()
+
+
+# testr=radius*np.random.power(2, Np)
+# test_ang=2*np.pi*np.random.rand(Np)
+# x_test=testr*np.cos(test_ang)
+# y_test=testr*np.sin(test_ang)
+# plt.plot(x_circle, y_circle, c="k")
+# plt.plot(x_test, y_test, ".")
+# #plt.hist(test, 50)
+# plt.show()
+
+# test=jnp.array([[1, 2, 3],
+#            [4, 5, 6],
+#            [7, 8, 9],
+#              [1,2,3]])
+# # print(jnp.sum(test*test, axis=1))
+# # print(np.(test, axis=1))
+# print(test.shape)
+
+testx=np.linspace(0,20,67)
+testy=np.linspace(0,20,132)
+testz=np.linspace(0,20,107)
+data=np.zeros((67, 132,107))
+
+interp=RegularGridInterpolator((testx, testz, testy), data)
+print(interp((5,6,7)))
