@@ -19,7 +19,7 @@ class flags:
                 help = (
                     'Setting this to true enables memory profiling features to debug code.'
                 )
-            )
+            ),
 
             'JITTED': ValueHolder(
                 name = 'jitted',
@@ -27,7 +27,7 @@ class flags:
                 help = (
                     'Setting this to false disables jax.jit of previously implicated functions.'
                 )
-            )
+            ),
 
             'PARALLELISED': ValueHolder(
                 name = 'jitted',
@@ -35,13 +35,21 @@ class flags:
                 help = (
                     'Setting this to false switches from diffrax to solve_ivp and disables parallelisation.'
                 )
-            )
+            ),
 
             'SEEDED': ValueHolder(
                 name = 'seeded',
                 default = False,
                 help = (
                     'Setting this to true seeds all random functions, useful for consistent benchmarking.'
+                )
+            ),
+
+            'JAX_INITIALISED': ValueHolder(
+                name = 'jax_initialised',
+                default = False,
+                help = (
+                    'Should set this to true after importing jax for the first time so that any following imports will not try to set environment variables or assert conditions based on if jax is already imported.'
                 )
             )
         }

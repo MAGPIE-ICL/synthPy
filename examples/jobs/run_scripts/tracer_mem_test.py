@@ -70,7 +70,8 @@ parameters = np.array([
 
 count = 0
 for i in parameters[0, :]:
-    print("\n\n\n", count += 1, "th trial:\n")#
+    count += 1
+    print("\n\n\n", count, "th trial:\n")#
 
     x = np.linspace(-extent_x, extent_x, i)
     y = np.linspace(-extent_y, extent_y, i)

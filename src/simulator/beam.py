@@ -1,4 +1,5 @@
 import numpy as np
+import os
 
 import utils
 
@@ -18,6 +19,9 @@ class Beam:
         Returns:
             s0, 9 x N float: N rays with (x, y, z, vx, vy, vz) in m, m/s and amplitude, phase and polarisation (a, p, r) 
         """
+
+        from multiprocessing import cpu_count
+        os.environ['XLA_FLAGS'] = "--xla_force_host_platform_device_count=" + str(cpu_count())
 
         self.Np = np.int64(Np)
         self.beam_size = beam_size

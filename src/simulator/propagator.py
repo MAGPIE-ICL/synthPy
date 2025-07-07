@@ -18,6 +18,9 @@ from utils import getsizeof
 
 class Propagator:
     def __init__(self, ScalarDomain, s0, *, probing_direction = 'z', inv_brems = False, phaseshift = False, parallelise = True):
+        #import config
+        #self.flags = config.flags
+
         self.ScalarDomain = ScalarDomain
 
         self.s0 = s0
@@ -36,41 +39,46 @@ class Propagator:
         if self.parallelise:
             print("\nInitialising jax...")
 
+            '''
             # set this to be a global flag in config to avoid issues of re-initialising jax if already done properly
-            jax_initialised = False
-            if not jax_initialised:
-                from multiprocessing import cpu_count
-                self.core_count = cpu_count()
+            if not self.flags.value_holders['jax_initialised'].value:
+                self.flags.update('jax_initialised', True)
+            '''
 
-                ### THIS NEEDS TO BE SET BEFORE JAX IS INITIALISED IN ANY WAY, INCLUDING IMPORTING
-                # - XLA_FLAGS are read WHEN jax is IMPORTED
+            from multiprocessing import cpu_count
+            self.core_count = cpu_count()
 
-                assert "jax" not in sys.modules, "jax already imported: you must restart your runtime"
-                # bring up issue to see if it can be made a on the run configurable variable
-                #jax.config.update('xla_force_host_platform_device_count', self.core_count)
-                os.environ['XLA_FLAGS'] = "--xla_force_host_platform_device_count=" + str(self.core_count)
+            '''
+            ### THIS NEEDS TO BE SET BEFORE JAX IS INITIALISED IN ANY WAY, INCLUDING IMPORTING
+            # - XLA_FLAGS are read WHEN jax is IMPORTED
 
-                # currently this setup means domain is converted back to numpy - benchmark and see which to use
-                # as not parallelisable I suspect we should use numpy anyway
+            assert "jax" not in sys.modules, "jax already imported: you must restart your runtime"
+            # bring up issue to see if it can be made a on the run configurable variable
+            #jax.config.update('xla_force_host_platform_device_count', self.core_count)
+            os.environ['XLA_FLAGS'] = "--xla_force_host_platform_device_count=" + str(self.core_count)
 
-                global jax
-                jax = import_module('jax')
+            # currently this setup means domain is converted back to numpy - benchmark and see which to use
+            # as not parallelisable I suspect we should use numpy anyway
+            '''
 
-                # defaults float data types to 64-bit instead of 32 for greater precision
-                jax.config.update('jax_enable_x64', True)
-                jax.config.update('jax_captured_constants_report_frames', -1)
-                jax.config.update('jax_captured_constants_warn_bytes', 128 * 1024 ** 2)
-                jax.config.update('jax_traceback_filtering', 'off')
-                # https://docs.jax.dev/en/latest/gpu_memory_allocation.html
-                #jax.config.update('xla_python_client_allocator', '\"platform\"')
-                # can't set via jax.config.update for some reason
-                os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = '\"platform\"'
+            global jax
+            jax = import_module('jax')
 
-                # look further into what this actually means...
-                print("\nDefault jax backend:", jax.default_backend())
+            # defaults float data types to 64-bit instead of 32 for greater precision
+            jax.config.update('jax_enable_x64', True)
+            jax.config.update('jax_captured_constants_report_frames', -1)
+            jax.config.update('jax_captured_constants_warn_bytes', 128 * 1024 ** 2)
+            jax.config.update('jax_traceback_filtering', 'off')
+            # https://docs.jax.dev/en/latest/gpu_memory_allocation.html
+            #jax.config.update('xla_python_client_allocator', '\"platform\"')
+            # can't set via jax.config.update for some reason
+            os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = '\"platform\"'
 
-                self.available_devices = jax.devices()
-                print(f"Available devices: {self.available_devices}")
+            # look further into what this actually means...
+            print("\nDefault jax backend:", jax.default_backend())
+
+            self.available_devices = jax.devices()
+            print(f"Available devices: {self.available_devices}")
 
         global jnp
         jnp = import_module('jax.numpy')
