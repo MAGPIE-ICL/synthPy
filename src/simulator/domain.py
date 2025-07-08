@@ -60,7 +60,7 @@ class ScalarDomain:
         self.x = jnp.float64(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n, dtype = jnp.float64))
         self.y = jnp.float64(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n, dtype = jnp.float64))
         self.z = jnp.float64(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n, dtype = jnp.float64))
-        self.XX, self.YY, self.ZZ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)#False)
+        self.XX, self.YY, self.ZZ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True, dtype = jnp.float64)#False)
 
         # Logical switches
         self.B_on = B_on
@@ -87,7 +87,8 @@ class ScalarDomain:
         self.ne = n_e0 * (1.0 + s * self.XX / self.x_length)
     
     def test_linear_cos(self, s1 = 0.1, s2 = 0.1, n_e0 = 2e23, Ly = 1):
-        """Linearly growing sinusoidal perturbation
+        """
+        Linearly growing sinusoidal perturbation
 
         Args:
             s1 (float, optional): scale of linear growth. Defaults to 0.1.
@@ -99,7 +100,8 @@ class ScalarDomain:
         self.ne = n_e0 * (1.0 + s1 * self.XX / self.x_length) * (1 + s2 * jnp.cos(2 * jnp.pi * self.YY / Ly))
     
     def test_exponential_cos(self, n_e0=1e24, Ly=1e-3, s=2e-3):
-        """Exponentially growing sinusoidal perturbation
+        """
+        Exponentially growing sinusoidal perturbation
 
         Args:
             n_e0 ([type], optional): mean electron density. Defaults to 1e24 m^-3.
@@ -108,10 +110,11 @@ class ScalarDomain:
         """
 
         # could we jax this calculation
-        self.ne = n_e0*10**(self.XX/s)*(1+jnp.cos(2*jnp.pi*self.YY/Ly))
+        self.ne = jnp.float64(n_e0 * 10 ** (self.XX / s) * (1 + jnp.cos(2 * jnp.pi * self.YY / Ly)))
         
     def external_ne(self, ne):
-        """Load externally generated grid
+        """
+        Load externally generated grid
 
         Args:
             ne ([type]): MxMxM grid of density in m^-3
@@ -120,7 +123,8 @@ class ScalarDomain:
         self.ne = ne
 
     def external_B(self, B):
-        """Load externally generated grid
+        """
+        Load externally generated grid
 
         Args:
             B ([type]): MxMxMx3 grid of B field in T
@@ -129,7 +133,8 @@ class ScalarDomain:
         self.B = B
 
     def external_Te(self, Te, Te_min = 1.0):
-        """Load externally generated grid
+        """
+        Load externally generated grid
 
         Args:
             Te ([type]): MxMxM grid of electron temperature in eV
@@ -138,7 +143,8 @@ class ScalarDomain:
         self.Te = jnp.maximum(Te_min,Te)
 
     def external_Z(self, Z):
-        """Load externally generated grid
+        """
+        Load externally generated grid
 
         Args:
             Z ([type]): MxMxM grid of ionisation
@@ -147,7 +153,8 @@ class ScalarDomain:
         self.Z = Z
         
     def test_B(self, Bmax=1.0):
-        """A Bz field with a linear gradient in x:
+        """
+        A Bz field with a linear gradient in x:
         Bz =  Bmax*x/extent
 
         Args:
