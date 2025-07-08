@@ -95,18 +95,9 @@ for i in parameters[0, :]:
 
         beam = beam_initialiser.Beam(j, beam_size, divergence, ne_extent, probing_direction = probing_direction, wavelength = lwl, beam_type = beam_type)
 
-        snapshot = tracemalloc.take_snapshot()
-        display_top(snapshot)
-
         tracer = p.Propagator(domain, probing_direction = probing_direction, inv_brems = False, phaseshift = False)
 
-        snapshot = tracemalloc.take_snapshot()
-        display_top(snapshot)
-
         tracer.calc_dndr(lwl)
-
-        snapshot = tracemalloc.take_snapshot()
-        display_top(snapshot)
 
         try:
             final_rays = tracer.solve(beam.s0, jitted = True)
