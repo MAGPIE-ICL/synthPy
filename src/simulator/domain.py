@@ -1,6 +1,9 @@
 import numpy as np
 import jax.numpy as jnp
 
+import jax
+jax.config.update('jax_enable_x64', True)
+
 class ScalarDomain:
     """
     A class to hold and generate scalar domains.

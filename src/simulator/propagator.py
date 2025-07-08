@@ -5,6 +5,9 @@ import sys
 import jax
 import jax.numpy as jnp
 
+#import jax
+jax.config.update('jax_enable_x64', True)
+
 from scipy.integrate import odeint, solve_ivp
 from time import time
 from datetime import datetime

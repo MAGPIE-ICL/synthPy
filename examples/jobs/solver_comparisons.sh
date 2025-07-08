@@ -14,4 +14,8 @@ echo 'packages loaded successfully'
 
 echo 'starting job'
 
+if [!-d /rds/general/user/sm5625/home/solver_comparisons]; then
+    mkdir -p /rds/general/user/sm5625/home/solver_comparisons;
+fi;
+
 python -u examples/jobs/run_scripts/solver_comparisons.py
