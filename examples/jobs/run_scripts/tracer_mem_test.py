@@ -68,7 +68,7 @@ beam_type = 'circular'
 
 parameters = np.array([
     [128, 256, 512, 1024],
-    [1, 100, 1e6, 1e7]
+    [10, 1e4, 1e6, 1e7]
 ], dtype = np.int64)
 
 count = 0
