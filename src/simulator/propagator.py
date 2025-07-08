@@ -243,7 +243,7 @@ class Propagator:
             else:
                 print("No suitable device detected!")
 
-            del s0_import
+            #del s0_import
 
             norm_factor = jnp.max(t)
 
