@@ -19,13 +19,11 @@ from scipy.constants import e
 from utils import getsizeof
 
 class Propagator:
-    def __init__(self, ScalarDomain, s0, *, probing_direction = 'z', inv_brems = False, phaseshift = False):
+    def __init__(self, ScalarDomain, *, probing_direction = 'z', inv_brems = False, phaseshift = False):
         #import config
         #self.flags = config.flags
 
         self.ScalarDomain = ScalarDomain
-
-        self.s0 = s0
 
         self.probing_direction = probing_direction
 
@@ -185,12 +183,11 @@ class Propagator:
 
         return pol
 
-    def solve(self, *, return_E = False, parallelise = True, jitted = True, save_steps = 2):
+    def solve(self, s0_import, *, return_E = False, parallelise = True, jitted = True, save_steps = 2):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
 
-        s0_import = self.s0
         Np = s0_import.shape[1]
 
         # make a wrapper function for getsizeof in utilities that outputs more meaningful information
@@ -370,7 +367,7 @@ class Propagator:
 
         return ray_to_Jonesvector(self.rf, self.extent, probing_direction = self.probing_direction, return_E = return_E)
 
-    def solve_at_depth(self, z):
+    def solve_at_depth(self, s0_import, z):
         """
         Solve intial rays up until a given depth, z
         """
@@ -382,8 +379,8 @@ class Propagator:
         length = self.extent + z
         t = jnp.linspace(0.0, length / c, 2)
 
-        s0 = self.s0
-        s0 = s0.flatten() #odeint insists
+        s0 = s0_import.flatten() #odeint insists
+        del s0_import
 
         print("\nStarting ray trace.")
 
@@ -412,7 +409,7 @@ class Propagator:
         self.dndz = None
         self.ScalarDomain.ne = None
         self.ne_nc = None
-        self.s0 = None
+        #self.s0 = None
         self.rf = None
         self.Jf = None
 
