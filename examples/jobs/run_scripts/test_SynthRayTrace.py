@@ -7,8 +7,8 @@ import gc
 
 import sys
 
-sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/simulator')     # import path/to/synthpy
-#sys.path.insert(0, '/home/administrator/Work/UROP_ICL_Internship/synthPy/src/simulator')
+#sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/simulator')     # import path/to/synthpy
+sys.path.insert(0, '/home/administrator/Work/UROP_ICL_Internship/synthPy/src/simulator')
 
 import config
 config.jax_init()
@@ -37,7 +37,7 @@ lwl = 1064e-9 #define laser wavelength
 
 # initialise beam
 # force to interpret as 64 bit integer instead of float - should adjust code to convert it to an integer if not already
-Np_array = np.array([1, 1e8, 1e9], dtype = np.int64)    # number of photons
+Np_array = np.array([100, 1e8, 1e9], dtype = np.int64)    # number of photons
 divergence = 5e-5   # realistic divergence value
 beam_size = extent_x    # beam radius
 ne_extent = probing_extent  # so the beam knows where to initialise initial positions

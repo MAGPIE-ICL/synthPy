@@ -85,6 +85,7 @@ def jax_init():
     # bring up issue to see if it can be made a on the run configurable variable
     #jax.config.update('xla_force_host_platform_device_count', self.core_count)
     os.environ['XLA_FLAGS'] = "--xla_force_host_platform_device_count=" + str(cpu_count())
+    #os.environ['JAX_ENABLE_X64'] = "True"
 
     '''
     from importlib import import_module

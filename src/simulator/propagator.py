@@ -5,9 +5,6 @@ import sys
 import jax
 import jax.numpy as jnp
 
-#import jax
-jax.config.update('jax_enable_x64', True)
-
 from scipy.integrate import odeint, solve_ivp
 from time import time
 from datetime import datetime
@@ -566,8 +563,8 @@ def ray_to_Jonesvector(rays, ne_extent, *, probing_direction = 'z', keep_current
         E_y_init = jnp.ones(Np)
 
         # Perform rotation for polarisation, multiplication for amplitude, and complex rotation for phase
-        ray_J[0] = amp * (jnp.cos(phase) + 1.0j * jnp.sin(phase)) * (jnp.cos(pol) * E_x_init - jnp.sin(pol) * E_y_init)
-        ray_J[1] = amp * (jnp.cos(phase) + 1.0j * jnp.sin(phase)) * (jnp.sin(pol) * E_x_init + jnp.cos(pol) * E_y_init)
+        ray_J = ray_J.at[0].set(amp * (jnp.cos(phase) + 1.0j * jnp.sin(phase)) * (jnp.cos(pol) * E_x_init - jnp.sin(pol) * E_y_init))
+        ray_J = ray_J.at[1].set(amp * (jnp.cos(phase) + 1.0j * jnp.sin(phase)) * (jnp.sin(pol) * E_x_init + jnp.cos(pol) * E_y_init))
 
         del amp
         del phase
