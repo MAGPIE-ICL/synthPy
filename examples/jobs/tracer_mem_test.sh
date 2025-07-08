@@ -22,4 +22,4 @@ mkdir -p /rds/general/user/sm5625/home/tracer_mem_test
 #python examples/jobs/run_scripts/tracer_mem_test.py &> tracer_mem_test_output.txt
 #python -u examples/jobs/run_scripts/tracer_mem_test.py &> tracer_mem_test_output.txt
 #python -u examples/jobs/run_scripts/tracer_mem_test.py | tee tracer_mem_test_output.txt
-python -u examples/jobs/run_scripts/tracer_mem_test.py &> tracer_mem_test/tracer_mem_test.output
+python -u examples/jobs/run_scripts/tracer_mem_test.py &> "tracer_mem_test/tracer_mem_test-$(date +"%Y-%m-%d_%I:%M_%p").output"
