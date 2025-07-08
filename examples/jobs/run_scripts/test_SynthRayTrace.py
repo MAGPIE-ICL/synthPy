@@ -51,9 +51,9 @@ beam_definition = beam_initialiser.Beam(Np, beam_size, divergence, ne_extent, pr
 import propagator as p
 importlib.reload(p)
 
-tracer = p.Propagator(domain, beam_definition.s0, probing_direction = probing_direction, inv_brems = False, phaseshift = False)
+tracer = p.Propagator(domain, probing_direction = probing_direction, inv_brems = False, phaseshift = False)
 
 # solve ray trace
 tracer.calc_dndr(lwl)
-tracer.solve(jitted = True)
+tracer.solve(beam_definition.s0, jitted = True)
 print("\nCompleted ray trace in", np.round(tracer.duration, 3), "seconds.")

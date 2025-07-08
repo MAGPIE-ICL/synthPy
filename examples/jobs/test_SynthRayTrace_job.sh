@@ -14,8 +14,5 @@ echo 'packages loaded successfully'
 
 echo 'starting job'
 
-if [!-d /rds/general/user/sm5625/home/synth_ray_trace]; then
-    mkdir -p /rds/general/user/sm5625/home/synth_ray_trace;
-fi;
-
+mkdir -p /rds/general/user/sm5625/home/synth_ray_trace
 python -u examples/jobs/run_scripts/test_SynthRayTrace.py &> synth_ray_trace/test_SynthRayTrace.output

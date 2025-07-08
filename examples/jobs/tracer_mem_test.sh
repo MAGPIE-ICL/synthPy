@@ -17,10 +17,7 @@ echo 'packages loaded successfully'
 
 echo 'starting job'
 
-if [!-d /rds/general/user/sm5625/home/tracer_mem_test]; then
-    mkdir -p /rds/general/user/sm5625/home/tracer_mem_test;
-fi;
-
+mkdir -p /rds/general/user/sm5625/home/tracer_mem_test
 #python examples/jobs/run_scripts/tracer_mem_test.py
 #python examples/jobs/run_scripts/tracer_mem_test.py &> tracer_mem_test_output.txt
 #python -u examples/jobs/run_scripts/tracer_mem_test.py &> tracer_mem_test_output.txt
