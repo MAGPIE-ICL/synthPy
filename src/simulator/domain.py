@@ -60,7 +60,7 @@ class ScalarDomain:
         self.x = jnp.float64(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n, dtype = jnp.float64))
         self.y = jnp.float64(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n, dtype = jnp.float64))
         self.z = jnp.float64(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n, dtype = jnp.float64))
-        self.XX, self.YY, self.ZZ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True, dtype = jnp.float64)#False)
+        self.XX, self.YY, self.ZZ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)#False)
 
         # Logical switches
         self.B_on = B_on
@@ -167,6 +167,7 @@ class ScalarDomain:
     def export_scalar_field(self, property: str = 'ne', fname: str = None):
         """
         Export the current scalar electron density profile as a pvti file format, property added for future scalability to export temperature, B-field, etc.
+
         Args:
             property: str, 'ne': export the electron density (default)
             fname: str, file path and name to save under. A VTI pointed to by a PVTI file are saved in this location. If left blank, the name will default to:
@@ -183,7 +184,8 @@ class ScalarDomain:
             min = dt.datetime.now().minute
             hour = dt.datetime.now().hour
 
-            fname = f'./plasma_PVTI_{day}_{month}_{year}_{hour}_{min}' #default fname to the current date and time 
+            # filename extended to include the name of the property to be exported
+            fname = f'./plasma_PVTI_{property}_{day}_{month}_{year}_{hour}_{min}' #default fname to the current date and time 
 
         if property == 'ne':
 
