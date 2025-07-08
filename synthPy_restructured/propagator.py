@@ -229,7 +229,7 @@ class Propagator:
             def dsdt_ODE(t, y, args):
                 return dsdt(t, y, args[0], args[1]) * norm_factor
 
-            def diffrax_solve(dydt, t0, t1, Nt, rtol=1e-5, atol=1e-7):
+            def diffrax_solve(dydt, t0, t1, Nt, rtol=1, atol=1e-3):
                 """
                 Here we wrap the diffrax diffeqsolve function such that we can easily parallelise it
                 """
@@ -313,6 +313,7 @@ class Propagator:
 
         self.Beam.rf, self.Beam.Jf = ray_to_Jonesvector(self.Beam.rf, self.extent, probing_direction = self.Beam.probing_direction)
         #print("\n", self.Beam.rf)
+        self.Beam.rf = 1e3*self.Beam.rf
         if return_E:
             return self.Beam.rf, self.Beam.Jf
         else:
@@ -407,7 +408,7 @@ def dsdt(t, s, Propagator, parallelise):
     #Te = Propagator.Te_interp(x.T)
     #opacity = Propagator.opacity_interp((energy_eV_array, rho, Te))
     #speed = jnp.sqrt(jnp.sum(v*v, axis=0))
-    print (p)
+    #print (p)
     sprime = sprime.at[6, :].set((Propagator.atten(x) + Propagator.atten_x_ray(x))*a) #add inverse bremsstrahlung and opacity
     sprime = sprime.at[7, :].set(Propagator.phase(x))
     sprime = sprime.at[8, :].set(Propagator.neB(x, v))

@@ -339,7 +339,11 @@ class Diagnostic:
             clear_rays(self)
 
     def plot(self, ax, clim=None, cmap=None):
-        ax.imshow(self.H, interpolation='nearest', origin='lower', clim=clim, cmap=cmap, extent = [self.xedges[0], self.xedges[-1], self.yedges[0], self.yedges[-1]])
+        im = ax.imshow(self.H, interpolation='nearest', origin='lower', clim=clim, cmap=cmap, extent = [self.xedges[0], self.xedges[-1], self.yedges[0], self.yedges[-1]])
+        #cax = divider.append_axes("right", "5%", pad="3%")
+        ax.figure.colorbar(im, fraction=0.05)
+        ax.set_xlabel("x position (mm)")
+        ax.set_ylabel("y position (mm)")
 
 class Shadowgraphy(Diagnostic):
     """

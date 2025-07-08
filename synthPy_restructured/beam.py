@@ -61,7 +61,9 @@ class Beam:
 
             #u  = np.random.rand(Np)+np.random.rand(Np) # radial coordinate of position
             #u[u > 1] = 2-u[u > 1]
-            u  = np.random.rand(Np) # radial coordinate of position
+            # radial coordinate of position. Probability is inearly weighted by radius so that
+            # positions are uniformly distributed
+            u  = np.random.power(2, Np)
 
             # angle
             ϕ = np.pi*np.random.rand(Np) #azimuthal angle of velocity
