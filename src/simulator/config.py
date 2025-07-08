@@ -99,7 +99,7 @@ def jax_init():
     jax.config.update('jax_enable_x64', True)
     # HPC doesn't recognise this config option
     #jax.config.update('jax_captured_constants_report_frames', -1)
-    jax.config.update('jax_captured_constants_warn_bytes', 128 * 1024 ** 2)
+    #jax.config.update('jax_captured_constants_warn_bytes', 128 * 1024 ** 2)
     jax.config.update('jax_traceback_filtering', 'off')
     # https://docs.jax.dev/en/latest/gpu_memory_allocation.html
     #jax.config.update('xla_python_client_allocator', '\"platform\"')
