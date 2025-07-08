@@ -23,7 +23,7 @@ def omega_pe(ne):
     return 5.64e4*np.sqrt(ne)
 
 class Propagator:
-    def __init__(self, ScalarDomain, Beam, inv_brems = False, x_ray = True, phaseshift = False):
+    def __init__(self, ScalarDomain, Beam, inv_brems = False, x_ray = False, phaseshift = False):
         self.ScalarDomain = ScalarDomain
         self.Beam = Beam
         self.inv_brems = inv_brems
@@ -40,6 +40,7 @@ class Propagator:
         index = ['x', 'y', 'z'].index(Beam.probing_direction)
         self.integration_length = ScalarDomain.lengths[index]
         self.extent = self.integration_length / 2
+        self.energy= 6.63e-34*c/(self.Beam.wavelength*1.6e-19)
 
         #Beam.init_beam(ne_extent)       # this is the second call instance for init_beam() stefano was referring too
 
@@ -155,6 +156,15 @@ class Propagator:
     def atten(self,x):
         if(self.inv_brems):
             return self.kappa_interp(x.T)
+        else:
+            return 0.0
+
+    def atten_x_ray(self, x):
+        if(self.x_ray):
+            rho = self.rho_interp(x.T)
+            Te = self.Te_interp(x.T)
+            opacity = self.opacity_interp((self.energy, rho, Te))
+            return -1*opacity*c
         else:
             return 0.0
 
@@ -386,28 +396,19 @@ def dsdt(t, s, Propagator, parallelise):
 
     # Amplitude, phase and polarisation
     a = s[6, :]
-    #p = s[7,:]
+    p = s[7,:]
     #r = s[8,:]
   
     sprime = sprime.at[3:6, :].set(Propagator.dndr(x))
     sprime = sprime.at[:3, :].set(v)
-    energy_eV = 6.63e-34*c/(Propagator.Beam.wavelength*1.6e-19)
-    energy_eV_array = jnp.full((np.size(x, axis=1)), energy_eV)
-    rho = Propagator.rho_interp(x.T)
-    Te = Propagator.Te_interp(x.T)
-    opacity = Propagator.opacity_interp((energy_eV_array, rho, Te))
+    # energy_eV = 6.63e-34*c/(Propagator.Beam.wavelength*1.6e-19)
+    # energy_eV_array = jnp.full((np.size(x, axis=1)), energy_eV)
+    #rho = Propagator.rho_interp(x.T)
+    #Te = Propagator.Te_interp(x.T)
+    #opacity = Propagator.opacity_interp((energy_eV_array, rho, Te))
     #speed = jnp.sqrt(jnp.sum(v*v, axis=0))
-    #print('rho=', rho)
-    #print("inv_brem =",  Propagator.atten(x))
-    # print(rho.shape)
-    # print("Te=", Te)
-    #print("opacity=", opacity)
-    # print("speed=", speed)
-    #print("opa=", -opacity*speed)
-    #sprime = sprime.at[6, :].set(Propagator.atten(x)*a)
-    #sprime = sprime.at[6, :].set(-1e10*a)
-    #print(a)
-    sprime = sprime.at[6, :].set((Propagator.atten(x)-opacity*c)*a) #add inverse bremsstrahlung and opacity
+    print (p)
+    sprime = sprime.at[6, :].set((Propagator.atten(x) + Propagator.atten_x_ray(x))*a) #add inverse bremsstrahlung and opacity
     sprime = sprime.at[7, :].set(Propagator.phase(x))
     sprime = sprime.at[8, :].set(Propagator.neB(x, v))
 
