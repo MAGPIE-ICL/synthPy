@@ -86,6 +86,8 @@ def jax_init():
     #jax.config.update('xla_force_host_platform_device_count', self.core_count)
     os.environ['XLA_FLAGS'] = "--xla_force_host_platform_device_count=" + str(cpu_count())
     #os.environ['JAX_ENABLE_X64'] = "True"
+    os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
+    os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
 
     '''
     from importlib import import_module
@@ -105,7 +107,8 @@ def jax_init():
     # https://docs.jax.dev/en/latest/gpu_memory_allocation.html
     #jax.config.update('xla_python_client_allocator', '\"platform\"')
     # can't set via jax.config.update for some reason
-    os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
+
+    jax.print_environment_info()
 
     # look further into what this actually means...
     print("\nDefault jax backend:", jax.default_backend())
