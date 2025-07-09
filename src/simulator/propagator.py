@@ -57,9 +57,15 @@ class Propagator:
         self.dndy = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.y, axis = 1)
         self.dndz = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.z, axis = 2)
 
+        self.ne_nc = None
+
         self.dndx_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndx, bounds_error = False, fill_value = 0.0)
         self.dndy_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndy, bounds_error = False, fill_value = 0.0)
         self.dndz_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndz, bounds_error = False, fill_value = 0.0)
+
+        self.dndx = None
+        self.dndy = None
+        self.dndz = None
 
         # for some reason this was never being called and errors where thrown when interps were called
         self.set_up_interps()
