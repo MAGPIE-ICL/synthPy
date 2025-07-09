@@ -111,7 +111,7 @@ class ScalarDomain:
 
         # could we jax this calculation
         self.ne = jnp.float64(n_e0 * 10 ** (self.XX / s) * (1 + jnp.cos(2 * jnp.pi * self.YY / Ly)))
-        
+
     def external_ne(self, ne):
         """
         Load externally generated grid
