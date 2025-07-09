@@ -3,6 +3,8 @@
 #PBS -l select=1:ncpus=4:mem=96gb:ngpus=1:gpu_type=RTX6000
 #PBS -j oe
 
+cd '/rds/general/user/sm5625/home/synthPy/'
+
 module load tools/prod
 module load jax/0.3.25-foss-2022a-CUDA-11.7.0
 
