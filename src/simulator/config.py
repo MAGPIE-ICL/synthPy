@@ -108,7 +108,7 @@ def jax_init():
     #jax.config.update('xla_python_client_allocator', '\"platform\"')
     # can't set via jax.config.update for some reason
 
-    jax.print_environment_info()
+    #jax.print_environment_info()
 
     # look further into what this actually means...
     print("\nDefault jax backend:", jax.default_backend())
