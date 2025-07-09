@@ -10,22 +10,29 @@ import sys
 #sys.path.insert(0, '/home/administrator/Work/UROP_ICL_Internship/synthPy/src/simulator')
 sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/simulator')     # import path/to/synthpy
 
+import config
+config.jax_init()
+
 parser = argparse.ArgumentParser()
 parser.add_argument("-d", "--domain", type=int)
 parser.add_argument("-r", "--rays", type=int)
 args = parser.parse_args()
 
-import config
-config.jax_init()
+n_cells = 512
+if args.domain is not None:
+    n_cells = args.domain
+
+Np = 1e7    # number of photons
+if args.rays is not None:
+    Np = args.rays
+
+print("\nRunning job with a", n_cells, "domain and", Np, "rays.")
+print("Predicted size of domain is:", ((n_cells / 1024)**3) * 32 / 8)
 
 # define some extent, the domain should be distributed as +extent to -extent, does not need to be cubic
 extent_x = 5e-3
 extent_y = 5e-3
 extent_z = 10e-3
-
-n_cells = 512
-if args.domain is not None:
-    n_cells = args.domain
 
 probing_extent = extent_z
 probing_direction = 'z'
@@ -43,10 +50,6 @@ domain.test_exponential_cos()
 lwl = 1064e-9 #define laser wavelength
 
 # initialise beam
-# force to interpret as 64 bit integer instead of float - should adjust code to convert it to an integer if not already
-Np = 1e7    # number of photons
-if args.rays is not None:
-    Np = args.rays
 divergence = 5e-5   # realistic divergence value
 beam_size = extent_x    # beam radius
 ne_extent = probing_extent  # so the beam knows where to initialise initial positions
@@ -65,4 +68,4 @@ tracer = p.Propagator(domain, probing_direction = probing_direction, inv_brems =
 # solve ray trace
 tracer.calc_dndr(lwl)
 tracer.solve(beam_definition.s0, jitted = True)
-print("\nCompleted ray trace in", np.round(tracer.duration, 3), "seconds.")
+print("\nCompleted ray trace in", np.round(tracer.duration, 3), "seconds.\n\n\n\n\n")
