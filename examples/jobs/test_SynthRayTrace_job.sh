@@ -25,3 +25,5 @@ echo 'starting job'
 #python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 704 -r 1000
 #python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 768 -r 1000
 python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 1024 -r 1 #&> "synth_ray_trace/test_SynthRayTrace-$(date +"%Y-%m-%d_%I:%M_%p").output"
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 1023 -r 1
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 1025 -r 1

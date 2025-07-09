@@ -466,28 +466,21 @@ class Refractometry(Diagnostic):
     def coherent_solve(self):
         ## Imaging the spatial axis - M = 2 - Coherent Implementation of the Refractometer
         r1 = distance(self.r0, 3 * self.L / 4 - self.focal_plane)
-        print("r1")
         # propagate E field
         self.propagate_E(r1, self.r0)
         r2, self.Jf = circular_aperture(self.r0, self.R, E = self.Jf)      # cut off
-        print("r2")
         r3 = sym_lens(r2, self.L/2)          # lens 1 - spherical
-        print("r3")
         self.propagate_E(r3, r2)
         r4 = distance(r3, 3*self.L/2)
-        print("r4")
         self.propagate_E(r4, r3)                 # displace rays to lens 2 - hybrid
         r5, self.Jf = circular_aperture(r4, self.R, E = self.Jf)      # cut off
-        print("r5")
         r6 = lens(r5, self.L/3, self.L/2)       # lens 2 - hybrid lens
-        print("r6")
         self.propagate_E(r6, r5)
 
         r7 = distance(r6, self.L)               # displace rays to detector
-        print("r7")
         self.propagate_E(r7, r6)
         self.rf = r7
-    
+
     def refractogram(self, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
         self.histogram_legacy(bin_scale = bin_scale, pix_x = pix_x, pix_y = pix_y, clear_mem = clear_mem)
 
