@@ -183,7 +183,7 @@ class Propagator:
 
         return pol
 
-    def solve(self, s0_import, *, return_E = False, parallelise = True, jitted = True, save_steps = 2):
+    def solve(self, s0_import, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = True):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
@@ -228,6 +228,8 @@ class Propagator:
                 # then apply sharding to rewrite s0 as a sharded array from it's original matrix
                 # and use jax.device_put to distribute it across devices:
                 Np = ((Np // self.core_count) * self.core_count)
+                assert Np > 0, "Not enough rays to parallelise over cores, increase to at least " + str(self.core_count)
+
                 s0 = jax.device_put(s0_import[:, 0:Np], NamedSharding(mesh, P(None, 'cols')))  # 'None' means don't shard axis 0
 
                 print(s0.sharding)            # See the sharding spec
@@ -308,7 +310,6 @@ class Propagator:
             # remove unnecessary static arguments to increase speed and reduce likelihood of unexpected behaviours
             sol = jax.vmap(lambda s: ODE_solve(s, args))(s0.T)
 
-            memory_debug = True
             if memory_debug:
                 jax.debug.visualize_array_sharding(sol.ys[:, -1, :])
 

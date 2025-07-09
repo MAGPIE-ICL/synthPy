@@ -41,7 +41,7 @@ class ScalarDomain:
         del lengths
         
         #likewise for dim
-        self.dim = dim
+        #self.dim = dim
         if isinstance(dim, valid_types):
             self.x_n, self.y_n, self.z_n = dim, dim, dim
             self.dim = jnp.array([dim, dim, dim])

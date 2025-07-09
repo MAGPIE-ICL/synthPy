@@ -15,4 +15,5 @@ echo 'packages loaded successfully'
 echo 'starting job'
 
 #mkdir -p /rds/general/user/sm5625/home/synth_ray_trace
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py #&> "synth_ray_trace/test_SynthRayTrace-$(date +"%Y-%m-%d_%I:%M_%p").output"
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 1024 -r 10 #&> "synth_ray_trace/test_SynthRayTrace-$(date +"%Y-%m-%d_%I:%M_%p").output"
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 1024 -r 10000000
