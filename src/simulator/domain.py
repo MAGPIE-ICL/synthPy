@@ -57,9 +57,9 @@ class ScalarDomain:
         del valid_types
 
         # define coordinate space
-        self.x = jnp.float64(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n, dtype = jnp.float64))
-        self.y = jnp.float64(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n, dtype = jnp.float64))
-        self.z = jnp.float64(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n, dtype = jnp.float64))
+        self.x = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
+        self.y = jnp.float32(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n))
+        self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
         self.XX, self.YY, self.ZZ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)#False)
 
         # Logical switches

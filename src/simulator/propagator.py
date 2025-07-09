@@ -237,16 +237,17 @@ class Propagator:
                 #jax.debug.visualize_array_sharding(s0)
             elif running_device == 'gpu':
                 gpu_devices = [d for d in self.available_devices if d.device_kind == 'gpu']
+                print("hi")
                 if gpu_devices:
-                    s0 = s0_import#jax.device_put(s0_import, gpu_devices[0])
-                    print("hi")
+                    s0 = jax.device_put(s0_import, gpu_devices[0])
+                    print("hello")
                 print("\n")
             elif running_device == 'tpu':
                 print("\n")
             else:
                 print("No suitable device detected!")
 
-            #del s0_import
+            del s0_import
 
             norm_factor = jnp.max(t)
 

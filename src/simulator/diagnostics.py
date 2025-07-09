@@ -481,7 +481,7 @@ class Refractometry(Diagnostic):
         self.propagate_E(r7, r6)
         self.rf = r7
     
-    def refactogram(self, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
+    def refractogram(self, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
         self.histogram_legacy(bin_scale = bin_scale, pix_x = pix_x, pix_y = pix_y, clear_mem = clear_mem)
 
 class Interferometry(Diagnostic):

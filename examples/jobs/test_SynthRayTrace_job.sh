@@ -15,14 +15,13 @@ echo 'packages loaded successfully'
 echo 'starting job'
 
 #mkdir -p /rds/general/user/sm5625/home/synth_ray_trace
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 512 -r 10
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 512 -r 1000
 python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 512 -r 10000000
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 768 -r 10
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 896 -r 10
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 960 -r 10
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 992 -r 10
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 1008 -r 10
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 1016 -r 10
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 1023 -r 10
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 1024 -r 10 #&> "synth_ray_trace/test_SynthRayTrace-$(date +"%Y-%m-%d_%I:%M_%p").output"
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 1024 -r 10000000
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 513 -r 1000
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 528 -r 1000
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 544 -r 1000
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 576 -r 1000
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 640 -r 1000
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 704 -r 1000
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 768 -r 1000
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 1024 -r 1 #&> "synth_ray_trace/test_SynthRayTrace-$(date +"%Y-%m-%d_%I:%M_%p").output"
