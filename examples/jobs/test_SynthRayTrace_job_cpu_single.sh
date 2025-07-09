@@ -14,4 +14,4 @@ echo 'packages loaded successfully'
 
 echo 'starting job'
 
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 2048 -r 8192
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 768 -r 8192
