@@ -1,3 +1,6 @@
+import numpy as np
+import argparse
+
 import sys
 #sys.path.insert(0, '/home/administrator/Work/UROP_ICL_Internship/synthPy/src/simulator')
 sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/simulator')     # import path/to/synthpy

@@ -324,7 +324,8 @@ class Propagator:
             sol = jax.vmap(lambda s: ODE_solve(s, args))(s0.T)
 
             if memory_debug:
-                jax.debug.visualize_array_sharding(sol.ys[:, -1, :])
+                # Visualises sharding, looks cool, but pretty useless - and a pain with higher core counts
+                #jax.debug.visualize_array_sharding(sol.ys[:, -1, :])
 
                 print("\nSize in memory of initial rays:", getsizeof(s0))
                 print("Size in memory of solution:", getsizeof(sol))

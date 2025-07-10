@@ -468,18 +468,20 @@ class Refractometry(Diagnostic):
         r1 = distance(self.r0, 3 * self.L / 4 - self.focal_plane)
         # propagate E field
         self.propagate_E(r1, self.r0)
+
         r2, self.Jf = circular_aperture(self.r0, self.R, E = self.Jf)      # cut off
-        r3 = sym_lens(r2, self.L/2)          # lens 1 - spherical
+        r3 = sym_lens(r2, self.L / 2)          # lens 1 - spherical
         self.propagate_E(r3, r2)
-        r4 = distance(r3, 3*self.L/2)
+
+        r4 = distance(r3, 3 * self.L / 2)
         self.propagate_E(r4, r3)                 # displace rays to lens 2 - hybrid
+
         r5, self.Jf = circular_aperture(r4, self.R, E = self.Jf)      # cut off
-        r6 = lens(r5, self.L/3, self.L/2)       # lens 2 - hybrid lens
+        r6 = lens(r5, self.L / 3, self.L / 2)       # lens 2 - hybrid lens
         self.propagate_E(r6, r5)
 
-        r7 = distance(r6, self.L)               # displace rays to detector
-        self.propagate_E(r7, r6)
-        self.rf = r7
+        self.rf = distance(r6, self.L)               # displace rays to detector
+        self.propagate_E(self.rf, r6)
 
     def refractogram(self, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
         self.histogram_legacy(bin_scale = bin_scale, pix_x = pix_x, pix_y = pix_y, clear_mem = clear_mem)
@@ -505,9 +507,9 @@ class Interferometry(Diagnostic):
         if deg >= 45:
             deg = - jnp.abs(deg - 90)
 
-        rad = deg* jnp.pi /180 #deg to rad
+        rad = deg * jnp.pi /180 #deg to rad
         y_weight = jnp.arctan(rad) #take x_weight is 1
-        x_weight = jnp.sqrt(1-y_weight**2)
+        x_weight = jnp.sqrt(1 - y_weight**2)
 
         ref_beam = jnp.exp(2 * n_fringes / 3 * 1.0j * (x_weight * self.rf[0,:] + y_weight * self.rf[2,:]))
 
@@ -526,13 +528,13 @@ class Interferometry(Diagnostic):
         # propagate E field
         self.propagate_E(r1, rr0)
         r2, self.Jf = circular_aperture(r1, self.R, E = self.Jf)    # cut off
-        r3 = sym_lens(r2, self.L/2)           # lens 1
+        r3 = sym_lens(r2, self.L / 2)           # lens 1
         self.propagate_E(r3, r2)
 
-        r4 = distance(r3, self.L*2)           # displace rays to lens 2.
+        r4 = distance(r3, self.L * 2)           # displace rays to lens 2.
         self.propagate_E(r4, r3)
         r5, self.Jf = circular_aperture(r4, self.R, E = self.Jf)    # cut off
-        r6 = sym_lens(r5, self.L/2)                             # lens 2
+        r6 = sym_lens(r5, self.L / 2)                             # lens 2
         self.propagate_E(r6, r5)
         
         r7 = distance(r6, self.L)             # displace rays to detector
