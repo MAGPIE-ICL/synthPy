@@ -4,6 +4,7 @@ import os
 import sys
 import jax
 import jax.numpy as jnp
+import gc
 
 from scipy.integrate import odeint, solve_ivp
 from time import time
@@ -127,9 +128,38 @@ class Propagator:
 
         #More compact notation is possible here, but we are explicit
         # can we find a way to reduce ram allocation
-        grad = grad.at[0, :].set(RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.x, axis = 2), bounds_error = False, fill_value = 0.0)(r.T))
-        grad = grad.at[1, :].set(RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.y, axis = 2), bounds_error = False, fill_value = 0.0)(r.T))
-        grad = grad.at[2, :].set(RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.z, axis = 2), bounds_error = False, fill_value = 0.0)(r.T))
+        self.dndx = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.x, axis = 0)
+        self.dndx_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndx, bounds_error = False, fill_value = 0.0)
+        del self.dndx
+
+        print(gc.collect())
+
+        grad = grad.at[0, :].set(self.dndx_interp(r.T))
+        del self.dndx_interp
+
+        print(gc.collect())
+
+        self.dndy = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.y, axis = 1)
+        self.dndy_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndy, bounds_error = False, fill_value = 0.0)
+        del self.dndy
+
+        print(gc.collect())
+
+        grad = grad.at[1, :].set(self.dndy_interp(r.T))
+        del self.dndy_interp
+
+        print(gc.collect())
+
+        self.dndz = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.z, axis = 2)
+        self.dndz_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndz, bounds_error = False, fill_value = 0.0)
+        del self.dndz
+
+        print(gc.collect())
+
+        grad = grad.at[2, :].set(self.dndz_interp(r.T))
+        del self.dndz_interp
+
+        print(gc.collect())
 
         return grad
 
