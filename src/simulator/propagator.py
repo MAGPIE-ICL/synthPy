@@ -343,9 +343,20 @@ class Propagator:
 
             path = rel_path_to_folder + folder_name
 
-            if not os.path.isdir(os.getcwd() + "/" + path):
-                os.mkdir(folder_name)
+            if os.path.isdir(os.getcwd() + "/" + folder_name):
                 path = folder_name
+            elif not os.path.isdir(os.getcwd() + "/" + path):
+                import errno
+
+                try:
+                    os.mkdir(path)
+                except OSError as e:
+                    if e.errno != errno.EEXIST:
+                        raise
+
+                path = folder_name
+            else:
+                os.mkdir(folder_name)
 
             path += "memory-domain" + str(self.ScalarDomain.dim[0]) + "_rays"+ str(s0.shape[1]) + "-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
             jax.profiler.save_device_memory_profile(path)
