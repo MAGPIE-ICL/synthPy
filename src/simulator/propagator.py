@@ -131,8 +131,8 @@ class Propagator:
         self.dndx_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndx, bounds_error = False, fill_value = 0.0)
         self.dndx = None
 
-        grad = grad.at[0, :].set(self.dndx_interp(r.T))
-        self.dndx_interp = None
+        grad = grad.at[0, :].set(self.dndy_interp(r.T))
+        self.dndy_interp = None
 
         self.dndy = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.y, axis = 1)
         self.dndy_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndy, bounds_error = False, fill_value = 0.0)
@@ -427,9 +427,9 @@ class Propagator:
         Can also use after calling solve to clear ray positions - important when running large number of rays
         """
 
-        self.dndx = None
-        self.dndy = None
-        self.dndz = None
+        #self.dndx = None
+        #self.dndy = None
+        #self.dndz = None
         self.ScalarDomain.ne = None
         self.ne_nc = None
         #self.s0 = None
