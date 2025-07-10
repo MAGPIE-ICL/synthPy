@@ -189,7 +189,7 @@ class Propagator:
 
         return pol
 
-    def solve(self, s0_import, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = True):
+    def solve(self, s0_import, *, return_E = False, parallelise = True, jitted = True, save_steps = 2):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
@@ -327,33 +327,34 @@ class Propagator:
         finish = time()
         self.duration = finish - start
 
-            if memory_debug:
-                # Visualises sharding, looks cool, but pretty useless - and a pain with higher core counts
-                #jax.debug.visualize_array_sharding(sol.ys[:, -1, :])
+        memory_debug = True
+        if memory_debug and parallelise:
+            # Visualises sharding, looks cool, but pretty useless - and a pain with higher core counts
+            #jax.debug.visualize_array_sharding(sol.ys[:, -1, :])
 
-                print("\nSize in memory of initial rays:", getsizeof(s0))
-                print("Size in memory of solution:", getsizeof(sol))
-                print("Size in memory of propagator class:", getsizeof(sol))
+            print("\nSize in memory of initial rays:", getsizeof(s0))
+            print("Size in memory of solution:", getsizeof(sol))
+            print("Size in memory of propagator class:", getsizeof(sol))
 
-                folder_name = "memory_benchmarks/"
-                rel_path_to_folder = "../../evaluation/"
+            folder_name = "memory_benchmarks/"
+            rel_path_to_folder = "../../evaluation/"
 
-                path = rel_path_to_folder + folder_name
+            path = rel_path_to_folder + folder_name
 
-                if not os.path.isdir(os.getcwd() + "/" + path):
-                    os.mkdir(folder_name)
-                    path = folder_name
+            if not os.path.isdir(os.getcwd() + "/" + path):
+                os.mkdir(folder_name)
+                path = folder_name
 
-                path += "memory-domain" + str(self.ScalarDomain.dim[0]) + "_rays"+ str(s0.shape[1]) + "-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
-                jax.profiler.save_device_memory_profile(path)
+            path += "memory-domain" + str(self.ScalarDomain.dim[0]) + "_rays"+ str(s0.shape[1]) + "-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
+            jax.profiler.save_device_memory_profile(path)
 
-                print("\n", end = '')
-                if os.path.isdir("~/go/bin/pprof"):
-                    #os_system(f"~/go/bin/pprof -top {sys.executable} memory_{N}.prof")
-                    os_system(f"~/go/bin/pprof -top /bin/ls " + path)
-                    #os_system(f"~/go/bin/pprof --web " + path)
-                else:
-                    print("No pprof install detected. Please download (using go) to visualise memory usage.")
+            print("\n", end = '')
+            if os.path.isdir("~/go/bin/pprof"):
+                #os_system(f"~/go/bin/pprof -top {sys.executable} memory_{N}.prof")
+                os_system(f"~/go/bin/pprof -top /bin/ls " + path)
+                #os_system(f"~/go/bin/pprof --web " + path)
+            else:
+                print("No pprof install detected. Please download (using go) to visualise memory usage.")
 
         if not parallelise:
             self.rf = sol.y[:,-1].reshape(9, Np)
