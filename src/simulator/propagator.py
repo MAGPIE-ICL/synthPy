@@ -70,6 +70,10 @@ class Propagator:
         # for some reason this was never being called and errors where thrown when interps were called
         self.set_up_interps()
 
+        self.x = None
+        self.y = None
+        self.z = None
+
     def omega_pe(self, ne):
         """Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28"""
 
