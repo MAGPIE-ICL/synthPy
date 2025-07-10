@@ -132,34 +132,22 @@ class Propagator:
         self.dndx_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndx, bounds_error = False, fill_value = 0.0)
         del self.dndx
 
-        print(gc.collect())
-
         grad = grad.at[0, :].set(self.dndx_interp(r.T))
         del self.dndx_interp
-
-        print(gc.collect())
 
         self.dndy = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.y, axis = 1)
         self.dndy_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndy, bounds_error = False, fill_value = 0.0)
         del self.dndy
 
-        print(gc.collect())
-
         grad = grad.at[1, :].set(self.dndy_interp(r.T))
         del self.dndy_interp
-
-        print(gc.collect())
 
         self.dndz = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.z, axis = 2)
         self.dndz_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndz, bounds_error = False, fill_value = 0.0)
         del self.dndz
 
-        print(gc.collect())
-
         grad = grad.at[2, :].set(self.dndz_interp(r.T))
         del self.dndz_interp
-
-        print(gc.collect())
 
         return grad
 
