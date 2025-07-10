@@ -394,6 +394,7 @@ class Schlieren(Diagnostic):
 
         r9=distance(r8, self.L) #displace rays to detector
         self.rf = r9
+        print(self.rf)
     
     """
     Example light field schlieren diagnostic. Inherits from Rays, has custom solve method.

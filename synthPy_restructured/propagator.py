@@ -27,8 +27,14 @@ class Propagator:
         self.ScalarDomain = ScalarDomain
         self.Beam = Beam
         self.inv_brems = inv_brems
-        self.phaseshift = phaseshift
         self.x_ray = x_ray
+        self.phaseshift = phaseshift
+
+        #Opacity takes into account inverse bremstrahlung. Therefore, if both x_ray and inv_brems are True,
+        # then x_ray should remain True and inv_brems should be set to False. 
+        if self.x_ray:
+            self.inv_brems = False
+        
 
         # finish initialising the beam position using the scalardomain edge position
 
@@ -125,11 +131,14 @@ class Propagator:
         #Opacity, Temperature, and Mass Density
         if(self.x_ray):
             grp_centres, grps, rho, Te, opa_data = open_emi_files("../../opa_multi_planck_CH_LTE_210506_Hydra_ColdOpa.spk")
-            opa_data_capped=np.minimum(100, opa_data)
+            opa_max=self.ScalarDomain.x_n/(self.ScalarDomain.x_length)
+            print(opa_max)
+            opa_data_capped=np.minimum(opa_max, opa_data)
             self.opacity_interp = RegularGridInterpolator((grp_centres, rho, Te), opa_data_capped, bounds_error = False, fill_value = 0.0)
             self.Te_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.Te, bounds_error = False, fill_value = 0.0)
             self.rho_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.rho, bounds_error = False, fill_value = 0.0)
-        
+            opacity_grid = self.opacity_interp((self.energy, self.ScalarDomain.rho, self.ScalarDomain.Te))
+            self.opacity_spatial_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), opacity_grid, bounds_error = False, fill_value = 0.)
         # Phase shift
         if(self.phaseshift):
             self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
@@ -158,12 +167,13 @@ class Propagator:
             return self.kappa_interp(x.T)
         else:
             return 0.0
+    
 
     def atten_x_ray(self, x):
         if(self.x_ray):
-            rho = self.rho_interp(x.T)
-            Te = self.Te_interp(x.T)
-            opacity = self.opacity_interp((self.energy, rho, Te))
+            # rho = self.rho_interp(x.T)
+            # Te = self.Te_interp(x.T)
+            opacity = self.opacity_spatial_interp(x.T)
             return -1*opacity*c
         else:
             return 0.0
@@ -224,18 +234,18 @@ class Propagator:
             sol = solve_ivp(dsdt_ODE, [0, t[-1]], s0, t_eval = t)
             print(sol)
         else:
-            norm_factor = np.max(t)
+            norm_factor = t[-1]
             # wrapper for same reason, diffrax.ODETerm instantiaties this and passes args (this will contain self)
             def dsdt_ODE(t, y, args):
                 return dsdt(t, y, args[0], args[1]) * norm_factor
 
-            def diffrax_solve(dydt, t0, t1, Nt, rtol=1, atol=1e-3):
+            def diffrax_solve(dydt, t0, t1, Nt, rtol=1e-3, atol=1e-3):
                 """
                 Here we wrap the diffrax diffeqsolve function such that we can easily parallelise it
                 """
 
                 # We convert our python function to a diffrax ODETerm
-                term = diffrax.ODETerm(dsdt_ODE)
+                term = diffrax.ODETerm(dydt)
                 # We chose a solver (time-stepping) method from within diffrax library
                 solver = diffrax.Tsit5() # (RK45 - closest I could find to solve_ivp's default method)
 
@@ -252,13 +262,14 @@ class Propagator:
                     args = args,
                     t0 = t0,
                     t1 = t1,
-                    dt0 = (t1 - t0) * norm_factor ** 2 / Nt,
+                    #dt0 = (t1 - t0) * norm_factor**2 / Nt,
+                    dt0 = None,
                     saveat = saveat,
                     stepsize_controller = stepsize_controller,
                     max_steps = (self.ScalarDomain.x_n ** 3) * 100
                 )
 
-            ODE_solve = diffrax_solve(dsdt_ODE, t[0], t[-1] / norm_factor, len(t))
+            ODE_solve = diffrax_solve(dsdt_ODE, 0, 1, len(t))
 
             if jitted:
                 start_comp = time()
@@ -302,7 +313,7 @@ class Propagator:
             '''
 
             #if sol.result == RESULTS.successful:
-            self.Beam.rf = sol.ys[:, -1, :].reshape(9, Np)
+            self.Beam.rf = sol.ys[:, -1, :].T
 
             print("\nParallelised output has resulting 3D matrix of form: [batch_count, 2, 9]:", sol.ys.shape)
             print("\t2 to account the start and end results")
@@ -313,7 +324,7 @@ class Propagator:
 
         self.Beam.rf, self.Beam.Jf = ray_to_Jonesvector(self.Beam.rf, self.extent, probing_direction = self.Beam.probing_direction)
         #print("\n", self.Beam.rf)
-        self.Beam.rf = 1e3*self.Beam.rf
+        #self.Beam.rf = 1e3*self.Beam.rf
         if return_E:
             return self.Beam.rf, self.Beam.Jf
         else:
@@ -408,8 +419,9 @@ def dsdt(t, s, Propagator, parallelise):
     #Te = Propagator.Te_interp(x.T)
     #opacity = Propagator.opacity_interp((energy_eV_array, rho, Te))
     #speed = jnp.sqrt(jnp.sum(v*v, axis=0))
-    #print (p)
+    #print (a)
     sprime = sprime.at[6, :].set((Propagator.atten(x) + Propagator.atten_x_ray(x))*a) #add inverse bremsstrahlung and opacity
+    #sprime = sprime.at[6, :].set(Propagator.atten(x) * a)
     sprime = sprime.at[7, :].set(Propagator.phase(x))
     sprime = sprime.at[8, :].set(Propagator.neB(x, v))
 
