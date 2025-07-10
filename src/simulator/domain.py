@@ -55,7 +55,7 @@ class ScalarDomain:
         del dim
         del valid_types
 
-        print("Predicted size in memory of domain:", self.ScalarDomain.dim[0] * self.ScalarDomain.dim[1] * self.ScalarDomain.dim[2] * 4 / 1024 ** 2, "MB")
+        print("Predicted size in memory of domain:", self..dim[0] * self..dim[1] * self..dim[2] * 4 / 1024 ** 2, "MB")
 
         # define coordinate space
         self.x = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
