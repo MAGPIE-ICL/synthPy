@@ -51,28 +51,8 @@ class Propagator:
 
         self.ne_nc = jnp.array(self.ScalarDomain.ne / nc, dtype = jnp.float32) #normalise to critical density
 
-        #More compact notation is possible here, but we are explicit
-        # can we find a way to reduce ram allocation
-        self.dndx = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.XX[:, 0, 0], axis = 0)
-        self.dndy = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.YY[0, :, 0], axis = 1)
-        self.dndz = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.ZZ[0, 0, :], axis = 2)
-
-        self.ne_nc = None
-
-        self.dndx_interp = RegularGridInterpolator((self.ScalarDomain.XX[:, 0, 0], self.ScalarDomain.YY[0, :, 0], self.ScalarDomain.ZZ[0, 0, :]), self.dndx, bounds_error = False, fill_value = 0.0)
-        self.dndy_interp = RegularGridInterpolator((self.ScalarDomain.XX[:, 0, 0], self.ScalarDomain.YY[0, :, 0], self.ScalarDomain.ZZ[0, 0, :]), self.dndy, bounds_error = False, fill_value = 0.0)
-        self.dndz_interp = RegularGridInterpolator((self.ScalarDomain.XX[:, 0, 0], self.ScalarDomain.YY[0, :, 0], self.ScalarDomain.ZZ[0, 0, :]), self.dndz, bounds_error = False, fill_value = 0.0)
-
-        self.dndx = None
-        self.dndy = None
-        self.dndz = None
-
         # for some reason this was never being called and errors where thrown when interps were called
         self.set_up_interps()
-
-        self.x = None
-        self.y = None
-        self.z = None
 
     def omega_pe(self, ne):
         """Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28"""
@@ -116,21 +96,21 @@ class Propagator:
 
     def set_up_interps(self):
         # Electron density
-        self.ne_interp = RegularGridInterpolator((self.ScalarDomain.XX[:, 0, 0], self.ScalarDomain.YY[0, :, 0], self.ScalarDomain.ZZ[0, 0, :]), self.ScalarDomain.ne, bounds_error = False, fill_value = 0.0)
+        self.ne_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.ne, bounds_error = False, fill_value = 0.0)
 
         # Magnetic field
         if(self.ScalarDomain.B_on):
-            self.Bx_interp = RegularGridInterpolator((self.ScalarDomain.XX[:, 0, 0], self.ScalarDomain.YY[0, :, 0], self.ScalarDomain.ZZ[0, 0, :]), self.ScalarDomain.B[:,:,:,0], bounds_error = False, fill_value = 0.0)
-            self.By_interp = RegularGridInterpolator((self.ScalarDomain.XX[:, 0, 0], self.ScalarDomain.YY[0, :, 0], self.ScalarDomain.ZZ[0, 0, :]), self.ScalarDomain.B[:,:,:,1], bounds_error = False, fill_value = 0.0)
-            self.Bz_interp = RegularGridInterpolator((self.ScalarDomain.XX[:, 0, 0], self.ScalarDomain.YY[0, :, 0], self.ScalarDomain.ZZ[0, 0, :]), self.ScalarDomain.B[:,:,:,2], bounds_error = False, fill_value = 0.0)
+            self.Bx_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.B[:,:,:,0], bounds_error = False, fill_value = 0.0)
+            self.By_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.B[:,:,:,1], bounds_error = False, fill_value = 0.0)
+            self.Bz_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.B[:,:,:,2], bounds_error = False, fill_value = 0.0)
 
         # Inverse Bremsstrahlung
         if(self.inv_brems):
-            self.kappa_interp = RegularGridInterpolator((self.ScalarDomain.XX[:, 0, 0], self.ScalarDomain.YY[0, :, 0], self.ScalarDomain.ZZ[0, 0, :]), self.kappa(), bounds_error = False, fill_value = 0.0)
+            self.kappa_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.kappa(), bounds_error = False, fill_value = 0.0)
 
         # Phase shift
         if(self.phaseshift):
-            self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.XX[:, 0, 0], self.ScalarDomain.YY[0, :, 0], self.ScalarDomain.ZZ[0, 0, :]), self.n_refrac(), bounds_error = False, fill_value = 1.0)
+            self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
 
     def dndr(self, r):
         """
@@ -145,9 +125,28 @@ class Propagator:
 
         grad = jnp.zeros_like(r)
 
+        #More compact notation is possible here, but we are explicit
+        # can we find a way to reduce ram allocation
+        self.dndx = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.x, axis = 0)
+        self.dndx_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndx, bounds_error = False, fill_value = 0.0)
+        self.dndx = None
+
         grad = grad.at[0, :].set(self.dndx_interp(r.T))
+        self.dndx_interp = None
+
+        self.dndy = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.y, axis = 1)
+        self.dndy_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndy, bounds_error = False, fill_value = 0.0)
+        self.dndy = None
+
         grad = grad.at[1, :].set(self.dndy_interp(r.T))
+        self.dndy_interp = None
+
+        self.dndz = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.z, axis = 2)
+        self.dndz_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndz, bounds_error = False, fill_value = 0.0)
+        self.dndz = None
+
         grad = grad.at[2, :].set(self.dndz_interp(r.T))
+        self.dndz_interp = None
 
         return grad
 
@@ -161,7 +160,7 @@ class Propagator:
     # Phase shift introduced by refractive index
     def phase(self, x):
         if(self.phaseshift):
-            #self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.XX[:, 0, 0], self.ScalarDomain.YY[0, :, 0], self.ScalarDomain.ZZ[0, 0, :]), self.n_refrac(), bounds_error = False, fill_value = 1.0)
+            #self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
             return self.omega * (self.refractive_index_interp(x.T) - 1.0)
         else:
             return 0.0
@@ -352,7 +351,7 @@ class Propagator:
             jax.profiler.save_device_memory_profile(path)
 
             print("\n", end = '')
-            if os.path.isdir("~/go/bin/pprof"):
+            if os.path.isfile("~/go/bin/pprof"):
                 #os_system(f"~/go/bin/pprof -top {sys.executable} memory_{N}.prof")
                 os_system(f"~/go/bin/pprof -top /bin/ls " + path)
                 #os_system(f"~/go/bin/pprof --web " + path)
