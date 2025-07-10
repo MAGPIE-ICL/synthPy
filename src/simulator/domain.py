@@ -53,14 +53,19 @@ class ScalarDomain:
             self.dim = jnp.array(dim)
 
         del dim
-
         del valid_types
+
+        print("Predicted size in memory of domain:", self.ScalarDomain.dim[0] * self.ScalarDomain.dim[1] * self.ScalarDomain.dim[2] * 4 / 1024 ** 2, "MB")
 
         # define coordinate space
         self.x = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
         self.y = jnp.float32(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n))
         self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
-        self.XX, self.YY, self.ZZ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)#False)
+        self.XX, self.YY, self.ZZ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)#False) - has to be true for jnp, but also helpful as allows us to delete intialising arrays safely
+
+        self.x = None
+        self.y = None
+        self.z = None
 
         # Logical switches
         self.B_on = B_on

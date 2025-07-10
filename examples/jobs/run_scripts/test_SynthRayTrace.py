@@ -27,7 +27,7 @@ if args.rays is not None:
     Np = args.rays
 
 print("\nRunning job with a", n_cells, "domain and", Np, "rays.")
-print("Predicted size of domain is:", ((n_cells / 1024)**3) * 32 / 8)
+#print("Predicted size of domain is:", ((n_cells / 1024)**3) * 32 / 8)
 
 # define some extent, the domain should be distributed as +extent to -extent, does not need to be cubic
 extent_x = 5e-3

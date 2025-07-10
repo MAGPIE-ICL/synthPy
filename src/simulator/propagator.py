@@ -198,7 +198,6 @@ class Propagator:
 
         # make a wrapper function for getsizeof in utilities that outputs more meaningful information
         print("\nSize in memory of initial rays:", getsizeof(s0_import))
-        print("Predicted size in memory of domain:", self.ScalarDomain.dim[0] * self.ScalarDomain.dim[1] * self.ScalarDomain.dim[2] * 4 / 1024 ** 2, "MB")
 
         # 8.0^0.5 is an arbritrary factor to ensure rays have enough time to escape the box
         # think we should change this???
