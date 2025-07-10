@@ -213,7 +213,7 @@ class Propagator:
 
         return pol
 
-    def solve(self, return_E = False, parallelise = True, jitted = True):
+    def solve(self, return_E = False, parallelise = True, jitted = True, Nt = 2):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
@@ -221,7 +221,8 @@ class Propagator:
         s0 = self.Beam.s0
 
         # 8.0^0.5 is an arbritrary factor to ensure rays have enough time to escape the box
-        t = np.linspace(0.0, np.sqrt(8.0) * self.extent / c, 2)
+        t = np.linspace(0.0, np.sqrt(8.0) * self.extent / c, Nt)
+        self.t = t
 
         start = time()
 
@@ -232,6 +233,7 @@ class Propagator:
             # wrapper allows dummy variables t & y to be used by solve_ivp(), self is required by dsdt
             dsdt_ODE = lambda t, y: dsdt(t, y, self, parallelise)
             sol = solve_ivp(dsdt_ODE, [0, t[-1]], s0, t_eval = t)
+            #print(sol.shape)
             print(sol)
         else:
             norm_factor = t[-1]
@@ -239,7 +241,7 @@ class Propagator:
             def dsdt_ODE(t, y, args):
                 return dsdt(t, y, args[0], args[1]) * norm_factor
 
-            def diffrax_solve(dydt, t0, t1, Nt, rtol=1e-3, atol=1e-3):
+            def diffrax_solve(dydt, t0, t1, Nt, rtol=1e-3, atol=1e-9):
                 """
                 Here we wrap the diffrax diffeqsolve function such that we can easily parallelise it
                 """
@@ -269,7 +271,7 @@ class Propagator:
                     max_steps = (self.ScalarDomain.x_n ** 3) * 100
                 )
 
-            ODE_solve = diffrax_solve(dsdt_ODE, 0, 1, len(t))
+            ODE_solve = diffrax_solve(dsdt_ODE, 0, 1, Nt)
 
             if jitted:
                 start_comp = time()
@@ -314,6 +316,8 @@ class Propagator:
 
             #if sol.result == RESULTS.successful:
             self.Beam.rf = sol.ys[:, -1, :].T
+            self.Beam.positions = sol.ys[:, :, :3]
+            self.Beam.amplitudes = sol.ys[:,:,6]
 
             print("\nParallelised output has resulting 3D matrix of form: [batch_count, 2, 9]:", sol.ys.shape)
             print("\t2 to account the start and end results")
@@ -413,15 +417,10 @@ def dsdt(t, s, Propagator, parallelise):
   
     sprime = sprime.at[3:6, :].set(Propagator.dndr(x))
     sprime = sprime.at[:3, :].set(v)
-    # energy_eV = 6.63e-34*c/(Propagator.Beam.wavelength*1.6e-19)
-    # energy_eV_array = jnp.full((np.size(x, axis=1)), energy_eV)
-    #rho = Propagator.rho_interp(x.T)
-    #Te = Propagator.Te_interp(x.T)
-    #opacity = Propagator.opacity_interp((energy_eV_array, rho, Te))
     #speed = jnp.sqrt(jnp.sum(v*v, axis=0))
     #print (a)
+    #print(-Propagator.atten_x_ray(x)/c)
     sprime = sprime.at[6, :].set((Propagator.atten(x) + Propagator.atten_x_ray(x))*a) #add inverse bremsstrahlung and opacity
-    #sprime = sprime.at[6, :].set(Propagator.atten(x) * a)
     sprime = sprime.at[7, :].set(Propagator.phase(x))
     sprime = sprime.at[8, :].set(Propagator.neB(x, v))
 
