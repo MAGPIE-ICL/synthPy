@@ -53,15 +53,15 @@ class Propagator:
 
         #More compact notation is possible here, but we are explicit
         # can we find a way to reduce ram allocation
-        self.dndx = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.x, axis = 0)
-        self.dndy = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.y, axis = 1)
-        self.dndz = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.z, axis = 2)
+        self.dndx = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.XX[:, 0, 0], axis = 0)
+        self.dndy = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.YY[0, :, 0], axis = 1)
+        self.dndz = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.ZZ[0, 0, :], axis = 2)
 
         self.ne_nc = None
 
-        self.dndx_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndx, bounds_error = False, fill_value = 0.0)
-        self.dndy_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndy, bounds_error = False, fill_value = 0.0)
-        self.dndz_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndz, bounds_error = False, fill_value = 0.0)
+        self.dndx_interp = RegularGridInterpolator((self.ScalarDomain.XX[:, 0, 0], self.ScalarDomain.YY[0, :, 0], self.ScalarDomain.ZZ[0, 0, :]), self.dndx, bounds_error = False, fill_value = 0.0)
+        self.dndy_interp = RegularGridInterpolator((self.ScalarDomain.XX[:, 0, 0], self.ScalarDomain.YY[0, :, 0], self.ScalarDomain.ZZ[0, 0, :]), self.dndy, bounds_error = False, fill_value = 0.0)
+        self.dndz_interp = RegularGridInterpolator((self.ScalarDomain.XX[:, 0, 0], self.ScalarDomain.YY[0, :, 0], self.ScalarDomain.ZZ[0, 0, :]), self.dndz, bounds_error = False, fill_value = 0.0)
 
         self.dndx = None
         self.dndy = None
@@ -116,21 +116,21 @@ class Propagator:
 
     def set_up_interps(self):
         # Electron density
-        self.ne_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.ne, bounds_error = False, fill_value = 0.0)
+        self.ne_interp = RegularGridInterpolator((self.ScalarDomain.XX[:, 0, 0], self.ScalarDomain.YY[0, :, 0], self.ScalarDomain.ZZ[0, 0, :]), self.ScalarDomain.ne, bounds_error = False, fill_value = 0.0)
 
         # Magnetic field
         if(self.ScalarDomain.B_on):
-            self.Bx_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.B[:,:,:,0], bounds_error = False, fill_value = 0.0)
-            self.By_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.B[:,:,:,1], bounds_error = False, fill_value = 0.0)
-            self.Bz_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.B[:,:,:,2], bounds_error = False, fill_value = 0.0)
+            self.Bx_interp = RegularGridInterpolator((self.ScalarDomain.XX[:, 0, 0], self.ScalarDomain.YY[0, :, 0], self.ScalarDomain.ZZ[0, 0, :]), self.ScalarDomain.B[:,:,:,0], bounds_error = False, fill_value = 0.0)
+            self.By_interp = RegularGridInterpolator((self.ScalarDomain.XX[:, 0, 0], self.ScalarDomain.YY[0, :, 0], self.ScalarDomain.ZZ[0, 0, :]), self.ScalarDomain.B[:,:,:,1], bounds_error = False, fill_value = 0.0)
+            self.Bz_interp = RegularGridInterpolator((self.ScalarDomain.XX[:, 0, 0], self.ScalarDomain.YY[0, :, 0], self.ScalarDomain.ZZ[0, 0, :]), self.ScalarDomain.B[:,:,:,2], bounds_error = False, fill_value = 0.0)
 
         # Inverse Bremsstrahlung
         if(self.inv_brems):
-            self.kappa_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.kappa(), bounds_error = False, fill_value = 0.0)
+            self.kappa_interp = RegularGridInterpolator((self.ScalarDomain.XX[:, 0, 0], self.ScalarDomain.YY[0, :, 0], self.ScalarDomain.ZZ[0, 0, :]), self.kappa(), bounds_error = False, fill_value = 0.0)
 
         # Phase shift
         if(self.phaseshift):
-            self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
+            self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.XX[:, 0, 0], self.ScalarDomain.YY[0, :, 0], self.ScalarDomain.ZZ[0, 0, :]), self.n_refrac(), bounds_error = False, fill_value = 1.0)
 
     def dndr(self, r):
         """
@@ -161,7 +161,7 @@ class Propagator:
     # Phase shift introduced by refractive index
     def phase(self, x):
         if(self.phaseshift):
-            #self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
+            #self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.XX[:, 0, 0], self.ScalarDomain.YY[0, :, 0], self.ScalarDomain.ZZ[0, 0, :]), self.n_refrac(), bounds_error = False, fill_value = 1.0)
             return self.omega * (self.refractive_index_interp(x.T) - 1.0)
         else:
             return 0.0
