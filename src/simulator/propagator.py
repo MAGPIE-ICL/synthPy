@@ -236,10 +236,10 @@ class Propagator:
                 # Specify sharding: don't split axis 0 (rows), split axis 1 (columns) across devices
                 # then apply sharding to rewrite s0 as a sharded array from it's original matrix
                 # and use jax.device_put to distribute it across devices:
-                #Np = ((Np // self.core_count) * self.core_count)
-                #assert Np > 0, "Not enough rays to parallelise over cores, increase to at least " + str(self.core_count)
+                Np = ((Np // self.core_count) * self.core_count)
+                assert Np > 0, "Not enough rays to parallelise over cores, increase to at least " + str(self.core_count)
 
-                s0 = jax.device_put(s0_import[:, 0:((Np // self.core_count) * self.core_count)], NamedSharding(mesh, P(None, 'cols')))  # 'None' means don't shard axis 0
+                s0 = jax.device_put(s0_import[:, 0:Np], NamedSharding(mesh, P(None, 'cols')))  # 'None' means don't shard axis 0
 
                 print(s0.sharding)            # See the sharding spec
                 #print(s0.addressable_shards)  # Check each device's shard
@@ -263,6 +263,9 @@ class Propagator:
                 print("No suitable device detected!")
 
             del s0_import
+            # optional for aggressive cleanup?
+            jax.clear_caches()
+            gc.collect()
 
             norm_factor = jnp.max(t)
 
