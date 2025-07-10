@@ -204,13 +204,13 @@ class Propagator:
         # think we should change this???
         t = jnp.linspace(0.0, jnp.sqrt(8.0) * self.extent / c, 2)
 
-        start = time()
-
         if not parallelise:
             s0 = s0_import.flatten() #odeint insists
 
             # wrapper allows dummy variables t & y to be used by solve_ivp(), self is required by dsdt
             dsdt_ODE = lambda t, y: dsdt(t, y, self)
+
+            start = time()
             sol = solve_ivp(dsdt_ODE, [0, t[-1]], s0, t_eval = t)
         else:
             self.available_devices = jax.devices()
@@ -321,7 +321,11 @@ class Propagator:
             # pass s0[:, i] for each ray via a jax.vmap for parallelisation
             # transposed as jax.vmap() expects form of [batch_idx, items] not [items, batch_idx]
             # remove unnecessary static arguments to increase speed and reduce likelihood of unexpected behaviours
+            start = time()
             sol = jax.vmap(lambda s: ODE_solve(s, args))(s0.T)
+
+        finish = time()
+        self.duration = finish - start
 
             if memory_debug:
                 # Visualises sharding, looks cool, but pretty useless - and a pain with higher core counts
@@ -344,12 +348,12 @@ class Propagator:
                 jax.profiler.save_device_memory_profile(path)
 
                 print("\n", end = '')
-                #os_system(f"~/go/bin/pprof -top {sys.executable} memory_{N}.prof")
-                os_system(f"~/go/bin/pprof -top /bin/ls " + path)
-                #os_system(f"~/go/bin/pprof --web " + path)
-
-        finish = time()
-        self.duration = finish - start
+                if os.path.isdir("~/go/bin/pprof"):
+                    #os_system(f"~/go/bin/pprof -top {sys.executable} memory_{N}.prof")
+                    os_system(f"~/go/bin/pprof -top /bin/ls " + path)
+                    #os_system(f"~/go/bin/pprof --web " + path)
+                else:
+                    print("No pprof install detected. Please download (using go) to visualise memory usage.")
 
         if not parallelise:
             self.rf = sol.y[:,-1].reshape(9, Np)
