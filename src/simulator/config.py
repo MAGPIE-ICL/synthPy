@@ -84,7 +84,7 @@ def jax_init():
     assert "jax" not in sys.modules, "jax already imported: you must restart your runtime - DO NOT RUN THIS FUNCTION TWICE"
     # bring up issue to see if it can be made a on the run configurable variable
     #jax.config.update('xla_force_host_platform_device_count', self.core_count)
-    os.environ['XLA_FLAGS'] = "--xla_force_host_platform_device_count=" + str(cpu_count())
+    #os.environ['XLA_FLAGS'] = "--xla_force_host_platform_device_count=" + str(cpu_count())
     #os.environ['JAX_ENABLE_X64'] = "True"
     #os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
     #os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
