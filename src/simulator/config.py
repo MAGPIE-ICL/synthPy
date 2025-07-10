@@ -89,13 +89,6 @@ def jax_init():
     #os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
     #os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
 
-    '''
-    from importlib import import_module
-
-    global jax
-    jax = import_module('jax')
-    '''
-
     import jax
 
     # defaults float data types to 64-bit instead of 32 for greater precision
@@ -105,6 +98,7 @@ def jax_init():
     #jax.config.update('jax_captured_constants_warn_bytes', 128 * 1024 ** 2)
     jax.config.update('jax_traceback_filtering', 'off')
     # https://docs.jax.dev/en/latest/gpu_memory_allocation.html
+    #jax.config.update('xla_python_client_preallocate', False)
     #jax.config.update('xla_python_client_allocator', '\"platform\"')
     # can't set via jax.config.update for some reason
 
@@ -115,14 +109,3 @@ def jax_init():
 
     available_devices = jax.devices()
     print(f"Available devices: {available_devices}")
-
-    '''
-    global jnp
-    jnp = import_module('jax.numpy')
-
-    global RegularGridInterpolator
-    RegularGridInterpolator = getattr(import_module('jax.scipy.interpolate'), 'RegularGridInterpolator')
-    #del module
-    '''
-
-    #return jax

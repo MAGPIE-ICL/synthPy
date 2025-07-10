@@ -127,20 +127,9 @@ class Propagator:
 
         #More compact notation is possible here, but we are explicit
         # can we find a way to reduce ram allocation
-        self.dndr = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.x, axis = 0)
-        self.dndr_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndr, bounds_error = False, fill_value = 0.0)
-
-        grad = grad.at[0, :].set(self.dndr_interp(r.T))
-
-        self.dndr = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.y, axis = 1)
-        self.dndr_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndr, bounds_error = False, fill_value = 0.0)
-
-        grad = grad.at[1, :].set(self.dndr_interp(r.T))
-
-        self.dndr = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.z, axis = 2)
-        self.dndr_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndr, bounds_error = False, fill_value = 0.0)
-
-        grad = grad.at[2, :].set(self.dndr_interp(r.T))
+        grad = grad.at[0, :].set(RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.x, axis = 2), bounds_error = False, fill_value = 0.0)(r.T))
+        grad = grad.at[1, :].set(RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.y, axis = 2), bounds_error = False, fill_value = 0.0)(r.T))
+        grad = grad.at[2, :].set(RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.z, axis = 2), bounds_error = False, fill_value = 0.0)(r.T))
 
         return grad
 
