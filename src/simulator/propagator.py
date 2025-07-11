@@ -125,6 +125,7 @@ class Propagator:
 
         #More compact notation is possible here, but we are explicit
         # can we find a way to reduce ram allocation
+        '''
         self.dndx = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.x, axis = 0)
         self.dndx_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndx, bounds_error = False, fill_value = 0.0)
         del self.dndx
@@ -145,6 +146,22 @@ class Propagator:
 
         grad = grad.at[2, :].set(self.dndz_interp(r.T))
         del self.dndz_interp
+        '''
+
+        dndr = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.x, axis = 0)
+        dndr_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), dndr, bounds_error = False, fill_value = 0.0)
+        grad = grad.at[0, :].set(dndr_interp(r.T))
+
+        dndr = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.y, axis = 1)
+        dndr_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), dndr, bounds_error = False, fill_value = 0.0)
+        grad = grad.at[1, :].set(dndr_interp(r.T))
+
+        dndr = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.z, axis = 2)
+        dndr_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), dndr, bounds_error = False, fill_value = 0.0)
+        grad = grad.at[2, :].set(dndr_interp(r.T))
+
+        #del dndr
+        #del dndr_interp
 
         return grad
 
@@ -238,7 +255,6 @@ class Propagator:
 
                 s0 = jax.device_put(s0_import[:, 0:Np], NamedSharding(mesh, P(None, 'cols')))  # 'None' means don't shard axis 0
 
-                print(s0.sharding)            # See the sharding spec
                 #print(s0.addressable_shards)  # Check each device's shard
                 #jax.debug.visualize_array_sharding(s0)
             elif running_device == 'gpu':
@@ -260,7 +276,7 @@ class Propagator:
             # optional for aggressive cleanup?
             #jax.clear_caches()
 
-            print("\n", s0.sharding, "\n")
+            print("\n", s0.sharding, "\n")            # See the sharding spec
 
             norm_factor = jnp.max(t)
 
@@ -269,7 +285,7 @@ class Propagator:
                 return dsdt(t, y, args[0], args[1]) * norm_factor
 
             import diffrax
-            #import optax
+            #import optax - diffrax uses as a dependency, don't need to import directly
 
             def diffrax_solve(dydt, t0, t1, Nt, rtol = 1e-7, atol = 1e-9):
                 """
@@ -355,13 +371,13 @@ class Propagator:
 
                 path = folder_name
             else:
-                path = os.getcwd() + rel_path_to_folder + folder_name
+                path = os.getcwd() + "/" + rel_path_to_folder + folder_name
 
             path += "memory-domain" + str(self.ScalarDomain.dim[0]) + "_rays"+ str(s0.shape[1]) + "-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
             jax.profiler.save_device_memory_profile(path)
 
             print("\n", end = '')
-            if os.path.isfile("~/go/bin/pprof"):
+            if os.path.isfile(os.path.expanduser("~") + "/go/bin/pprof"):
                 #os_system(f"~/go/bin/pprof -top {sys.executable} memory_{N}.prof")
                 os_system(f"~/go/bin/pprof -top /bin/ls " + path)
                 #os_system(f"~/go/bin/pprof --web " + path)
