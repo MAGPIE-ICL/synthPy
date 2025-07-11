@@ -233,8 +233,9 @@ class Propagator:
             # wrapper allows dummy variables t & y to be used by solve_ivp(), self is required by dsdt
             dsdt_ODE = lambda t, y: dsdt(t, y, self, parallelise)
             sol = solve_ivp(dsdt_ODE, [0, t[-1]], s0, t_eval = t)
-            #print(sol.shape)
             print(sol)
+            
+            
         else:
             norm_factor = t[-1]
             # wrapper for same reason, diffrax.ODETerm instantiaties this and passes args (this will contain self)
@@ -298,6 +299,8 @@ class Propagator:
         Np = s0.size // 9
         if not parallelise:
             self.Beam.rf = sol.y[:,-1].reshape(9, Np)
+            self.Beam.positions = np.transpose(sol.y.reshape(9, Np, Nt), (1, 2, 0))[:, : ,:3]
+            self.Beam.amplitudes = np.transpose(sol.y.reshape(9, Np, Nt), (1, 2, 0))[:, :, 6]
         else:
             '''
             #for i in enumerate(sol.result):
