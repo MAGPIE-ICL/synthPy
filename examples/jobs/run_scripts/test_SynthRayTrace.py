@@ -67,5 +67,5 @@ tracer = p.Propagator(domain, probing_direction = probing_direction, inv_brems =
 
 # solve ray trace
 tracer.calc_dndr(lwl)
-tracer.solve(beam_definition.s0, jitted = True)
+tracer.solve(beam_definition.s0)
 print("\nCompleted ray trace in", np.round(tracer.duration, 3), "seconds.\n\n\n\n\n")

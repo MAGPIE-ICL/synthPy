@@ -72,6 +72,7 @@ class ScalarDomain:
         """
 
         self.ne = jnp.zeros_like(self.XX)
+        self.cleanup()
     
     def test_slab(self, s = 1, n_e0 = 2e23):
         """
@@ -86,6 +87,7 @@ class ScalarDomain:
         """
 
         self.ne = n_e0 * (1.0 + s * self.XX / self.x_length)
+        self.cleanup()
     
     def test_linear_cos(self, s1 = 0.1, s2 = 0.1, n_e0 = 2e23, Ly = 1):
         """
@@ -99,6 +101,7 @@ class ScalarDomain:
         """
 
         self.ne = n_e0 * (1.0 + s1 * self.XX / self.x_length) * (1 + s2 * jnp.cos(2 * jnp.pi * self.YY / Ly))
+        self.cleanup()
     
     def test_exponential_cos(self, n_e0=1e24, Ly=1e-3, s=2e-3):
         """
@@ -112,6 +115,7 @@ class ScalarDomain:
 
         # could we jax this calculation
         self.ne = jnp.float64(n_e0 * 10 ** (self.XX / s) * (1 + jnp.cos(2 * jnp.pi * self.YY / Ly)))
+        self.cleanup()
 
     def external_ne(self, ne):
         """
@@ -122,6 +126,7 @@ class ScalarDomain:
         """
 
         self.ne = ne
+        self.cleanup()
 
     def external_B(self, B):
         """
@@ -132,6 +137,7 @@ class ScalarDomain:
         """
 
         self.B = B
+        self.cleanup()
 
     def external_Te(self, Te, Te_min = 1.0):
         """
@@ -141,7 +147,8 @@ class ScalarDomain:
             Te ([type]): MxMxM grid of electron temperature in eV
         """
 
-        self.Te = jnp.maximum(Te_min,Te)
+        self.Te = jnp.maximum(Te_min, Te)
+        self.cleanup()
 
     def external_Z(self, Z):
         """
@@ -152,6 +159,7 @@ class ScalarDomain:
         """
 
         self.Z = Z
+        self.cleanup()
         
     def test_B(self, Bmax=1.0):
         """
@@ -162,8 +170,9 @@ class ScalarDomain:
             Bmax ([type], optional): maximum B field, default 1.0 T
         """
 
-        self.B          = jnp.zeros(jnp.append(jnp.array(self.XX.shape),3))
-        self.B[:,:,:,2] = Bmax*self.XX/self.x_length
+        self.B = jnp.zeros(jnp.append(jnp.array(self.XX.shape), 3))
+        self.B[:, :, :, 2] = Bmax * self.XX / self.x_length
+        self.cleanup()
 
     def export_scalar_field(self, property: str = 'ne', fname: str = None):
         """
@@ -240,3 +249,8 @@ class ScalarDomain:
             file.write(content)
 
         print(f'Scalar Domain electron density succesfully saved under {fname}.pvti !')
+
+    def cleanup(self):
+        del self.XX
+        del self.YY
+        del self.ZZ

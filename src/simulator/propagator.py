@@ -33,7 +33,7 @@ class Propagator:
         self.extent = self.integration_length / 2
 
 # The following functions are methods to be called by the solve()
-    def calc_dndr(self, lwl = 1064e-9):
+    def calc_dndr(self, lwl = 1064e-9, *, keep_domain = False):
         """
         Generate interpolators for derivatives.
 
@@ -62,6 +62,12 @@ class Propagator:
             self.By_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.B[:,:,:,1], bounds_error = False, fill_value = 0.0)
             self.Bz_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.B[:,:,:,2], bounds_error = False, fill_value = 0.0)
 
+        if not keep_domain:
+            try:
+                del self.ScalarDomain.B
+            except:
+                self.ScalarDomain.B = None
+
         # Inverse Bremsstrahlung
         if(self.inv_brems):
             self.kappa_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.kappa(), bounds_error = False, fill_value = 0.0)
@@ -69,6 +75,12 @@ class Propagator:
         # Phase shift
         if(self.phaseshift):
             self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
+
+        if not keep_domain:
+            try:
+                del self.ScalarDomain.ne
+            except:
+                self.ScalarDomain.ne = None
 
     def omega_pe(self, ne):
         """Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28"""
@@ -98,7 +110,8 @@ class Propagator:
             return jnp.maximum(2.0, jnp.log(v_the(Te) / V(ne, Te, Z, omega)))
 
         ne_cc = self.ScalarDomain.ne * 1e-6
-        o_pe = self.omega_pe(ne_cc)
+        # don't think this is actually used?
+        #o_pe = self.omega_pe(ne_cc)
         CL = coloumbLog(ne_cc, self.ScalarDomain.Te, self.ScalarDomain.Z, self.omega)
 
         return 3.1e-5 * self.ScalarDomain.Z * c * jnp.power(ne_cc / self.omega, 2) * CL * jnp.power(self.ScalarDomain.Te, -1.5) # 1/s
@@ -231,6 +244,7 @@ class Propagator:
 
                 s0 = jax.device_put(s0_import[:, 0:Np], NamedSharding(mesh, P(None, 'cols')))  # 'None' means don't shard axis 0
 
+                print(s0.sharding)            # See the sharding spec
                 #print(s0.addressable_shards)  # Check each device's shard
                 #jax.debug.visualize_array_sharding(s0)
             elif running_device == 'gpu':
@@ -251,8 +265,6 @@ class Propagator:
             del s0_import
             # optional for aggressive cleanup?
             #jax.clear_caches()
-
-            print("\n", s0.sharding, "\n")            # See the sharding spec
 
             norm_factor = jnp.max(t)
 
@@ -319,6 +331,8 @@ class Propagator:
 
         finish = time()
         self.duration = finish - start
+
+        del self.ne_nc
 
         memory_debug = True
         if memory_debug and parallelise:
@@ -432,8 +446,8 @@ class Propagator:
         #self.dndx = None
         #self.dndy = None
         #self.dndz = None
-        self.ScalarDomain.ne = None
-        self.ne_nc = None
+        #self.ScalarDomain.ne = None
+        #self.ne_nc = None
         #self.s0 = None
         self.rf = None
         self.Jf = None
