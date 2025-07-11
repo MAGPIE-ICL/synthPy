@@ -1,5 +1,6 @@
 import numpy as np
 import jax.numpy as jnp
+import jax
 
 class ScalarDomain:
     """
@@ -61,7 +62,9 @@ class ScalarDomain:
         self.x = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
         self.y = jnp.float32(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n))
         self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
+        jax.print_environment_info()
         self.XX, self.YY, self.ZZ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)#False) - has to be true for jnp
+        jax.print_environment_info()
 
         # Logical switches
         self.B_on = B_on
