@@ -86,8 +86,8 @@ def jax_init():
     #jax.config.update('xla_force_host_platform_device_count', self.core_count)
     os.environ['XLA_FLAGS'] = "--xla_force_host_platform_device_count=" + str(cpu_count())
     #os.environ['JAX_ENABLE_X64'] = "True"
-    #os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
-    #os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
+    os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
+    os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
 
     import jax
 
@@ -102,7 +102,7 @@ def jax_init():
     #jax.config.update('xla_python_client_allocator', '\"platform\"')
     # can't set via jax.config.update for some reason
 
-    #jax.print_environment_info()
+    jax.print_environment_info()
 
     # look further into what this actually means...
     print("\nDefault jax backend:", jax.default_backend())

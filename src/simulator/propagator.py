@@ -1,10 +1,8 @@
-#import numpy as np
 import matplotlib.pyplot as plt
 import os
 import sys
 import jax
 import jax.numpy as jnp
-import gc
 
 from scipy.integrate import odeint, solve_ivp
 from time import time
@@ -264,8 +262,7 @@ class Propagator:
 
             del s0_import
             # optional for aggressive cleanup?
-            jax.clear_caches()
-            gc.collect()
+            #jax.clear_caches()
 
             norm_factor = jnp.max(t)
 
