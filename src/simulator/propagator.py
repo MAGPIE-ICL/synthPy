@@ -136,6 +136,28 @@ class Propagator:
 
         grad = jnp.zeros_like(r)
 
+        dndx = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.x, axis = 0)
+        dndx_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), dndx, bounds_error = False, fill_value = 0.0)
+        del dndx
+
+        grad = grad.at[0, :].set(dndx_interp(r.T))
+        del dndx_interp
+
+        dndy = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.y, axis = 1)
+        dndy_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), dndy, bounds_error = False, fill_value = 0.0)
+        del dndy
+        
+        grad = grad.at[1, :].set(dndy_interp(r.T))
+        del dndy_interp
+
+        dndz = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.z, axis = 2)
+        dndz_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), dndz, bounds_error = False, fill_value = 0.0)
+        del dndz
+
+        grad = grad.at[2, :].set(dndz_interp(r.T))
+        del dndz_interp
+
+        '''
         #More compact notation is possible here, but we are explicit
         dndr = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.x, axis = 0)
         dndr_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), dndr, bounds_error = False, fill_value = 0.0)
@@ -151,6 +173,7 @@ class Propagator:
 
         del dndr
         del dndr_interp
+        '''
 
         return grad
 
