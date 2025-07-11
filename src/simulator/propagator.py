@@ -136,29 +136,30 @@ class Propagator:
 
         grad = jnp.zeros_like(r)
 
+        #More compact notation is possible here, but we are explicit
         self.dndx = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.x, axis = 0)
         self.dndx_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndx, bounds_error = False, fill_value = 0.0)
         del self.dndx
 
-        grad = grad.at[0, :].set(dndx_interp(r.T))
+        grad = grad.at[0, :].set(self.dndx_interp(r.T))
         del self.dndx_interp
 
         self.dndy = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.y, axis = 1)
         self.dndy_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndy, bounds_error = False, fill_value = 0.0)
         del self.dndy
         
-        grad = grad.at[1, :].set(dndy_interp(r.T))
+        grad = grad.at[1, :].set(self.dndy_interp(r.T))
         del self.dndy_interp
 
         self.dndz = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.z, axis = 2)
         self.dndz_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndz, bounds_error = False, fill_value = 0.0)
         del self.dndz
 
-        self.grad = grad.at[2, :].set(dndz_interp(r.T))
+        grad = grad.at[2, :].set(self.dndz_interp(r.T))
         del self.dndz_interp
 
+        # this is less memory efficient according to benchmarking - would it decrease the likelihood of memory leaks though?
         '''
-        #More compact notation is possible here, but we are explicit
         dndr = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.x, axis = 0)
         dndr_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), dndr, bounds_error = False, fill_value = 0.0)
         grad = grad.at[0, :].set(dndr_interp(r.T))
