@@ -51,7 +51,24 @@ class Propagator:
         self.ne_nc = jnp.array(self.ScalarDomain.ne / nc, dtype = jnp.float32) #normalise to critical density
 
         # for some reason this was never being called and errors where thrown when interps were called
-        self.set_up_interps()
+        #self.set_up_interps() - just put directly into function instead
+
+        # Electron density
+        self.ne_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.ne, bounds_error = False, fill_value = 0.0)
+
+        # Magnetic field
+        if(self.ScalarDomain.B_on):
+            self.Bx_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.B[:,:,:,0], bounds_error = False, fill_value = 0.0)
+            self.By_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.B[:,:,:,1], bounds_error = False, fill_value = 0.0)
+            self.Bz_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.B[:,:,:,2], bounds_error = False, fill_value = 0.0)
+
+        # Inverse Bremsstrahlung
+        if(self.inv_brems):
+            self.kappa_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.kappa(), bounds_error = False, fill_value = 0.0)
+
+        # Phase shift
+        if(self.phaseshift):
+            self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
 
     def omega_pe(self, ne):
         """Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28"""
@@ -92,24 +109,6 @@ class Propagator:
         o_pe = self.omega_pe(ne_cc)
 
         return jnp.sqrt(1.0 - (o_pe / self.omega) ** 2)
-
-    def set_up_interps(self):
-        # Electron density
-        self.ne_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.ne, bounds_error = False, fill_value = 0.0)
-
-        # Magnetic field
-        if(self.ScalarDomain.B_on):
-            self.Bx_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.B[:,:,:,0], bounds_error = False, fill_value = 0.0)
-            self.By_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.B[:,:,:,1], bounds_error = False, fill_value = 0.0)
-            self.Bz_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.B[:,:,:,2], bounds_error = False, fill_value = 0.0)
-
-        # Inverse Bremsstrahlung
-        if(self.inv_brems):
-            self.kappa_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.kappa(), bounds_error = False, fill_value = 0.0)
-
-        # Phase shift
-        if(self.phaseshift):
-            self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
 
     def dndr(self, r):
         """
@@ -243,26 +242,25 @@ class Propagator:
                 #print(s0.addressable_shards)  # Check each device's shard
                 #jax.debug.visualize_array_sharding(s0)
             elif running_device == 'gpu':
-                '''
                 gpu_devices = [d for d in self.available_devices if d.device_kind == 'gpu']
                 print(gpu_devices)
                 assert len(gpu_devices) >= 0, "Running on GPU yet none detected?"
 
-                if len(gpu_devices) == 1:
-                    s0 = jax.device_put(s0_import, gpu_devices)
-                else:
-                    s0 = jax.device_put(s0_import, gpu_devices[0])
-                '''
-                s0 = s0_import
-                print("\n")
+                #if len(gpu_devices) == 1:
+                #    s0 = jax.device_put(s0_import, gpu_devices)
+                #else:
+                s0 = jax.device_put(s0_import, gpu_devices[0])
+                #s0 = s0_import
             elif running_device == 'tpu':
-                print("\n")
+                pass
             else:
                 print("No suitable device detected!")
 
             del s0_import
             # optional for aggressive cleanup?
             #jax.clear_caches()
+
+            print("\n", s0.sharding, "\n")
 
             norm_factor = jnp.max(t)
 
@@ -325,7 +323,7 @@ class Propagator:
             # transposed as jax.vmap() expects form of [batch_idx, items] not [items, batch_idx]
             # remove unnecessary static arguments to increase speed and reduce likelihood of unexpected behaviours
             start = time()
-            sol = jax.vmap(lambda s: ODE_solve(s, args))(s0.T)
+            sol = jax.block_until_ready(jax.vmap(lambda s: ODE_solve(s, args))(s0.T))
 
         finish = time()
         self.duration = finish - start
@@ -357,7 +355,7 @@ class Propagator:
 
                 path = folder_name
             else:
-                os.mkdir(folder_name)
+                path = os.getcwd() + rel_path_to_folder + folder_name
 
             path += "memory-domain" + str(self.ScalarDomain.dim[0]) + "_rays"+ str(s0.shape[1]) + "-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
             jax.profiler.save_device_memory_profile(path)
