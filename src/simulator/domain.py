@@ -71,6 +71,7 @@ class ScalarDomain:
             self.generate_electron_density_profile(ne_type)
         else:
             print("\nElectron density profile to generate not passed. You will need to initialise this yourself with a call to this library.")
+            print("If you run low on memory, you can enforce a manual domain cleanup with ScalarDomain.cleanup()")
             self.XX, self.YY, self.ZZ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)#False) - has to be true for jnp
 
         print("")
@@ -121,6 +122,8 @@ class ScalarDomain:
             self.XX = None
             self.YY = None
             self.ZZ = None
+
+    self.cleanup()
 
     def test_null(self):
         """
