@@ -8,7 +8,7 @@ class ScalarDomain:
     This contains also the method to propagate rays through the scara domain
     """
 
-    def __init__(self, lengths, dim, B_on = False):
+    def __init__(self, lengths, dim, *, B_on = False, ne_type = "test_linear_cos"):
         """
         Example:
             N_V = 100
@@ -64,7 +64,7 @@ class ScalarDomain:
         self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
         jax.print_environment_info()
         # allocates 3x domain size - big issue for memory usage, NEED to reduce!
-        self.XX, self.YY, self.ZZ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)#False) - has to be true for jnp
+        self.XX, self.YY, _ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)#False) - has to be true for jnp
         jax.print_environment_info()
 
         # Logical switches
