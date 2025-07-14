@@ -5,10 +5,10 @@ import jax
 class ScalarDomain:
     """
     A class to hold and generate scalar domains.
-    This contains also the method to propagate rays through the scara domain
+    This contains also the method to propagate rays through the scalar domain
     """
 
-    def __init__(self, lengths, dim, *, B_on = False, ne_type = "test_linear_cos"):
+    def __init__(self, lengths, dim, *, B_on = False, ne_type = None):
         """
         Example:
             N_V = 100
@@ -24,6 +24,9 @@ class ScalarDomain:
             z (float array): z coordinates, m
             extent (float): physical size, m
         """
+
+        # Logical switches
+        self.B_on = B_on
 
         valid_types = (int, float, jnp.int64)
 
@@ -62,13 +65,62 @@ class ScalarDomain:
         self.x = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
         self.y = jnp.float32(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n))
         self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
+
         jax.print_environment_info()
-        # allocates 3x domain size - big issue for memory usage, NEED to reduce!
-        self.XX, self.YY, _ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)#False) - has to be true for jnp
+        if ne_type is not None:
+            self.generate_electron_density_profile(ne_type)
+        else:
+            print("\nElectron density profile to generate not passed. You will need to initialise this yourself with a call to this library.")
+            self.XX, self.YY, self.ZZ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)#False) - has to be true for jnp
+
+        print("")
         jax.print_environment_info()
 
-        # Logical switches
-        self.B_on = B_on
+    def generate_electron_density_profile(self, ne_type):
+        if ne_type == "test_null":
+            print("\nGenerating test null -e field.")
+            self.XX, _, _ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)
+
+            self.YY = None
+            self.ZZ = None
+
+            self.test_null()
+        elif ne_type == "test_slab":
+            print("\nGenerating test slab -e field.")
+            self.XX, _, _ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)
+
+            self.YY = None
+            self.ZZ = None
+
+            self.test_slab()
+        elif ne_type == "test_linear_cos":
+            print("\nGenerating test linear decay periodic -e field.")
+            self.XX, self.YY, _ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)
+
+            self.ZZ = None
+
+            self.test_linear_cos()
+        elif ne_type == "test_exponential_cos":
+            print("\nGenerating test exponential decay periodic -e field.")
+            self.XX, self.YY, _ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)
+
+            self.ZZ = None
+
+            self.test_exponential_cos()
+        elif ne_type == "test_B":
+            print("\nGenerating test B -e field.")
+            self.XX, _, _ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)
+
+            self.YY = None
+            self.ZZ = None
+
+            self.test_B()
+        else:
+            print("\nNo valid profile detected, ensure passed name is correct or call yourself.")
+
+            self.XX = None
+            self.YY = None
+            self.ZZ = None
 
     def test_null(self):
         """
@@ -76,7 +128,6 @@ class ScalarDomain:
         """
 
         self.ne = jnp.zeros_like(self.XX)
-        self.cleanup()
     
     def test_slab(self, s = 1, n_e0 = 2e23):
         """
@@ -91,8 +142,7 @@ class ScalarDomain:
         """
 
         self.ne = n_e0 * (1.0 + s * self.XX / self.x_length)
-        self.cleanup()
-    
+
     def test_linear_cos(self, s1 = 0.1, s2 = 0.1, n_e0 = 2e23, Ly = 1):
         """
         Linearly growing sinusoidal perturbation
@@ -105,8 +155,6 @@ class ScalarDomain:
         """
 
         self.ne = n_e0 * (1.0 + s1 * self.XX / self.x_length) * (1 + s2 * jnp.cos(2 * jnp.pi * self.YY / Ly))
-        jax.print_environment_info()
-        self.cleanup()
     
     def test_exponential_cos(self, n_e0=1e24, Ly=1e-3, s=2e-3):
         """
@@ -118,9 +166,7 @@ class ScalarDomain:
             s ([type], optional): scale of exponential growth. Defaults to 2e-3 m.
         """
 
-        # could we jax this calculation
         self.ne = jnp.float64(n_e0 * 10 ** (self.XX / s) * (1 + jnp.cos(2 * jnp.pi * self.YY / Ly)))
-        self.cleanup()
 
     def external_ne(self, ne):
         """
@@ -131,7 +177,6 @@ class ScalarDomain:
         """
 
         self.ne = ne
-        self.cleanup()
 
     def external_B(self, B):
         """
@@ -142,7 +187,6 @@ class ScalarDomain:
         """
 
         self.B = B
-        self.cleanup()
 
     def external_Te(self, Te, Te_min = 1.0):
         """
@@ -153,7 +197,6 @@ class ScalarDomain:
         """
 
         self.Te = jnp.maximum(Te_min, Te)
-        self.cleanup()
 
     def external_Z(self, Z):
         """
@@ -164,7 +207,6 @@ class ScalarDomain:
         """
 
         self.Z = Z
-        self.cleanup()
         
     def test_B(self, Bmax=1.0):
         """
@@ -177,7 +219,6 @@ class ScalarDomain:
 
         self.B = jnp.zeros(jnp.append(jnp.array(self.XX.shape), 3))
         self.B[:, :, :, 2] = Bmax * self.XX / self.x_length
-        self.cleanup()
 
     def export_scalar_field(self, property: str = 'ne', fname: str = None):
         """
@@ -256,6 +297,9 @@ class ScalarDomain:
         print(f'Scalar Domain electron density succesfully saved under {fname}.pvti !')
 
     def cleanup(self):
-        del self.XX
-        del self.YY
-        del self.ZZ
+        if self.XX is not None:
+            del self.XX
+        if self.YY is not None:
+            del self.YY
+        if self.ZZ is not None:
+            del self.ZZ
