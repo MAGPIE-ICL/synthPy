@@ -1,6 +1,6 @@
 #!/bin/sh
-#PBS -l walltime=7:59:00
-#PBS -l select=1:ncpus=4:mem=64gb:ngpus=1:gpu_type=A100
+#PBS -l walltime=00:59:00
+#PBS -l select=1:ncpus=4:mem=16gb:ngpus=1:gpu_type=A40
 #PBS -j oe
 
 cd '/rds/general/user/sm5625/home/synthPy/'

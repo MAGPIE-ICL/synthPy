@@ -16,6 +16,7 @@ from scipy.constants import e
 #from scipy.constants import m_e
 
 from utils import getsizeof
+#from utils import trilinearInterpolator
 
 class Propagator:
     def __init__(self, ScalarDomain, *, probing_direction = 'z', inv_brems = False, phaseshift = False):
@@ -136,6 +137,16 @@ class Propagator:
 
         grad = jnp.zeros_like(r)
 
+        '''
+        dndx = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.x, axis = 0)
+        dndy = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.y, axis = 0)
+        dndz = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.z, axis = 0)
+
+        grad = grad.at[0, :].set(trilinearInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), dndx, r))
+        grad = grad.at[1, :].set(trilinearInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), dndy, r))
+        grad = grad.at[2, :].set(trilinearInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), dndz, r))
+        '''
+
         #More compact notation is possible here, but we are explicit
         dndx = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.x, axis = 0)
         dndx_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), dndx, bounds_error = False, fill_value = 0.0)
@@ -147,7 +158,7 @@ class Propagator:
         dndy = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.y, axis = 1)
         dndy_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), dndy, bounds_error = False, fill_value = 0.0)
         del dndy
-        
+
         grad = grad.at[1, :].set(dndy_interp(r.T))
         del dndy_interp
 
@@ -235,13 +246,13 @@ class Propagator:
         t = jnp.linspace(0.0, jnp.sqrt(8.0) * self.extent / c, 2)
 
         if not parallelise:
-            s0 = s0_import.flatten() #odeint insists
-
-            # wrapper allows dummy variables t & y to be used by solve_ivp(), self is required by dsdt
-            dsdt_ODE = lambda t, y: dsdt(t, y, self)
+            import numpy as np
+            s0 = np.array(jnp.ravel(s0_import))
+            #s0 = s0.flatten() #odeint insists
 
             start = time()
-            sol = solve_ivp(dsdt_ODE, [0, t[-1]], s0, t_eval = t)
+            # wrapper allows dummy variables t & y to be used by solve_ivp(), self is required by dsdt
+            sol = solve_ivp(lambda t, y: dsdt(t, y, self, parallelise), [0, t[-1]], s0, t_eval = t)
         else:
             self.available_devices = jax.devices()
 
@@ -458,7 +469,7 @@ class Propagator:
         start = time()
 
         parallelise = False
-        dsdt_ODE = lambda t, y: dsdt(t, y, self)
+        dsdt_ODE = lambda t, y: dsdt(t, y, self, parallelise)
         sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t)
 
         finish = time()

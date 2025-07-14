@@ -123,7 +123,7 @@ class ScalarDomain:
             self.YY = None
             self.ZZ = None
 
-    self.cleanup()
+        self.cleanup()
 
     def test_null(self):
         """
