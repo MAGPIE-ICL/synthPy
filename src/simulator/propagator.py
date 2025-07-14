@@ -376,16 +376,16 @@ class Propagator:
                 path = folder_name
             elif os.path.isdir(os.getcwd() + "/" + path):
                 pass
-            '''
-            elif not os.path.isdir(os.getcwd() + "/" + path):
-                import errno
+                '''
+                elif not os.path.isdir(os.getcwd() + "/" + path):
+                    import errno
 
-                try:
-                    os.mkdir(path)
-                except OSError as e:
-                    if e.errno != errno.EEXIST:
-                        raise
-            '''
+                    try:
+                        os.mkdir(path)
+                    except OSError as e:
+                        if e.errno != errno.EEXIST:
+                            raise
+                '''
             else:
                 path = os.getcwd() + "/" + folder_name
 

@@ -63,6 +63,7 @@ class ScalarDomain:
         self.y = jnp.float32(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n))
         self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
         jax.print_environment_info()
+        # allocates 3x domain size - big issue for memory usage, NEED to reduce!
         self.XX, self.YY, self.ZZ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)#False) - has to be true for jnp
         jax.print_environment_info()
 
@@ -104,6 +105,7 @@ class ScalarDomain:
         """
 
         self.ne = n_e0 * (1.0 + s1 * self.XX / self.x_length) * (1 + s2 * jnp.cos(2 * jnp.pi * self.YY / Ly))
+        jax.print_environment_info()
         self.cleanup()
     
     def test_exponential_cos(self, n_e0=1e24, Ly=1e-3, s=2e-3):
