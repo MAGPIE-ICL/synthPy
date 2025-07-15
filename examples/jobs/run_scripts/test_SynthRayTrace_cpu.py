@@ -13,9 +13,6 @@ sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/simulator')     # 
 import config
 config.jax_init()
 
-import jax
-jax.default_device('cpu')
-
 parser = argparse.ArgumentParser()
 parser.add_argument("-d", "--domain", type=int)
 parser.add_argument("-r", "--rays", type=int)
@@ -68,5 +65,5 @@ tracer = p.Propagator(domain, probing_direction = probing_direction, inv_brems =
 
 # solve ray trace
 tracer.calc_dndr(lwl)
-tracer.solve(beam_definition.s0)
+tracer.solve(beam_definition.s0, force_device = "cpu")
 print("\nCompleted ray trace in", np.round(tracer.duration, 3), "seconds.\n\n\n\n\n")

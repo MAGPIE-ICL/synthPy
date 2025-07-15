@@ -244,7 +244,7 @@ class Propagator:
 
         return pol
 
-    def solve(self, s0_import, *, return_E = False, parallelise = True, jitted = True, save_steps = 2):
+    def solve(self, s0_import, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, force_device = None):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
@@ -269,12 +269,14 @@ class Propagator:
         else:
             self.available_devices = jax.devices()
 
+            #jax.default_device('gpu')
+
             from jax.lib import xla_bridge
             running_device = xla_bridge.get_backend().platform
             print("\nRunning device:", running_device, end='')
 
             s0_transformed = s0_import.T
-            del s0_import
+            #del s0_import
 
             if running_device == 'cpu':
                 from multiprocessing import cpu_count
@@ -293,7 +295,9 @@ class Propagator:
                 Np = ((Np // self.core_count) * self.core_count)
                 assert Np > 0, "Not enough rays to parallelise over cores, increase to at least " + str(self.core_count)
 
-                s0 = jax.device_put(s0_transformed[:, 0:Np], NamedSharding(mesh, P(None, 'cols')))  # 'None' means don't shard axis 0
+                # temp variables in as temporary resolution to problem of transposing s0_import messing up sharding - fix later
+                s0_temp = jax.device_put(s0_import[:, 0:Np], NamedSharding(mesh, P(None, 'cols')))  # 'None' means don't shard axis 0
+                s0 = s0_temp.T
 
                 print(s0.sharding)            # See the sharding spec
                 #print(s0.addressable_shards)  # Check each device's shard
@@ -310,6 +314,8 @@ class Propagator:
             else:
                 print("No suitable device detected!")
 
+            # s0_import clearup down here temporarily as quick fix, should be above if statement where commented out when resolved
+            del s0_import
             del s0_transformed
             # optional for aggressive cleanup?
             #jax.clear_caches()
