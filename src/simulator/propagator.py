@@ -244,7 +244,7 @@ class Propagator:
 
         return pol
 
-    def solve(self, s0_import, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, force_device = None):
+    def solve(self, s0_import, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, force_device = None, memory_debug = False):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
@@ -392,7 +392,6 @@ class Propagator:
 
         del self.ne_nc
 
-        memory_debug = True
         if memory_debug and parallelise:
             # Visualises sharding, looks cool, but pretty useless - and a pain with higher core counts
             #jax.debug.visualize_array_sharding(sol.ys[:, -1, :])
