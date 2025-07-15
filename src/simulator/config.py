@@ -87,8 +87,8 @@ def jax_init():
     os.environ['XLA_FLAGS'] = "--xla_force_host_platform_device_count=" + str(cpu_count())
     #os.environ['JAX_ENABLE_X64'] = "True"
     #os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
-    #os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
-    os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = ".95"
+    os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
+    os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = ".90"
 
     import jax
 
