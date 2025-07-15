@@ -16,6 +16,7 @@ config.jax_init()
 parser = argparse.ArgumentParser()
 parser.add_argument("-d", "--domain", type=int)
 parser.add_argument("-r", "--rays", type=int)
+parser.add_argument("-f", "--force_device", type=str)
 args = parser.parse_args()
 
 n_cells = 512
@@ -65,5 +66,9 @@ tracer = p.Propagator(domain, probing_direction = probing_direction, inv_brems =
 
 # solve ray trace
 tracer.calc_dndr(lwl)
-tracer.solve(beam_definition.s0, force_device = "cpu")
+
+if args.force_device is not None:
+    force_device = args.force_device
+
+tracer.solve(beam_definition.s0, force_device = force_device)
 print("\nCompleted ray trace in", np.round(tracer.duration, 3), "seconds.\n\n\n\n\n")

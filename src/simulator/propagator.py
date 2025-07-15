@@ -269,7 +269,11 @@ class Propagator:
         else:
             self.available_devices = jax.devices()
 
-            #jax.default_device('gpu')
+            if force_device is not None:
+                try:
+                    jax.default_device = jax.devices(force_device)[0]
+                except:
+                    print("\njax cannot detect that device if it does exist - try not passing a force_device param and seeing if it runs.")
 
             from jax.lib import xla_bridge
             running_device = xla_bridge.get_backend().platform
