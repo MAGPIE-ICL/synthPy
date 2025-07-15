@@ -14,9 +14,10 @@ import config
 config.jax_init()
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-d", "--domain", type=int)
-parser.add_argument("-r", "--rays", type=int)
-parser.add_argument("-m", "--memory", type=int)
+parser.add_argument("-d", "--domain", type = int)
+parser.add_argument("-r", "--rays", type = int)
+parser.add_argument("-f". "--force_device", type = str)
+parser.add_argument("-m", "--memory", type = int)
 args = parser.parse_args()
 
 n_cells = 512
