@@ -273,6 +273,9 @@ class Propagator:
             running_device = xla_bridge.get_backend().platform
             print("\nRunning device:", running_device, end='')
 
+            s0_transformed = s0_import.T
+            del s0_import
+
             if running_device == 'cpu':
                 from multiprocessing import cpu_count
                 self.core_count = cpu_count()
@@ -290,7 +293,7 @@ class Propagator:
                 Np = ((Np // self.core_count) * self.core_count)
                 assert Np > 0, "Not enough rays to parallelise over cores, increase to at least " + str(self.core_count)
 
-                s0 = jax.device_put(s0_import[:, 0:Np], NamedSharding(mesh, P(None, 'cols')))  # 'None' means don't shard axis 0
+                s0 = jax.device_put(s0_transformed[:, 0:Np], NamedSharding(mesh, P(None, 'cols')))  # 'None' means don't shard axis 0
 
                 print(s0.sharding)            # See the sharding spec
                 #print(s0.addressable_shards)  # Check each device's shard
@@ -300,13 +303,14 @@ class Propagator:
                 print("\nThere are", len(gpu_devices), "available GPU devices:", gpu_devices)
                 assert len(gpu_devices) > 0, "Running on GPU yet none detected?"
 
-                s0 = jax.device_put(s0_import, gpu_devices[0])
+                s0 = jax.device_put(s0_transformed, gpu_devices[0])
             elif running_device == 'tpu':
+                s0 = s0_transformed
                 pass
             else:
                 print("No suitable device detected!")
 
-            del s0_import
+            del s0_transformed
             # optional for aggressive cleanup?
             #jax.clear_caches()
 
@@ -371,7 +375,7 @@ class Propagator:
             # transposed as jax.vmap() expects form of [batch_idx, items] not [items, batch_idx]
             # remove unnecessary static arguments to increase speed and reduce likelihood of unexpected behaviours
             start = time()
-            sol = jax.block_until_ready(jax.vmap(lambda s: ODE_solve(s, args))(s0.T))
+            sol = jax.block_until_ready(jax.vmap(lambda s: ODE_solve(s, args))(s0))
 
         finish = time()
         self.duration = finish - start
