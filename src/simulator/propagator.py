@@ -297,13 +297,13 @@ class Propagator:
                 #jax.debug.visualize_array_sharding(s0)
             elif running_device == 'gpu':
                 gpu_devices = [d for d in self.available_devices if d.device_kind == 'gpu']
-                print("There are", len(gpu_devices), " available GPU devices:", gpu_devices)
-                assert len(gpu_devices) >= 0, "Running on GPU yet none detected?"
+                print("\nThere are", len(gpu_devices), " available GPU devices:", gpu_devices)
+                #assert len(gpu_devices) > 0, "Running on GPU yet none detected?"
 
                 #if len(gpu_devices) == 1:
                 #    s0 = jax.device_put(s0_import, gpu_devices)
                 #else:
-                s0 = jax.device_put(s0_import, gpu_devices[0])
+                #s0 = jax.device_put(s0_import, gpu_devices[0])
                 #s0 = s0_import
             elif running_device == 'tpu':
                 pass
