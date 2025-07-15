@@ -66,12 +66,11 @@ class ScalarDomain:
         self.y = jnp.float32(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n))
         self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
 
-        jax.print_environment_info()
         if ne_type is not None:
             self.generate_electron_density_profile(ne_type)
         else:
-            print("\nElectron density profile to generate not passed. You will need to initialise this yourself with a call to this library.")
-            print("If you run low on memory, you can enforce a manual domain cleanup with ScalarDomain.cleanup()")
+            print("\nWARNING: Electron density profile to generate not passed. You will need to initialise this yourself with a call to this library.")
+            print("If you run low on memory, you can enforce a manual domain cleanup with a call to ScalarDomain.cleanup()")
             self.XX, self.YY, self.ZZ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)#False) - has to be true for jnp
 
         print("")
