@@ -13,6 +13,7 @@ sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/simulator')     # 
 import config
 config.jax_init()
 
+import jax
 jax.default_device('cpu')
 
 parser = argparse.ArgumentParser()
