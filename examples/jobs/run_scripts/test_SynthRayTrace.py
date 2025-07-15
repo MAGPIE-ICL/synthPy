@@ -43,9 +43,7 @@ import domain as d
 import importlib
 importlib.reload(d)
 
-domain = d.ScalarDomain(lengths, n_cells) # B_on = False by default
-
-domain.test_exponential_cos()
+domain = d.ScalarDomain(lengths, n_cells, "test_exponential_cos") # B_on = False by default
 
 lwl = 1064e-9 #define laser wavelength
 
