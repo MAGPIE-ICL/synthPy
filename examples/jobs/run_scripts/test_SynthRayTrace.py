@@ -68,9 +68,11 @@ tracer = p.Propagator(domain, probing_direction = probing_direction, inv_brems =
 # solve ray trace
 tracer.calc_dndr(lwl)
 
+force_device = None
 if args.force_device is not None:
     force_device = args.force_device
 
+memory_debug = False
 if args.memory is not None:
     memory_debug = True
 
