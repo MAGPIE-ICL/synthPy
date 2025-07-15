@@ -298,13 +298,9 @@ class Propagator:
             elif running_device == 'gpu':
                 gpu_devices = jax.devices('gpu')
                 print("\nThere are", len(gpu_devices), "available GPU devices:", gpu_devices)
-                #assert len(gpu_devices) > 0, "Running on GPU yet none detected?"
+                assert len(gpu_devices) > 0, "Running on GPU yet none detected?"
 
-                #if len(gpu_devices) == 1:
-                #    s0 = jax.device_put(s0_import, gpu_devices)
-                #else:
-                #s0 = jax.device_put(s0_import, gpu_devices[0])
-                s0 = s0_import
+                s0 = jax.device_put(s0_import, gpu_devices[0])
             elif running_device == 'tpu':
                 pass
             else:
