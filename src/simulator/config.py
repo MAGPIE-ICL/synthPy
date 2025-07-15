@@ -88,9 +88,9 @@ def jax_init():
     #os.environ['JAX_ENABLE_X64'] = "True"
     #os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
     #os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
-    #os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "1.00"
-    os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"
-    os.environ["TF_CUDA_MALLOC_ASYNC_SUPPORTED_PREALLOC"] = "-1"
+    os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "1.00"
+    #os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"
+    #os.environ["TF_CUDA_MALLOC_ASYNC_SUPPORTED_PREALLOC"] = "-1"
 
     import jax
 
@@ -105,7 +105,7 @@ def jax_init():
     #jax.config.update('xla_python_client_allocator', '\"platform\"')
     # can't set via jax.config.update for some reason
 
-    jax.config.update('jax_compiler_enable_remat_pass', False)
+    #jax.config.update('jax_compiler_enable_remat_pass', False)
 
     jax.print_environment_info()
 
