@@ -271,7 +271,8 @@ class Propagator:
 
             if force_device is not None:
                 try:
-                    jax.default_device = jax.devices(force_device)[0]
+                    #jax.default_device = jax.devices(force_device)[0]
+                    jax.config.update('jax_platform_name', 'cpu')
                 except:
                     print("\njax cannot detect that device if it does exist - try not passing a force_device param and seeing if it runs.")
 
