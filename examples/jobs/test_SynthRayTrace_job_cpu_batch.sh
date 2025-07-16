@@ -14,8 +14,8 @@ echo 'packages loaded successfully'
 
 echo 'starting job'
 
-for i in $(seq 1 2048);
+for i in $(seq 128 2048);
 do
     echo "Domain of $i"
-    python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 512 -r 8192 | grep killed &> output.txt
+    python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d $i -r 256 | grep killed &> output.txt
 done
