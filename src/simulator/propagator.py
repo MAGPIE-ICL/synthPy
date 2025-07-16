@@ -52,7 +52,7 @@ class Propagator:
         if (self.ScalarDomain.B_on):
             self.VerdetConst = 2.62e-13 * lwl ** 2 # radians per Tesla per m^2
 
-        ne_nc = jnp.array(self.ScalarDomain.ne / nc, dtype = jnp.float32) #normalise to critical density
+        ne_nc = jnp.array(self.ScalarDomain.ne / self.nc, dtype = jnp.float32) #normalise to critical density
 
         # for some reason this was never being called and errors where thrown when interps were called
         #self.set_up_interps() - just put directly into function instead
