@@ -34,6 +34,7 @@ class Propagator:
         self.extent = self.integration_length / 2
 
 # The following functions are methods to be called by the solve()
+    @jax.jit
     def calc_dndr(self, lwl = 1064e-9, *, keep_domain = False):
         """
         Generate interpolators for derivatives.
@@ -272,7 +273,7 @@ class Propagator:
             if force_device is not None:
                 try:
                     #jax.default_device = jax.devices(force_device)[0]
-                    jax.config.update('jax_platform_name', 'cpu')
+                    jax.config.update('jax_platform_name', force_device)
                 except:
                     print("\njax cannot detect that device if it does exist - try not passing a force_device param and seeing if it runs.")
 

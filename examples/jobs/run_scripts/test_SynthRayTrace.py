@@ -76,5 +76,7 @@ memory_debug = False
 if args.memory is not None:
     memory_debug = True
 
+print(memory_debug)
+
 tracer.solve(beam_definition.s0, force_device = force_device, memory_debug = memory_debug)
 print("\nCompleted ray trace in", np.round(tracer.duration, 3), "seconds.\n\n\n\n\n")
