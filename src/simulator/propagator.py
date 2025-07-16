@@ -281,7 +281,7 @@ class Propagator:
             print("\nRunning device:", running_device, end='')
 
             s0_transformed = s0_import.T
-            #del s0_import
+            del s0_import
 
             if running_device == 'cpu':
                 from multiprocessing import cpu_count
@@ -292,7 +292,7 @@ class Propagator:
 
                 # Create a Sharding object to distribute a value across devices:
                 # Assume self.core_count is the no. of core devices available
-                mesh = jax.make_mesh((self.core_count,), ('cols',))  # 1D mesh for columns
+                mesh = jax.make_mesh((self.core_count,), ('rows',))  # 1D mesh for columns
 
                 # Specify sharding: don't split axis 0 (rows), split axis 1 (columns) across devices
                 # then apply sharding to rewrite s0 as a sharded array from it's original matrix
@@ -300,9 +300,9 @@ class Propagator:
                 Np = ((Np // self.core_count) * self.core_count)
                 assert Np > 0, "Not enough rays to parallelise over cores, increase to at least " + str(self.core_count)
 
-                # temp variables in as temporary resolution to problem of transposing s0_import messing up sharding - fix later
-                s0_temp = jax.device_put(s0_import[:, 0:Np], NamedSharding(mesh, P(None, 'cols')))  # 'None' means don't shard axis 0
-                s0 = s0_temp.T
+                # if you don't wish to transpose before operation you need to use the old call
+                # s0 = jax.device_put(s0_transformed[:, 0:Np], NamedSharding(mesh, P(None, 'cols')))
+                s0 = jax.device_put(s0_transformed[0:Np, :], NamedSharding(mesh, P('rows', None)))  # 'None' means don't shard axis 0
 
                 print(s0.sharding)            # See the sharding spec
                 #print(s0.addressable_shards)  # Check each device's shard
@@ -319,8 +319,6 @@ class Propagator:
             else:
                 print("No suitable device detected!")
 
-            # s0_import clearup down here temporarily as quick fix, should be above if statement where commented out when resolved
-            del s0_import
             del s0_transformed
             # optional for aggressive cleanup?
             #jax.clear_caches()
