@@ -46,13 +46,13 @@ class Propagator:
         """
 
         self.omega = 2 * jnp.pi * c / lwl
-        self.nc = 3.14207787e-4 * self.omega ** 2
+        nc = 3.14207787e-4 * self.omega ** 2
 
         # Find Faraday rotation constant http://farside.ph.utexas.edu/teaching/em/lectures/node101.html
         if (self.ScalarDomain.B_on):
             self.VerdetConst = 2.62e-13 * lwl ** 2 # radians per Tesla per m^2
 
-        ne_nc = jnp.array(self.ScalarDomain.ne / self.nc, dtype = jnp.float32) #normalise to critical density
+        ne_nc = jnp.array(self.ScalarDomain.ne / nc, dtype = jnp.float32) #normalise to critical density
 
         # for some reason this was never being called and errors where thrown when interps were called
         #self.set_up_interps() - just put directly into function instead
@@ -142,21 +142,21 @@ class Propagator:
 
         grad = jnp.zeros_like(r)
 
-        dndx = -0.5 * c ** 2 * jnp.gradient(self.ScalarDomain.ne / self.nc, self.ScalarDomain.x, axis = 0)
+        dndx = -0.5 * c ** 2 * jnp.gradient(ne_nc, self.ScalarDomain.x, axis = 0)
         dndx_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), dndx, bounds_error = False, fill_value = 0.0)
         del dndx
 
         grad = grad.at[0, :].set(dndx_interp(r.T))
         del dndx_interp
 
-        dndy = -0.5 * c ** 2 * jnp.gradient(self.ScalarDomain.ne / self.nc, self.ScalarDomain.y, axis = 1)
+        dndy = -0.5 * c ** 2 * jnp.gradient(ne_nc, self.ScalarDomain.y, axis = 1)
         dndy_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), dndy, bounds_error = False, fill_value = 0.0)
         del dndy
 
         grad = grad.at[1, :].set(dndy_interp(r.T))
         del dndy_interp
 
-        dndz = -0.5 * c ** 2 * jnp.gradient(self.ScalarDomain.ne / self.nc, self.ScalarDomain.z, axis = 2)
+        dndz = -0.5 * c ** 2 * jnp.gradient(ne_nc, self.ScalarDomain.z, axis = 2)
         dndz_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), dndz, bounds_error = False, fill_value = 0.0)
         del dndz
 
