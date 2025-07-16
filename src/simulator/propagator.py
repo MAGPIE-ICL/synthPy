@@ -36,7 +36,7 @@ class Propagator:
         self.extent = self.integration_length / 2
 
 # The following functions are methods to be called by the solve()
-    #@partial(jax.jit, static_argnames = ['self', 'lwl', 'keep_domain'])
+    @partial(jax.jit, static_argnames = ['self', 'lwl', 'keep_domain'])
     def calc_dndr(self, lwl = 1064e-9, *, keep_domain = False):
         """
         Generate interpolators for derivatives.
@@ -129,7 +129,7 @@ class Propagator:
 
         return jnp.sqrt(1.0 - (o_pe / self.omega) ** 2)
 
-    def dndr(self, r ne_nc):
+    def dndr(self, r, ne_nc):
         """
         Returns the gradient at the locations r
 
