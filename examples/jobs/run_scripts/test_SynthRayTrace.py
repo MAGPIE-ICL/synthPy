@@ -63,7 +63,7 @@ importlib.reload(beam_initialiser)
 import propagator as p
 importlib.reload(p)
 
-with jax.checking_leaks()
+with jax.checking_leaks():
     beam_definition = beam_initialiser.Beam(Np, beam_size, divergence, ne_extent, probing_direction = probing_direction, wavelength = lwl, beam_type = beam_type)
 
     tracer = p.Propagator(domain, probing_direction = probing_direction, inv_brems = False, phaseshift = False)
