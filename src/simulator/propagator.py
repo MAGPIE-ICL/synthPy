@@ -64,6 +64,7 @@ class Propagator:
         # for some reason this was never being called and errors where thrown when interps were called
         #self.set_up_interps() - just put directly into function instead
 
+        '''
         # Electron density
         self.ne_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.ne, bounds_error = False, fill_value = 0.0)
 
@@ -92,6 +93,7 @@ class Propagator:
                 del self.ScalarDomain.ne
             except:
                 self.ScalarDomain.ne = None
+        '''
 
     def omega_pe(self, ne):
         """Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28"""
