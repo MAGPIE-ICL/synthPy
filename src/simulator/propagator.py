@@ -36,7 +36,6 @@ class Propagator:
         self.extent = self.integration_length / 2
 
 # The following functions are methods to be called by the solve()
-    @jax.jit
     def calc_dndr(self, lwl = 1064e-9, *, keep_domain = False):
         """
         Generate interpolators for derivatives.
@@ -52,7 +51,7 @@ class Propagator:
         if (self.ScalarDomain.B_on):
             self.VerdetConst = 2.62e-13 * lwl ** 2 # radians per Tesla per m^2
 
-        ne_nc = jnp.array(self.ScalarDomain.ne / nc, dtype = jnp.float32) #normalise to critical density
+        self.ne_nc = jax.jit(jnp.array(self.ScalarDomain.ne / nc, dtype = jnp.float32)) #normalise to critical density
 
         # for some reason this was never being called and errors where thrown when interps were called
         #self.set_up_interps() - just put directly into function instead
@@ -129,7 +128,7 @@ class Propagator:
 
         return jnp.sqrt(1.0 - (o_pe / self.omega) ** 2)
 
-    def dndr(self, r, ne_nc):
+    def dndr(self, r):
         """
         Returns the gradient at the locations r
 
@@ -142,21 +141,21 @@ class Propagator:
 
         grad = jnp.zeros_like(r)
 
-        dndx = -0.5 * c ** 2 * jnp.gradient(ne_nc, self.ScalarDomain.x, axis = 0)
+        dndx = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.x, axis = 0)
         dndx_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), dndx, bounds_error = False, fill_value = 0.0)
         del dndx
 
         grad = grad.at[0, :].set(dndx_interp(r.T))
         del dndx_interp
 
-        dndy = -0.5 * c ** 2 * jnp.gradient(ne_nc, self.ScalarDomain.y, axis = 1)
+        dndy = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.y, axis = 1)
         dndy_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), dndy, bounds_error = False, fill_value = 0.0)
         del dndy
 
         grad = grad.at[1, :].set(dndy_interp(r.T))
         del dndy_interp
 
-        dndz = -0.5 * c ** 2 * jnp.gradient(ne_nc, self.ScalarDomain.z, axis = 2)
+        dndz = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.z, axis = 2)
         dndz_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), dndz, bounds_error = False, fill_value = 0.0)
         del dndz
 
@@ -249,7 +248,7 @@ class Propagator:
 
         return pol
 
-    def solve(self, s0_import, ne_nc, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, force_device = None, memory_debug = False):
+    def solve(self, s0_import, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, force_device = None, memory_debug = False):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
@@ -270,7 +269,7 @@ class Propagator:
 
             start = time()
             # wrapper allows dummy variables t & y to be used by solve_ivp(), self is required by dsdt
-            sol = solve_ivp(lambda t, y: dsdt(t, y, self, parallelise, ne_nc), [0, t[-1]], s0, t_eval = t)
+            sol = solve_ivp(lambda t, y: dsdt(t, y, self, parallelise), [0, t[-1]], s0, t_eval = t)
         else:
             self.available_devices = jax.devices()
 
@@ -396,7 +395,7 @@ class Propagator:
         finish = time()
         self.duration = finish - start
 
-        #del self.ne_nc
+        del self.ne_nc
 
         if memory_debug and parallelise:
             # Visualises sharding, looks cool, but pretty useless - and a pain with higher core counts
@@ -524,7 +523,7 @@ class Propagator:
         self.Jf = None
 
 # ODEs of photon paths, standalone function to support the solve()
-def dsdt(t, s, propagator, parallelise, ne_nc):
+def dsdt(t, s, propagator, parallelise):
     """
     Returns an array with the gradients and velocity per ray for ode_int
 
@@ -560,7 +559,7 @@ def dsdt(t, s, propagator, parallelise, ne_nc):
     #p = s[7,:]
     #r = s[8,:]
 
-    sprime = sprime.at[3:6, :].set(propagator.dndr(x, ne_nc))
+    sprime = sprime.at[3:6, :].set(propagator.dndr(x))
     sprime = sprime.at[:3, :].set(v)
 
     sprime = sprime.at[6, :].set(propagator.atten(x) * a)
