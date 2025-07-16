@@ -10,9 +10,6 @@ from datetime import datetime
 from os import system as os_system
 from jax.scipy.interpolate import RegularGridInterpolator
 
-from equinox import filter_jit
-from functools import partial
-
 from scipy.constants import c
 from scipy.constants import e
 #from scipy.constants import hbar
@@ -52,13 +49,6 @@ class Propagator:
         if (self.ScalarDomain.B_on):
             self.VerdetConst = 2.62e-13 * lwl ** 2 # radians per Tesla per m^2
 
-        '''
-        @partial(jax.jit, static_argnums=0)
-        def ne_nc_calc(self):
-            return jnp.array(self.ScalarDomain.ne / nc, dtype = jnp.float32) #normalise to critical density
-
-        self.ne_nc = ne_nc_calc(self)
-        '''
         self.ne_nc = jnp.array(self.ScalarDomain.ne / nc, dtype = jnp.float32)
 
         # for some reason this was never being called and errors where thrown when interps were called
@@ -380,7 +370,7 @@ class Propagator:
             if jitted:
                 start_comp = time()
 
-                #from equinox import filter_jit
+                from equinox import filter_jit
                 # equinox.filter_jit() (imported as filter_jit()) provides debugging info unlike jax.jit() - it does not like static args though so sticking with jit for now
                 #ODE_solve = jax.jit(ODE_solve, static_argnums = 1)#, device = available_devices[0])
                 ODE_solve = filter_jit(ODE_solve)#, device = available_devices[0])

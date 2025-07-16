@@ -90,7 +90,7 @@ def jax_init():
     os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
     #os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "1.00"
     os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"
-    os.environ["TF_CUDA_MALLOC_ASYNC_SUPPORTED_PREALLOC"] = "-1"
+    os.environ["TF_CUDA_MALLOC_ASYNC_SUPPORTED_PREALLOC"] = "0.95"
 
     import jax
 
