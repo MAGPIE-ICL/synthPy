@@ -10,6 +10,8 @@ from datetime import datetime
 from os import system as os_system
 from jax.scipy.interpolate import RegularGridInterpolator
 
+from functools import partial
+
 from scipy.constants import c
 from scipy.constants import e
 #from scipy.constants import hbar
@@ -34,7 +36,7 @@ class Propagator:
         self.extent = self.integration_length / 2
 
 # The following functions are methods to be called by the solve()
-    @jax.jit
+    @partial(jax.jit, static_argnames = ['self'])
     def calc_dndr(self, lwl = 1064e-9, *, keep_domain = False):
         """
         Generate interpolators for derivatives.
