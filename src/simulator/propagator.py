@@ -36,7 +36,7 @@ class Propagator:
         self.extent = self.integration_length / 2
 
 # The following functions are methods to be called by the solve()
-    @partial(jax.jit, static_argnames = ['self', 'lwl', 'keep_domain'])
+    #@partial(jax.jit, static_argnames = ['self', 'lwl', 'keep_domain'])
     def calc_dndr(self, lwl = 1064e-9, *, keep_domain = False):
         """
         Generate interpolators for derivatives.
@@ -46,13 +46,13 @@ class Propagator:
         """
 
         self.omega = 2 * jnp.pi * c / lwl
-        nc = 3.14207787e-4 * self.omega ** 2
+        self.nc = 3.14207787e-4 * self.omega ** 2
 
         # Find Faraday rotation constant http://farside.ph.utexas.edu/teaching/em/lectures/node101.html
         if (self.ScalarDomain.B_on):
             self.VerdetConst = 2.62e-13 * lwl ** 2 # radians per Tesla per m^2
 
-        self.ne_nc = jnp.array(self.ScalarDomain.ne / nc, dtype = jnp.float32) #normalise to critical density
+        #self.ne_nc = jnp.array(self.ScalarDomain.ne / nc, dtype = jnp.float32) #normalise to critical density
 
         # for some reason this was never being called and errors where thrown when interps were called
         #self.set_up_interps() - just put directly into function instead
@@ -140,21 +140,21 @@ class Propagator:
 
         grad = jnp.zeros_like(r)
 
-        dndx = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.x, axis = 0)
+        dndx = -0.5 * c ** 2 * jnp.gradient(self.ScalarDomain.ne / self.nc, self.ScalarDomain.x, axis = 0)
         dndx_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), dndx, bounds_error = False, fill_value = 0.0)
         del dndx
 
         grad = grad.at[0, :].set(dndx_interp(r.T))
         del dndx_interp
 
-        dndy = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.y, axis = 1)
+        dndy = -0.5 * c ** 2 * jnp.gradient(self.ScalarDomain.ne / self.nc, self.ScalarDomain.y, axis = 1)
         dndy_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), dndy, bounds_error = False, fill_value = 0.0)
         del dndy
 
         grad = grad.at[1, :].set(dndy_interp(r.T))
         del dndy_interp
 
-        dndz = -0.5 * c ** 2 * jnp.gradient(self.ne_nc, self.ScalarDomain.z, axis = 2)
+        dndz = -0.5 * c ** 2 * jnp.gradient(self.ScalarDomain.ne / self.nc, self.ScalarDomain.z, axis = 2)
         dndz_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), dndz, bounds_error = False, fill_value = 0.0)
         del dndz
 
@@ -394,7 +394,7 @@ class Propagator:
         finish = time()
         self.duration = finish - start
 
-        del self.ne_nc
+        #del self.ne_nc
 
         if memory_debug and parallelise:
             # Visualises sharding, looks cool, but pretty useless - and a pain with higher core counts
