@@ -22,7 +22,7 @@ if args.force_device is not None:
     force_device = args.force_device
 
 import config
-config.jax_init(force_device)
+config.jax_init(force_device = force_device)
 
 import jax
 
