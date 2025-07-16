@@ -52,7 +52,7 @@ class Propagator:
         if (self.ScalarDomain.B_on):
             self.VerdetConst = 2.62e-13 * lwl ** 2 # radians per Tesla per m^2
 
-        #self.ne_nc = jnp.array(self.ScalarDomain.ne / nc, dtype = jnp.float32) #normalise to critical density
+        ne_nc = jnp.array(self.ScalarDomain.ne / nc, dtype = jnp.float32) #normalise to critical density
 
         # for some reason this was never being called and errors where thrown when interps were called
         #self.set_up_interps() - just put directly into function instead
@@ -85,6 +85,8 @@ class Propagator:
                 del self.ScalarDomain.ne
             except:
                 self.ScalarDomain.ne = None
+
+        return ne_nc
 
     def omega_pe(self, ne):
         """Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28"""
@@ -127,7 +129,7 @@ class Propagator:
 
         return jnp.sqrt(1.0 - (o_pe / self.omega) ** 2)
 
-    def dndr(self, r):
+    def dndr(self, r ne_nc):
         """
         Returns the gradient at the locations r
 
@@ -247,7 +249,7 @@ class Propagator:
 
         return pol
 
-    def solve(self, s0_import, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, force_device = None, memory_debug = False):
+    def solve(self, s0_import, ne_nc, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, force_device = None, memory_debug = False):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
@@ -268,7 +270,7 @@ class Propagator:
 
             start = time()
             # wrapper allows dummy variables t & y to be used by solve_ivp(), self is required by dsdt
-            sol = solve_ivp(lambda t, y: dsdt(t, y, self, parallelise), [0, t[-1]], s0, t_eval = t)
+            sol = solve_ivp(lambda t, y: dsdt(t, y, self, parallelise, ne_nc), [0, t[-1]], s0, t_eval = t)
         else:
             self.available_devices = jax.devices()
 
@@ -332,7 +334,7 @@ class Propagator:
 
             # wrapper for same reason, diffrax.ODETerm instantiaties this and passes args (this will contain self)
             def dsdt_ODE(t, y, args):
-                return dsdt(t, y, args[0], args[1]) * norm_factor
+                return dsdt(t, y, args[0], args[1], args[2]) * norm_factor
 
             import diffrax
             #import optax - diffrax uses as a dependency, don't need to import directly
@@ -522,7 +524,7 @@ class Propagator:
         self.Jf = None
 
 # ODEs of photon paths, standalone function to support the solve()
-def dsdt(t, s, propagator, parallelise):
+def dsdt(t, s, propagator, parallelise, ne_nc):
     """
     Returns an array with the gradients and velocity per ray for ode_int
 
@@ -558,7 +560,7 @@ def dsdt(t, s, propagator, parallelise):
     #p = s[7,:]
     #r = s[8,:]
 
-    sprime = sprime.at[3:6, :].set(propagator.dndr(x))
+    sprime = sprime.at[3:6, :].set(propagator.dndr(x, ne_nc))
     sprime = sprime.at[:3, :].set(v)
 
     sprime = sprime.at[6, :].set(propagator.atten(x) * a)
