@@ -86,11 +86,11 @@ def jax_init():
     #jax.config.update('xla_force_host_platform_device_count', self.core_count)
     os.environ['XLA_FLAGS'] = "--xla_force_host_platform_device_count=" + str(cpu_count())
     #os.environ['JAX_ENABLE_X64'] = "True"
-    #os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
-    #os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
-    os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "1.00"
-    #os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"
-    #os.environ["TF_CUDA_MALLOC_ASYNC_SUPPORTED_PREALLOC"] = "-1"
+    os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
+    os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
+    #os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "1.00"
+    os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"
+    os.environ["TF_CUDA_MALLOC_ASYNC_SUPPORTED_PREALLOC"] = "-1"
 
     import jax
 
