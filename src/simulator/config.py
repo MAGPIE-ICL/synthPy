@@ -70,7 +70,7 @@ class flags:
         for i, (k, v) in enumerate(self.value_holders):
             self.value_holders[k].value = self.value_holders[k].default
 
-def jax_init():
+def jax_init(force_device = None):
     import sys
     import os
 
@@ -89,8 +89,12 @@ def jax_init():
     #os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
     os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
     os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.9"
-    os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"
-    #os.environ["TF_CUDA_MALLOC_ASYNC_SUPPORTED_PREALLOC"] = "0.95"
+
+    if force_device == "cpu":
+        os.environ['JAX_PLATFORM_NAME'] = 'cpu'
+    else:
+        os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"
+        #os.environ["TF_CUDA_MALLOC_ASYNC_SUPPORTED_PREALLOC"] = "0.95"
 
     import jax
 

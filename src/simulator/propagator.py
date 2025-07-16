@@ -244,7 +244,7 @@ class Propagator:
 
         return pol
 
-    def solve(self, s0_import, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, force_device = None, memory_debug = False):
+    def solve(self, s0_import, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
@@ -269,12 +269,14 @@ class Propagator:
         else:
             self.available_devices = jax.devices()
 
+            '''
             if force_device is not None:
                 try:
                     #jax.default_device = jax.devices(force_device)[0]
                     jax.config.update('jax_platform_name', force_device)
                 except:
                     print("\njax cannot detect that device if it does exist - try not passing a force_device param and seeing if it runs.")
+            '''
 
             from jax.lib import xla_bridge
             running_device = xla_bridge.get_backend().platform

@@ -10,17 +10,21 @@ import sys
 #sys.path.insert(0, '/home/administrator/Work/UROP_ICL_Internship/synthPy/src/simulator')
 sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/simulator')     # import path/to/synthpy
 
-import config
-config.jax_init()
-
-import jax
-
 parser = argparse.ArgumentParser()
 parser.add_argument("-d", "--domain", type = int)
 parser.add_argument("-r", "--rays", type = int)
 parser.add_argument("-f", "--force-device", type = str)
 parser.add_argument("-m", "--memory", type = int)
 args = parser.parse_args()
+
+force_device = None
+if args.force_device is not None:
+    force_device = args.force_device
+
+import config
+config.jax_init(force_device)
+
+import jax
 
 n_cells = 512
 if args.domain is not None:
@@ -71,15 +75,9 @@ with jax.checking_leaks():
     # solve ray trace
     tracer.calc_dndr(lwl)
 
-    force_device = None
-    if args.force_device is not None:
-        force_device = args.force_device
-
     memory_debug = False
     if args.memory is not None:
         memory_debug = True
 
-    print(memory_debug)
-
-    tracer.solve(beam_definition.s0, force_device = force_device, memory_debug = memory_debug)
+    tracer.solve(beam_definition.s0, memory_debug = memory_debug)
     print("\nCompleted ray trace in", np.round(tracer.duration, 3), "seconds.\n\n\n\n\n")
