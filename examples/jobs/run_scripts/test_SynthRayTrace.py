@@ -13,6 +13,8 @@ sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/simulator')     # 
 import config
 config.jax_init()
 
+import jax
+
 parser = argparse.ArgumentParser()
 parser.add_argument("-d", "--domain", type = int)
 parser.add_argument("-r", "--rays", type = int)
@@ -61,22 +63,23 @@ importlib.reload(beam_initialiser)
 import propagator as p
 importlib.reload(p)
 
-beam_definition = beam_initialiser.Beam(Np, beam_size, divergence, ne_extent, probing_direction = probing_direction, wavelength = lwl, beam_type = beam_type)
+with jax.checking_leaks()
+    beam_definition = beam_initialiser.Beam(Np, beam_size, divergence, ne_extent, probing_direction = probing_direction, wavelength = lwl, beam_type = beam_type)
 
-tracer = p.Propagator(domain, probing_direction = probing_direction, inv_brems = False, phaseshift = False)
+    tracer = p.Propagator(domain, probing_direction = probing_direction, inv_brems = False, phaseshift = False)
 
-# solve ray trace
-tracer.calc_dndr(lwl)
+    # solve ray trace
+    tracer.calc_dndr(lwl)
 
-force_device = None
-if args.force_device is not None:
-    force_device = args.force_device
+    force_device = None
+    if args.force_device is not None:
+        force_device = args.force_device
 
-memory_debug = False
-if args.memory is not None:
-    memory_debug = True
+    memory_debug = False
+    if args.memory is not None:
+        memory_debug = True
 
-print(memory_debug)
+    print(memory_debug)
 
-tracer.solve(beam_definition.s0, force_device = force_device, memory_debug = memory_debug)
-print("\nCompleted ray trace in", np.round(tracer.duration, 3), "seconds.\n\n\n\n\n")
+    tracer.solve(beam_definition.s0, force_device = force_device, memory_debug = memory_debug)
+    print("\nCompleted ray trace in", np.round(tracer.duration, 3), "seconds.\n\n\n\n\n")
