@@ -1,12 +1,41 @@
 import numpy as np
 import jax.numpy as jnp
 import jax
+import equinox as eqx
 
-class ScalarDomain:
+class ScalarDomain(eqx.Module):
     """
     A class to hold and generate scalar domains.
     This contains also the method to propagate rays through the scalar domain
     """
+
+    B_on: bool
+
+    x_length: jnp.int64
+    y_length: jnp.int64
+    z_length: jnp.int64
+
+    lengths: jax.Array
+
+    x_n: jnp.int64
+    y_n: jnp.int64
+    z_n: jnp.int64
+
+    dim: jax.Array
+
+    x: jax.Array
+    y: jax.Array
+    z: jax.Array
+
+    XX: jax.Array
+    YY: jax.Array
+    ZZ: jax.Array
+
+    ne: jax.Array
+
+    B: jax.Array
+    Te: jax.Array
+    Z: jax.Array
 
     def __init__(self, lengths, dim, *, B_on = False, ne_type = None):
         """
@@ -25,10 +54,20 @@ class ScalarDomain:
             extent (float): physical size, m
         """
 
+        # initalise to none for equinox incase not initialised properly later on
+        self.ne = None
+        self.B = None
+        self.Te = None
+        self.Z = None
+
         # Logical switches
         self.B_on = B_on
 
         valid_types = (int, float, jnp.int64)
+
+        ##
+        ## NOT FORCING THESE CONVERSIONS MAY CAUSE ISSUES WITH EQUINOX CLASS LATER DOWN THE LINE DEPENDING ON USER INPUT
+        ##
 
         # if 1 length given, assumes all are the same
         if isinstance(lengths, valid_types):
@@ -300,8 +339,11 @@ class ScalarDomain:
 
     def cleanup(self):
         if self.XX is not None:
-            del self.XX
+            #del self.XX
+            self.XX = None
         if self.YY is not None:
-            del self.YY
+            #del self.YY
+            self.YY = None
         if self.ZZ is not None:
-            del self.ZZ
+            #del self.ZZ
+            self.ZZ = None
