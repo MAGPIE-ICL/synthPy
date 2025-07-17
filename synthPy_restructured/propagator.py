@@ -17,18 +17,23 @@ from equinox import filter_jit
 from SpK_reader import open_emi_files
 from scipy.constants import c, e
 
+
+
 def omega_pe(ne):
     '''Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28'''
 
-    return 5.64e4*np.sqrt(ne)
+    return 56.35*np.sqrt(ne)
 
 class Propagator:
-    def __init__(self, ScalarDomain, Beam, inv_brems = False, x_ray = False, phaseshift = False):
+    def __init__(self, ScalarDomain, Beam, inv_brems = False, x_ray = False, phaseshift = False, n_refrac = False):
         self.ScalarDomain = ScalarDomain
         self.Beam = Beam
         self.inv_brems = inv_brems
         self.x_ray = x_ray
         self.phaseshift = phaseshift
+        self.prev_x = None
+        self.phase_integral = 0
+        self.n_refrac = n_refrac
 
         #Opacity takes into account inverse bremstrahlung. Therefore, if both x_ray and inv_brems are True,
         # then x_ray should remain True and inv_brems should be set to False. 
@@ -62,6 +67,7 @@ class Propagator:
 
         self.omega = 2*np.pi*(c/lwl)
         nc = 3.14207787e-4*self.omega**2
+        self.nc = nc
 
         # Find Faraday rotation constant http://farside.ph.utexas.edu/teaching/em/lectures/node101.html
         if (self.ScalarDomain.B_on):
@@ -110,8 +116,8 @@ class Propagator:
     # Plasma refractive index
     def n_refrac(self):
 
-        ne_cc = self.ScalarDomain.ne*1e-6
-        o_pe  = omega_pe(ne_cc)
+        #ne_cc = self.ScalarDomain.ne*1e-6
+        o_pe  = omega_pe(self.ScalarDomain.ne)
         return np.sqrt(1.0-(o_pe/self.omega)**2)
 
     def set_up_interps(self):
@@ -132,7 +138,6 @@ class Propagator:
         if(self.x_ray):
             grp_centres, grps, rho, Te, opa_data = open_emi_files("../../opa_multi_planck_CH_LTE_210506_Hydra_ColdOpa.spk")
             opa_max=self.ScalarDomain.x_n/(self.ScalarDomain.x_length)
-            print(opa_max)
             opa_data_capped=np.minimum(opa_max, opa_data)
             self.opacity_interp = RegularGridInterpolator((grp_centres, rho, Te), opa_data_capped, bounds_error = False, fill_value = 0.0)
             self.Te_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.Te, bounds_error = False, fill_value = 0.0)
@@ -213,7 +218,7 @@ class Propagator:
 
         return pol
 
-    def solve(self, return_E = False, parallelise = True, jitted = True, Nt = 2):
+    def solve(self, return_E = False, parallelise = True, jitted = True, Nt = 2, Ntrack = 0):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
@@ -271,6 +276,19 @@ class Propagator:
                     stepsize_controller = stepsize_controller,
                     max_steps = (self.ScalarDomain.x_n ** 3) * 100
                 )
+            # def ODE_solve_2(s, mask):
+                
+            #     return jax.lax.cond(mask, 
+            #                         lambda s : diffrax_solve(dsdt_ODE, 0, 1, Nt)(s, args1),
+            #                         lambda s : diffrax_solve(dsdt_ODE, 0, 1, 2)(s, args1), s)
+            
+            # key = jax.random.PRNGKey(100)
+            
+            # # randomly choose k unique indices from N
+            # chosen_indices = jax.random.choice(key, self.Beam.Np, shape=(Ntrack,), replace=False)
+
+            # # create a boolean mask: True for f1, False for f2
+            # mask = jnp.zeros(self.Beam.Np, dtype=bool).at[chosen_indices].set(True)
 
             ODE_solve = diffrax_solve(dsdt_ODE, 0, 1, Nt)
 
@@ -287,11 +305,17 @@ class Propagator:
             # Solve for specific s0 intial values
             #args = {'self': self, 'parallelise': parallelise}
             #args = [self, parallelise]
-            args = (self, parallelise) # passed args must be hashable to be made static for jax.jit, tuple is hashable, array & dict are not
+            args1 = (self, parallelise) # passed args must be hashable to be made static for jax.jit, tuple is hashable, array & dict are not
 
             # pass s0[:, i] for each ray via a jax.vmap for parallelisation
             # transposed as jax.vmap() expects form of [batch_idx, items] not [items, batch_idx]
-            sol = jax.vmap(lambda s: ODE_solve(s, args))(s0.T)
+            sol = jax.vmap(lambda s: ODE_solve(s, args1))(s0.T)
+            #sol = jax.vmap(ODE_solve_2)(s0.T, mask)
+            #print(sol.ys)
+            
+        print("phase shift from line integral:", self.phase_integral)
+        self.prev_x = None
+        self.phase_integral = 0
 
         finish = time()
         self.duration = finish - start
@@ -301,6 +325,7 @@ class Propagator:
             self.Beam.rf = sol.y[:,-1].reshape(9, Np)
             self.Beam.positions = np.transpose(sol.y.reshape(9, Np, Nt), (1, 2, 0))[:, : ,:3]
             self.Beam.amplitudes = np.transpose(sol.y.reshape(9, Np, Nt), (1, 2, 0))[:, :, 6]
+            self.Beam.phases = np.transpose(sol.y.reshape(9, Np, Nt), (1, 2, 0))[:, :, 7]
         else:
             '''
             #for i in enumerate(sol.result):
@@ -321,6 +346,7 @@ class Propagator:
             self.Beam.rf = sol.ys[:, -1, :].T
             self.Beam.positions = sol.ys[:, :, :3]
             self.Beam.amplitudes = sol.ys[:,:,6]
+            
 
             print("\nParallelised output has resulting 3D matrix of form: [batch_count, 2, 9]:", sol.ys.shape)
             print("\t2 to account the start and end results")
@@ -331,7 +357,7 @@ class Propagator:
 
         self.Beam.rf, self.Beam.Jf = ray_to_Jonesvector(self.Beam.rf, self.extent, probing_direction = self.Beam.probing_direction)
         #print("\n", self.Beam.rf)
-        #self.Beam.rf = 1e3*self.Beam.rf
+        
         if return_E:
             return self.Beam.rf, self.Beam.Jf
         else:
@@ -384,6 +410,12 @@ class Propagator:
         self.ne_nc = None
         self.Beam.sf = None
         self.Beam.rf = None
+        prev_x = None
+        phase_integral = 0
+
+def distance(x2, x1):
+    return jnp.sqrt(jnp.sum((x2-x1)*(x2-x1), axis=0))
+
 
 # ODEs of photon paths, standalone function to support the solve()
 def dsdt(t, s, Propagator, parallelise):
@@ -407,18 +439,27 @@ def dsdt(t, s, Propagator, parallelise):
 
     #sprime = np.zeros_like(s.reshape(9, s.size // 9))
     sprime = jnp.zeros_like(s)
-
+    
     # Position and velocity
     # needs to be before the reshape to avoid indexing errors
     x = s[:3, :]
     v = s[3:6, :]
 
+    if Propagator.phase_shift is True:
+        if Propagator.prev_x is not None:
+            dr = distance(x, Propagator.prev_x)
+            Propagator.phase_integral -= Propagator.ne_interp(x.T)*dr/Propagator.nc*np.pi/Propagator.Beam.wavelength
+
+        Propagator.prev_x = x
+
     # Amplitude, phase and polarisation
     a = s[6, :]
     p = s[7,:]
     #r = s[8,:]
-  
-    sprime = sprime.at[3:6, :].set(Propagator.dndr(x))
+    if Propagator.n_refrac is not True:   
+        sprime = sprime.at[3:6, :].set(Propagator.dndr(x))
+    else:
+        sprime = sprime.at[3:6, :].set(Propagator.grad_refrac)
     sprime = sprime.at[:3, :].set(v)
     #speed = jnp.sqrt(jnp.sum(v*v, axis=0))
     #print (a)
