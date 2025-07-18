@@ -158,14 +158,12 @@ def dsdt(t, s, interps, parallelise, inv_brems, phaseshift, B_on, ne_nc, coordin
         9N float array: flattened array for ode_int
     """
 
-    '''
     if not parallelise:
         # jnp.reshape() auto converts to a jax array rather than having to do after a numpy reshape
         s = jnp.reshape(s, (9, s.size // 9))
     else:
         # forces s to be a matrix even if has the indexes of a 1d array such that dsdt() can be generalised
         s = jnp.reshape(s, (9, 1))  # one ray per vmap iteration if parallelised
-    '''
     
     # unsure as jax array - also passed not created, should be a copy anyway no?
     #del s
@@ -196,13 +194,12 @@ def dsdt(t, s, interps, parallelise, inv_brems, phaseshift, B_on, ne_nc, coordin
             interps['Bz_interp'],
             B_on, r, v, VerdetConst
         )
-    )
 
     del r
     del v
     del a
 
-    return sprime.flatten()
+    return sprime#.flatten()
 
 # wrapper for same reason, diffrax.ODETerm instantiaties this and passes args (this will contain self)
 # diffrax/jax prefers top level functions for tracing purposes
@@ -451,8 +448,8 @@ def solve(s0_import, extent, r_n, coordinates, interps, ne_nc, omega, VerdetCons
 
             from equinox import filter_jit
             # equinox.filter_jit() (imported as filter_jit()) provides debugging info unlike jax.jit() - it does not like static args though so sticking with jit for now
-            ODE_solve = jax.jit(ODE_solve)#, static_argnums = 1)#, device = available_devices[0])
-            #ODE_solve = filter_jit(ODE_solve)#, device = available_devices[0])
+            #ODE_solve = jax.jit(ODE_solve)#, static_argnums = 1)#, device = available_devices[0])
+            ODE_solve = filter_jit(ODE_solve)#, device = available_devices[0])
             # not sure about the performance of non-static specified arguments with filter_jit() - only use for debugging not in 'production'
 
             print("\njax compilation of solver took:", time() - start_comp, "seconds")
@@ -462,9 +459,11 @@ def solve(s0_import, extent, r_n, coordinates, interps, ne_nc, omega, VerdetCons
 
         # pass s0[:, i] for each ray via a jax.vmap for parallelisation
         start = time()
-        sol = jax.block_until_ready(
-            jax.vmap(lambda rays: ODE_solve(rays, args))(s0)
-        )
+        sol = lambda rays: ODE_solve(s0, args)(s0)
+        #sol = jax.block_until_ready(
+        #    jax.vmap(lambda rays: ODE_solve(rays, args))(s0)
+        #)
+        print(sol)
 
         #sol = jax.block_until_ready(jax.vmap(ODE_solve, in_axes = (0, None))(s0, args))
         #sol = jax.block_until_ready(jax.vmap(lambda s, args: ODE_solve(s, args), in_axes = (0, None))(s0, args))
