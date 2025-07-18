@@ -3,6 +3,7 @@ import os
 import sys
 import jax
 import jax.numpy as jnp
+import numpy as np
 
 from scipy.integrate import odeint, solve_ivp
 from time import time
@@ -19,47 +20,6 @@ import interpolations
 
 from utils import getsizeof
 #from utils import trilinearInterpolator
-
-# Attenuation due to inverse bremsstrahlung
-def atten(kappa_interp, inv_brems, x):
-    if(inv_brems):
-        return kappa_interp(x.T)
-    else:
-        return 0.0
-
-# Phase shift introduced by refractive index
-def phase(refractive_index_interp, phaseshift, x, omega):
-    if(phaseshift):
-        return omega * (refractive_index_interp(x.T) - 1.0)
-    else:
-        return 0.0
-
-def neB(ne_interp, Bx_interp, By_interp, Bz_interp, B_on, x, v, VerdetConst):
-    """
-    Returns the VerdetConst ne B.v
-
-    Args:
-        x (3xN float): N [x,y,z] locations
-        v (3xN float): N [vx,vy,vz] velocities
-
-    Returns:
-        N float: N values of ne B.v
-    """
-
-    def get_ne(ne_interp, x):
-        return ne_interp(x.T)
-
-    def get_B(Bx_interp, By_interp, Bz_interp, x):
-        return jnp.array([Bx_interp(x.T), By_interp(x.T), Bz_interp(x.T)])
-
-    if (B_on):
-        ne_N = get_ne(ne_interp, x)
-        Bv_N = jnp.sum(get_B(Bx_interp, By_interp, Bz_interp, x) * v, axis = 0)
-        pol = VerdetConst * ne_N * Bv_N
-    else:
-        pol = 0.0
-
-    return pol
 
 def calc_dndr(ScalarDomain, lwl = 1064e-9, *, keep_domain = False):
     """
@@ -79,7 +39,7 @@ def calc_dndr(ScalarDomain, lwl = 1064e-9, *, keep_domain = False):
 
     ne_nc = jnp.array(ScalarDomain.ne / nc, dtype = jnp.float32)
 
-    interps = interpolations.set_up_interps(ScalarDomain, omega)
+    interps = interpolations.interpolation_setup(ScalarDomain, omega)
 
     if not keep_domain:
         try:
@@ -184,17 +144,38 @@ def dsdt(t, s, interps, parallelise, inv_brems, phaseshift, B_on, ne_nc, coordin
     sprime = sprime.at[3:6, :].set(dndr(r, ne_nc, *coordinates))
     sprime = sprime.at[:3, :].set(v)
 
-    sprime = sprime.at[6, :].set(atten(interps['kappa_interp'], inv_brems, r) * amp)
-    sprime = sprime.at[7, :].set(phase(interps['refractive_index_interp'], phaseshift, r, omega))
-    sprime = sprime.at[8, :].set(
-        neB(
-            interps['ne_interp'],
-            interps['Bx_interp'],
-            interps['By_interp'],
-            interps['Bz_interp'],
-            B_on, r, v, VerdetConst
+    '''
+    # Attenuation due to inverse bremsstrahlung
+    if inv_brems:
+        sprime = sprime.at[6, :].set(interps['kappa_interp'](r.T) * amp)
+    if phaseshift:
+        sprime = sprime.at[7, :].set(omega * (interps['refractive_index_interp'](r.T) - 1.0))
+    if B_on:
+        """
+        Returns the VerdetConst ne B.v
+
+        Args:
+            x (3xN float): N [x,y,z] locations
+            v (3xN float): N [vx,vy,vz] velocities
+
+        Returns:
+            N float: N values of ne B.v
+        """
+
+        ne_N = interps['ne_interp'](r.T)
+
+        Bv_N = jnp.sum(
+            jnp.array(
+                [
+                    interps['Bx_interp'](r.T),
+                    interps['By_interp'](r.T),
+                    interps['Bz_interp'](r.T)
+                ]
+            ) * v, axis = 0
         )
-    )
+
+        sprime = sprime.at[8, :].set(VerdetConst * ne_N * Bv_N)
+    '''
 
     del r
     del v
@@ -461,11 +442,12 @@ def solve(s0_import, extent, r_n, coordinates, interps, ne_nc, omega, VerdetCons
         # pass s0[:, i] for each ray via a jax.vmap for parallelisation
         start = time()
         sol = jax.block_until_ready(
-            jax.vmap(lambda rays: ODE_solve(rays, args))(s0)
+            # in_axes version ensures that vmap doesn't map args parameters, just s0
+            #jax.vmap(lambda rays, args: ODE_solve, in_axes = (0, None))(s0, args)
+            jax.vmap(lambda s: ODE_solve(s, args))(s0)
         )
 
         #sol = jax.block_until_ready(jax.vmap(ODE_solve, in_axes = (0, None))(s0, args))
-        #sol = jax.block_until_ready(jax.vmap(lambda s, args: ODE_solve(s, args), in_axes = (0, None))(s0, args))
 
     duration = time() - start
 
