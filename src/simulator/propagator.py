@@ -20,11 +20,6 @@ import interpolations
 from utils import getsizeof
 #from utils import trilinearInterpolator
 
-def omega_pe(ne):
-    """Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28"""
-
-    return 5.64e4 * jnp.sqrt(ne)
-
 # Attenuation due to inverse bremsstrahlung
 def atten(kappa_interp, inv_brems, x):
     if(inv_brems):
@@ -66,107 +61,48 @@ def neB(ne_interp, Bx_interp, By_interp, Bz_interp, B_on, x, v, VerdetConst):
 
     return pol
 
-class Propagator:
-    def __init__(self, ScalarDomain, *, probing_direction = 'z', inv_brems = False, phaseshift = False):
-        #import config
-        #self.flags = config.flags
+def calc_dndr(ScalarDomain, lwl = 1064e-9, *, keep_domain = False):
+    """
+    Generate interpolators for derivatives.
 
-        self.ScalarDomain = ScalarDomain
+    Args:
+        lwl (float, optional): laser wavelength. Defaults to 1064e-9 m.
+    """
 
-        self.probing_direction = probing_direction
+    # Find Faraday rotation constant http://farside.ph.utexas.edu/teaching/em/lectures/node101.html
+    VerdetConst = 0.0
+    if (ScalarDomain.B_on):
+        VerdetConst = 2.62e-13 * lwl ** 2 # radians per Tesla per m^2
 
-        self.inv_brems = inv_brems
-        self.phaseshift = phaseshift
+    omega = 2 * jnp.pi * c / lwl
+    nc = 3.14207787e-4 * omega ** 2
 
-        self.integration_length = ScalarDomain.lengths[['x', 'y', 'z'].index(self.probing_direction)]
-        self.extent = self.integration_length / 2
+    ne_nc = jnp.array(ScalarDomain.ne / nc, dtype = jnp.float32)
 
-# The following functions are methods to be called by the solve()
-    def calc_dndr(self, lwl = 1064e-9, *, keep_domain = False):
-        """
-        Generate interpolators for derivatives.
+    interps = interpolations.set_up_interps(ScalarDomain, omega)
 
-        Args:
-            lwl (float, optional): laser wavelength. Defaults to 1064e-9 m.
-        """
+    if not keep_domain:
+        try:
+            del ScalarDomain.ne
+        except:
+            ScalarDomain.ne = None
 
-        # Find Faraday rotation constant http://farside.ph.utexas.edu/teaching/em/lectures/node101.html
-        VerdetConst = 0.0
-        if (self.ScalarDomain.B_on):
-            VerdetConst = 2.62e-13 * lwl ** 2 # radians per Tesla per m^2
+    if not keep_domain:
+        try:
+            del ScalarDomain.B
+        except:
+            ScalarDomain.B = None
 
-        omega = 2 * jnp.pi * c / lwl
-        nc = 3.14207787e-4 * omega ** 2
-
-        ne_nc = jnp.array(self.ScalarDomain.ne / nc, dtype = jnp.float32)
-
-        interps = interpolations.set_up_interps(self.ScalarDomain, self.inv_brems, self.phaseshift)
-
-        if not keep_domain:
-            try:
-                del propagator.ScalarDomain.B
-            except:
-                propagator.ScalarDomain.B = None
-        
-        if not keep_domain:
-            try:
-                del self.ScalarDomain.ne
-            except:
-                self.ScalarDomain.ne = None
-
-        return (interps, ne_nc, omega, VerdetConst, self.inv_brems, self.phaseshift, self.ScalarDomain.B_on)
-
-    # NRL formulary inverse brems - cheers Jack Halliday for coding in Python
-    # Converted to rate coefficient by multiplying by group velocity in plasma
-    def kappa(self):
-        # Useful subroutines
-        def v_the(Te):
-            """Calculate electron thermal speed. Provide Te in eV. Retrurns result in m/s"""
-
-            return 4.19e5 * jnp.sqrt(Te)
-
-        def V(ne, Te, Z, omega):
-            o_pe = omega_pe(ne)
-            o_max = jnp.copy(o_pe)
-            o_max[o_pe < omega] = omega
-            L_classical = Z * e / Te
-            L_quantum = 2.760428269727312e-10 / jnp.sqrt(Te) # hbar / jnp.sqrt(m_e * e * Te)
-            L_max = jnp.maximum(L_classical, L_quantum)
-
-            return o_max * L_max
-
-        def coloumbLog(ne, Te, Z, omega):
-            return jnp.maximum(2.0, jnp.log(v_the(Te) / V(ne, Te, Z, omega)))
-
-        ne_cc = self.ScalarDomain.ne * 1e-6
-        # don't think this is actually used?
-        #o_pe = omega_pe(ne_cc)
-        CL = coloumbLog(ne_cc, self.ScalarDomain.Te, self.ScalarDomain.Z, self.omega)
-
-        return 3.1e-5 * self.ScalarDomain.Z * c * jnp.power(ne_cc / self.omega, 2) * CL * jnp.power(self.ScalarDomain.Te, -1.5) # 1/s
-
-    # Plasma refractive index
-    def n_refrac(self):
-        ne_cc = self.ScalarDomain.ne * 1e-6
-        o_pe = omega_pe(ne_cc)
-
-        return jnp.sqrt(1.0 - (o_pe / self.omega) ** 2)
-
-    def clear_memory(self):
-        """
-        Clears variables not needed by solve method, saving memory
-
-        Can also use after calling solve to clear ray positions - important when running large number of rays
-        """
-
-        #self.dndx = None
-        #self.dndy = None
-        #self.dndz = None
-        #self.ScalarDomain.ne = None
-        #self.ne_nc = None
-        #self.s0 = None
-        self.rf = None
-        self.Jf = None
+    return (
+        interps,
+        ne_nc,
+        omega,
+        VerdetConst,
+        ScalarDomain.inv_brems,
+        ScalarDomain.phaseshift,
+        ScalarDomain.B_on,
+        ScalarDomain.probing_direction
+    )
 
 def dndr(r, ne_nc, coordinates):
     """
@@ -197,7 +133,7 @@ def dndr(r, ne_nc, coordinates):
     del dndy_interp
 
     dndz = -0.5 * c ** 2 * jnp.gradient(ne_nc, z, axis = 1)
-    dndz_interp = RegularGridInterpolator(coordinates, dndy, bounds_error = False, fill_value = 0.0)
+    dndz_interp = RegularGridInterpolator(coordinates, dndz, bounds_error = False, fill_value = 0.0)
     del dndz
 
     grad = grad.at[2, :].set(dndz_interp(r.T))
@@ -207,261 +143,6 @@ def dndr(r, ne_nc, coordinates):
     # is less memory efficient according to benchmarking - would it decrease the likelihood of memory leaks though?
 
     return grad
-
-def solve(s0_import, extent, r_n, coordinates, interps, ne_nc, omega, VerdetConst, inv_brems, phaseshift, B_on, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False, probing_direction = 'z'):
-    # Need to make sure all rays have left volume
-    # Conservative estimate of diagonal across volume
-    # Then can backproject to surface of volume
-
-    Np = s0_import.shape[1]
-
-    # make a wrapper function for getsizeof in utilities that outputs more meaningful information
-    print("\nSize in memory of initial rays:", getsizeof(s0_import))
-
-    # 8.0^0.5 is an arbritrary factor to ensure rays have enough time to escape the box
-    # think we should change this???
-    t = jnp.linspace(0.0, jnp.sqrt(8.0) * extent / c, 2)
-
-    if not parallelise:
-        import numpy as np
-        s0 = np.array(jnp.ravel(s0_import))
-        #s0 = s0.flatten() #odeint insists
-
-        start = time()
-        # wrapper allows dummy variables t & y to be used by solve_ivp(), self is required by dsdt
-        sol = solve_ivp(lambda t, y: dsdt(t, y, interps, parallelise), [0, t[-1]], s0, t_eval = t)
-    else:
-        available_devices = jax.devices()
-
-        '''
-        if force_device is not None:
-            try:
-                #jax.default_device = jax.devices(force_device)[0]
-                jax.config.update('jax_platform_name', force_device)
-            except:
-                print("\njax cannot detect that device if it does exist - try not passing a force_device param and seeing if it runs.")
-        '''
-
-        from jax.lib import xla_bridge
-        running_device = xla_bridge.get_backend().platform
-        print("\nRunning device:", running_device, end='')
-
-        # transposed as jax.vmap() expects form of [batch_idx, items] not [items, batch_idx]
-        s0_transformed = s0_import.T
-        del s0_import
-
-        if running_device == 'cpu':
-            from multiprocessing import cpu_count
-            core_count = cpu_count()
-            print(", with:", core_count, "cores.")
-
-            from jax.sharding import PartitionSpec as P, NamedSharding
-
-            # Create a Sharding object to distribute a value across devices:
-            # Assume self.core_count is the no. of core devices available
-            mesh = jax.make_mesh((core_count,), ('rows',))  # 1D mesh for columns
-
-            # Specify sharding: don't split axis 0 (rows), split axis 1 (columns) across devices
-            # then apply sharding to rewrite s0 as a sharded array from it's original matrix
-            # and use jax.device_put to distribute it across devices:
-            Np = ((Np // core_count) * core_count)
-            assert Np > 0, "Not enough rays to parallelise over cores, increase to at least " + str(core_count)
-
-            # if you don't wish to transpose before operation you need to use the old call
-            # s0 = jax.device_put(s0_transformed[:, 0:Np], NamedSharding(mesh, P(None, 'cols')))
-            s0 = jax.device_put(s0_transformed[0:Np, :], NamedSharding(mesh, P('rows', None)))  # 'None' means don't shard axis 0
-
-            print(s0.sharding)            # See the sharding spec
-            #print(s0.addressable_shards)  # Check each device's shard
-            #jax.debug.visualize_array_sharding(s0)
-        elif running_device == 'gpu':
-            gpu_devices = jax.devices('gpu')
-            print("\nThere are", len(gpu_devices), "available GPU devices:", gpu_devices)
-            assert len(gpu_devices) > 0, "Running on GPU yet none detected?"
-
-            s0 = jax.device_put(s0_transformed, gpu_devices[0])
-        elif running_device == 'tpu':
-            s0 = s0_transformed
-            pass
-        else:
-            print("No suitable device detected!")
-
-        del s0_transformed
-        # optional for aggressive cleanup?
-        #jax.clear_caches()
-
-        norm_factor = jnp.max(t)
-
-        from diffrax import ODETerm, Tsit5, SaveAt, PIDController, diffeqsolve
-        #import optax - diffrax uses as a dependency, don't need to import directly
-
-        def diffrax_solve(dydt, t0, t1, Nt, rtol = 1e-7, atol = 1e-9):
-            """
-            Here we wrap the diffrax diffeqsolve function such that we can easily parallelise it
-            """
-
-            # We convert our python function to a diffrax ODETerm
-            term = ODETerm(dsdt_ODE)
-            # We chose a solver (time-stepping) method from within diffrax library
-            solver = Tsit5() # (RK45 - closest I could find to solve_ivp's default method)
-
-            # At what time points you want to save the solution
-            saveat = SaveAt(ts = jnp.linspace(t0, t1, Nt))
-            # Diffrax uses adaptive time stepping to gain accuracy within certain tolerances
-            stepsize_controller = PIDController(rtol = rtol, atol = atol)
-
-            return lambda s0, args : diffeqsolve(
-                term,
-                solver,
-                y0 = jnp.array(s0),
-                args = args,
-                t0 = t0,
-                t1 = t1,
-                dt0 = (t1 - t0) * norm_factor / Nt,
-                saveat = saveat,
-                stepsize_controller = stepsize_controller,
-                # set max steps to no. of cells x100
-                max_steps = r_n[0] * r_n[1] * r_n[2] * 100 #10000 - default for solve_ivp?????
-            )
-
-        # hardcode to normalise to 1 due to diffrax bug
-        ODE_solve = diffrax_solve(dsdt_ODE, t[0], t[-1] / norm_factor, save_steps)
-
-        if jitted:
-            start_comp = time()
-
-            from equinox import filter_jit
-            # equinox.filter_jit() (imported as filter_jit()) provides debugging info unlike jax.jit() - it does not like static args though so sticking with jit for now
-            #ODE_solve = jax.jit(ODE_solve, static_argnums = 1)#, device = available_devices[0])
-            ODE_solve = filter_jit(ODE_solve)#, device = available_devices[0])
-            # not sure about the performance of non-static specified arguments with filter_jit() - only use for debugging not in 'production'
-
-            print("\njax compilation of solver took:", time() - start_comp, "seconds")
-
-        # passed args must be hashable to be made static for jax.jit, tuple is hashable, array & dict are not
-        args = (interps, parallelise, inv_brems, phaseshift, B_on, ne_nc, coordinates, omega, VerdetConst)
-
-        # pass s0[:, i] for each ray via a jax.vmap for parallelisation
-        start = time()
-        sol = jax.block_until_ready(
-            jax.vmap(lambda rays: ODE_solve(rays, args))(s0)
-        )
-
-        #sol = jax.block_until_ready(jax.vmap(ODE_solve, in_axes = (0, None))(s0, args))
-        #sol = jax.block_until_ready(jax.vmap(lambda s, args: ODE_solve(s, args), in_axes = (0, None))(s0, args))
-
-    duration = time() - start
-
-    del ne_nc
-
-    if memory_debug and parallelise:
-        # Visualises sharding, looks cool, but pretty useless - and a pain with higher core counts
-        #jax.debug.visualize_array_sharding(sol.ys[:, -1, :])
-
-        print("\nSize in memory of initial rays:", getsizeof(s0))
-        print("Size in memory of solution:", getsizeof(sol))
-        print("Size in memory of propagator class:", getsizeof(sol))
-
-        folder_name = "memory_benchmarks/"
-        rel_path_to_folder = "../../evaluation/"
-
-        path = rel_path_to_folder + folder_name
-
-        if os.path.isdir(os.getcwd() + "/" + folder_name):
-            path = folder_name
-        elif os.path.isdir(os.getcwd() + "/" + path):
-            pass
-            '''
-            elif not os.path.isdir(os.getcwd() + "/" + path):
-                import errno
-
-                try:
-                    os.mkdir(path)
-                except OSError as e:
-                    if e.errno != errno.EEXIST:
-                        raise
-            '''
-        else:
-            path = os.getcwd() + "/" + folder_name
-
-            try:
-                os.mkdir(path)
-            except OSError as e:
-                if e.errno != errno.EEXIST:
-                    raise
-
-        path += "memory-domain" + str(ScalarDomain.dim[0]) + "_rays"+ str(s0.shape[1]) + "-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
-        jax.profiler.save_device_memory_profile(path)
-
-        print("\n", end = '')
-        if os.path.isfile(os.path.expanduser("~") + "/go/bin/pprof"):
-            #os_system(f"~/go/bin/pprof -top {sys.executable} memory_{N}.prof")
-            os_system(f"~/go/bin/pprof -top /bin/ls " + path)
-            #os_system(f"~/go/bin/pprof --web " + path)
-        else:
-            print("No pprof install detected. Please download (using go) to visualise memory usage.")
-
-    if not parallelise:
-        rf = sol.y[:,-1].reshape(9, Np)
-    else:
-        """
-        #for i in enumerate(sol.result):
-        #    print(i)
-        for idx, result in enumerate(sol.result):
-            # Check if each result is successful
-            if result.success:
-                print(f"Solution at index {idx} succeeded.")
-            else:
-                print(f"Solution at index {idx} failed.")
-    
-        #print(next(sol.result))
-        #print(next(sol.result))
-        #print(type(sol.result[0]))  # Check the type of results
-        """
-
-        #if sol.result == RESULTS.successful:
-        #rf = sol.ys[:, -1, :].reshape(9, Np)# / scalar
-        rf = sol.ys[:, -1, :].T
-
-        print("\nParallelised output has resulting 3D matrix of form: [batch_count, 2, 9]:", sol.ys.shape)
-        print("\t2 to account for the start and end results")
-        print("\t9 containing the 3 position and velocity components, amplitude, phase and polarisation")
-        print("\tIf batch_count is lower than expected, this is likely due to jax's forced integer batch sharding when parallelising over cpu cores.")
-        print("\nWe slice the end result and transpose into the form:", rf.shape, "to work with later code.")
-        #else:
-        #    print("Ray tracer failed. This could be a case of diffrax exceeding max steps again due to apparent 'strictness' compared to solve_ivp, check error log.")
-
-    return ray_to_Jonesvector(rf, extent, probing_direction = probing_direction, return_E = return_E), duration
-
-def solve_at_depth(self, s0_import, z):
-    """
-    Solve intial rays up until a given depth, z
-    """
-
-    # Need to make sure all rays have left volume
-    # Conservative estimate of diagonal across volume
-    # Then can backproject to surface of volume
-
-    length = self.extent + z
-    t = jnp.linspace(0.0, length / c, 2)
-
-    s0 = s0_import.flatten() #odeint insists
-    del s0_import
-
-    print("\nStarting ray trace.")
-
-    start = time()
-
-    parallelise = False
-    dsdt_ODE = lambda t, y: dsdt(t, y, self, parallelise)
-    sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t)
-
-    finish = time()
-    self.duration = finish - start
-
-    print("\nRay trace completed in:\t", self.duration, "s")
-
-    self.rf, _ = ray_to_Jonesvector(sol.y[:,-1].reshape(9, s0.size // 9), self.extent, probing_direction = self.probing_direction)
 
 # ODEs of photon paths, standalone function to support the solve()
 def dsdt(t, s, interps, parallelise, inv_brems, phaseshift, B_on, ne_nc, coordinates, omega, VerdetConst):
@@ -500,13 +181,14 @@ def dsdt(t, s, interps, parallelise, inv_brems, phaseshift, B_on, ne_nc, coordin
     #p = s[7,:]
     #r = s[8,:]
 
-    sprime = sprime.at[3:6, :].set(propagator.dndr(r, ne_nc, *coordinates))
+    '''
+    sprime = sprime.at[3:6, :].set(dndr(r, ne_nc, *coordinates))
     sprime = sprime.at[:3, :].set(v)
 
-    sprime = sprime.at[6, :].set(propagator.atten(interps['kappa_interp'], inv_brems, r) * a)
-    sprime = sprime.at[7, :].set(propagator.phase(interps['refractive_index_interp'], phaseshift, r, omega))
+    sprime = sprime.at[6, :].set(atten(interps['kappa_interp'], inv_brems, r) * a)
+    sprime = sprime.at[7, :].set(phase(interps['refractive_index_interp'], phaseshift, r, omega))
     sprime = sprime.at[8, :].set(
-        propagator.neB(
+        neB(
             interps['ne_interp'],
             interps['Bx_interp'],
             interps['By_interp'],
@@ -514,6 +196,9 @@ def dsdt(t, s, interps, parallelise, inv_brems, phaseshift, B_on, ne_nc, coordin
             B_on, r, v, VerdetConst
         )
     )
+    '''
+    sprime = sprime.at[3:6, :].set(r)
+    sprime = sprime.at[:3, :].set(v)
 
     del r
     del v
@@ -643,3 +328,267 @@ def ray_to_Jonesvector(rays, ne_extent, *, probing_direction = 'z', keep_current
         return jnp.array(ray_p), jnp.array(ray_J)
 
     return jnp.array(ray_p), None
+
+def solve(s0_import, extent, r_n, coordinates, interps, ne_nc, omega, VerdetConst, inv_brems, phaseshift, B_on, probing_direction, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False):
+    Np = s0_import.shape[1]
+
+    print("\nSize in memory of initial rays:", getsizeof(s0_import))
+
+    # Need to make sure all rays have left volume
+    # Conservative estimate of diagonal across volume
+    # Then can backproject to surface of volume
+
+    #self.integration_length = ScalarDomain.lengths[['x', 'y', 'z'].index(self.ScalarDomain.probing_direction)]
+    #self.extent = self.integration_length / 2
+
+    # this was implemented as extent was derived from lengths, which was double its value, we now derive directly from extent so this is unnecessary
+
+    t = jnp.linspace(0.0, jnp.sqrt(8.0) * extent / c, 2)
+
+    # 8.0^0.5 is an arbritrary factor to ensure rays have enough time to escape the box
+    # think we should change this???
+
+    if not parallelise:
+        import numpy as np
+        s0 = np.array(jnp.ravel(s0_import))
+        #s0 = s0.flatten() #odeint insists
+
+        start = time()
+        # wrapper allows dummy variables t & y to be used by solve_ivp(), self is required by dsdt
+        sol = solve_ivp(lambda t, y: dsdt(t, y, interps, parallelise), [0, t[-1]], s0, t_eval = t)
+    else:
+        available_devices = jax.devices()
+
+        '''
+        if force_device is not None:
+            try:
+                #jax.default_device = jax.devices(force_device)[0]
+                jax.config.update('jax_platform_name', force_device)
+            except:
+                print("\njax cannot detect that device if it does exist - try not passing a force_device param and seeing if it runs.")
+        '''
+
+        from jax.lib import xla_bridge
+        running_device = xla_bridge.get_backend().platform
+        print("\nRunning device:", running_device, end='')
+
+        # transposed as jax.vmap() expects form of [batch_idx, items] not [items, batch_idx]
+        s0_transformed = s0_import.T
+        del s0_import
+
+        if running_device == 'cpu':
+            from multiprocessing import cpu_count
+            core_count = cpu_count()
+            print(", with:", core_count, "cores.")
+
+            from jax.sharding import PartitionSpec as P, NamedSharding
+
+            # Create a Sharding object to distribute a value across devices:
+            # Assume self.core_count is the no. of core devices available
+            mesh = jax.make_mesh((core_count,), ('rows',))  # 1D mesh for columns
+
+            # Specify sharding: don't split axis 0 (rows), split axis 1 (columns) across devices
+            # then apply sharding to rewrite s0 as a sharded array from it's original matrix
+            # and use jax.device_put to distribute it across devices:
+            Np = ((Np // core_count) * core_count)
+            assert Np > 0, "Not enough rays to parallelise over cores, increase to at least " + str(core_count)
+
+            # if you don't wish to transpose before operation you need to use the old call
+            # s0 = jax.device_put(s0_transformed[:, 0:Np], NamedSharding(mesh, P(None, 'cols')))
+            s0 = jax.device_put(s0_transformed[0:Np, :], NamedSharding(mesh, P('rows', None)))  # 'None' means don't shard axis 0
+
+            print(s0.sharding)            # See the sharding spec
+            #print(s0.addressable_shards)  # Check each device's shard
+            #jax.debug.visualize_array_sharding(s0)
+        elif running_device == 'gpu':
+            gpu_devices = jax.devices('gpu')
+            print("\nThere are", len(gpu_devices), "available GPU devices:", gpu_devices)
+            assert len(gpu_devices) > 0, "Running on GPU yet none detected?"
+
+            s0 = jax.device_put(s0_transformed, gpu_devices[0])
+        elif running_device == 'tpu':
+            s0 = s0_transformed
+            pass
+        else:
+            assert "No suitable device detected!"
+
+        del s0_transformed
+        # optional for aggressive cleanup?
+        #jax.clear_caches()
+
+        norm_factor = jnp.max(t)
+
+        from diffrax import ODETerm, Tsit5, SaveAt, PIDController, diffeqsolve
+        #import optax - diffrax uses as a dependency, don't need to import directly
+
+        def diffrax_solve(dydt, t0, t1, Nt, rtol = 1e-7, atol = 1e-9):
+            """
+            Here we wrap the diffrax diffeqsolve function such that we can easily parallelise it
+            """
+
+            # We convert our python function to a diffrax ODETerm
+            term = ODETerm(dsdt_ODE)
+            # We chose a solver (time-stepping) method from within diffrax library
+            solver = Tsit5() # (RK45 - closest I could find to solve_ivp's default method)
+
+            # At what time points you want to save the solution
+            saveat = SaveAt(ts = jnp.linspace(t0, t1, Nt))
+            # Diffrax uses adaptive time stepping to gain accuracy within certain tolerances
+            stepsize_controller = PIDController(rtol = rtol, atol = atol)
+
+            return lambda s0, args : diffeqsolve(
+                term,
+                solver,
+                y0 = jnp.array(s0),
+                args = args,
+                t0 = t0,
+                t1 = t1,
+                dt0 = (t1 - t0) * norm_factor / Nt,
+                saveat = saveat,
+                stepsize_controller = stepsize_controller,
+                # set max steps to no. of cells x100
+                max_steps = r_n[0] * r_n[1] * r_n[2] * 100 #10000 - default for solve_ivp?????
+            )
+
+        # hardcode to normalise to 1 due to diffrax bug
+        ODE_solve = diffrax_solve(dsdt_ODE, t[0], t[-1] / norm_factor, save_steps)
+
+        if jitted:
+            start_comp = time()
+
+            from equinox import filter_jit
+            # equinox.filter_jit() (imported as filter_jit()) provides debugging info unlike jax.jit() - it does not like static args though so sticking with jit for now
+            #ODE_solve = jax.jit(ODE_solve, static_argnums = 1)#, device = available_devices[0])
+            ODE_solve = filter_jit(ODE_solve)#, device = available_devices[0])
+            # not sure about the performance of non-static specified arguments with filter_jit() - only use for debugging not in 'production'
+
+            print("\njax compilation of solver took:", time() - start_comp, "seconds")
+
+        # passed args must be hashable to be made static for jax.jit, tuple is hashable, array & dict are not
+        #args = (interps, parallelise, inv_brems, phaseshift, B_on, ne_nc, coordinates, omega, VerdetConst)
+        args = (parallelise)
+
+        # pass s0[:, i] for each ray via a jax.vmap for parallelisation
+        start = time()
+        sol = jax.block_until_ready(
+            jax.vmap(lambda rays: ODE_solve(rays, args))(s0)
+        )
+
+        #sol = jax.block_until_ready(jax.vmap(ODE_solve, in_axes = (0, None))(s0, args))
+        #sol = jax.block_until_ready(jax.vmap(lambda s, args: ODE_solve(s, args), in_axes = (0, None))(s0, args))
+
+    duration = time() - start
+
+    del interps
+    del ne_nc
+
+    if memory_debug and parallelise:
+        # Visualises sharding, looks cool, but pretty useless - and a pain with higher core counts
+        #jax.debug.visualize_array_sharding(sol.ys[:, -1, :])
+
+        print("\nSize in memory of initial rays:", getsizeof(s0))
+        print("Size in memory of solution:", getsizeof(sol))
+        print("Size in memory of propagator class:", getsizeof(sol))
+
+        folder_name = "memory_benchmarks/"
+        rel_path_to_folder = "../../evaluation/"
+
+        path = rel_path_to_folder + folder_name
+
+        if os.path.isdir(os.getcwd() + "/" + folder_name):
+            path = folder_name
+        elif os.path.isdir(os.getcwd() + "/" + path):
+            pass
+            '''
+            elif not os.path.isdir(os.getcwd() + "/" + path):
+                import errno
+
+                try:
+                    os.mkdir(path)
+                except OSError as e:
+                    if e.errno != errno.EEXIST:
+                        raise
+            '''
+        else:
+            path = os.getcwd() + "/" + folder_name
+
+            try:
+                os.mkdir(path)
+            except OSError as e:
+                if e.errno != errno.EEXIST:
+                    raise
+
+        path += "memory-domain" + str(ScalarDomain.dim[0]) + "_rays"+ str(s0.shape[1]) + "-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
+        jax.profiler.save_device_memory_profile(path)
+
+        print("\n", end = '')
+        if os.path.isfile(os.path.expanduser("~") + "/go/bin/pprof"):
+            #os_system(f"~/go/bin/pprof -top {sys.executable} memory_{N}.prof")
+            os_system(f"~/go/bin/pprof -top /bin/ls " + path)
+            #os_system(f"~/go/bin/pprof --web " + path)
+        else:
+            print("No pprof install detected. Please download (using go) to visualise memory usage.")
+
+    if not parallelise:
+        rf = sol.y[:,-1].reshape(9, Np)
+    else:
+        """
+        #for i in enumerate(sol.result):
+        #    print(i)
+        for idx, result in enumerate(sol.result):
+            # Check if each result is successful
+            if result.success:
+                print(f"Solution at index {idx} succeeded.")
+            else:
+                print(f"Solution at index {idx} failed.")
+    
+        #print(next(sol.result))
+        #print(next(sol.result))
+        #print(type(sol.result[0]))  # Check the type of results
+        """
+
+        #if sol.result == RESULTS.successful:
+        #rf = sol.ys[:, -1, :].reshape(9, Np)# / scalar
+        rf = sol.ys[:, -1, :].T
+
+        print("\nParallelised output has resulting 3D matrix of form: [batch_count, 2, 9]:", sol.ys.shape)
+        print("\t2 to account for the start and end results")
+        print("\t9 containing the 3 position and velocity components, amplitude, phase and polarisation")
+        print("\tIf batch_count is lower than expected, this is likely due to jax's forced integer batch sharding when parallelising over cpu cores.")
+        print("\nWe slice the end result and transpose into the form:", rf.shape, "to work with later code.")
+        #else:
+        #    print("Ray tracer failed. This could be a case of diffrax exceeding max steps again due to apparent 'strictness' compared to solve_ivp, check error log.")
+
+    return ray_to_Jonesvector(rf, extent, probing_direction = probing_direction, return_E = return_E), duration
+
+# need to remove this, replacing main solve function with this option as a flag for part solves in reduced domains
+# (or just if someone wanted that for some reason - doesn't have to be the intended one of course, that's the point of generalisation)
+def solve_at_depth(self, s0_import, z):
+    """
+    Solve intial rays up until a given depth, z
+    """
+
+    # Need to make sure all rays have left volume
+    # Conservative estimate of diagonal across volume
+    # Then can backproject to surface of volume
+
+    length = self.extent + z
+    t = jnp.linspace(0.0, length / c, 2)
+
+    s0 = s0_import.flatten() #odeint insists
+    del s0_import
+
+    print("\nStarting ray trace.")
+
+    start = time()
+
+    parallelise = False
+    dsdt_ODE = lambda t, y: dsdt(t, y, self, parallelise)
+    sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t)
+
+    finish = time()
+    self.duration = finish - start
+
+    print("\nRay trace completed in:\t", self.duration, "s")
+
+    self.rf, _ = ray_to_Jonesvector(sol.y[:,-1].reshape(9, s0.size // 9), self.extent, probing_direction = self.probing_direction)

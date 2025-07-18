@@ -27,11 +27,12 @@ def count_nans(matrix, axes = [0, 2]):
         y = y[mask]
 
 def getsizeof(object):
-    memory_attributed = getsizeof_default(object)
+    return mem_conversion(getsizeof_default(object))
 
+def mem_conversion(mem_size):
     count = 0
-    while memory_attributed > 1024:
-        memory_attributed /= 1024
+    while mem_size > 1024:
+        mem_size /= 1024
         count += 1
 
     if count == 0:
@@ -45,7 +46,7 @@ def getsizeof(object):
     else:
         unit = "-> didn't resolve unit, this value is way too big something is very wrong."
 
-    return str(memory_attributed) + unit
+    return str(mem_size) + " " + unit
 
 class trilinearInterpolator:
     """
@@ -235,3 +236,24 @@ def trilinearInterpolator(values, location):
     #    print("Expected 3D array, defaulting to jax.scipy.interpolate.RegularGridInterpolator incase this is an issue with our custom trilinear interpolator.")
     #    # default to scipy code
 '''
+
+class colour:
+    PURPLE = '\033[95m'
+    CYAN = '\033[96m'
+    DARKCYAN = '\033[36m'
+    BLUE = '\033[94m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    RED = '\033[91m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+    END = '\033[0m'
+
+# stored here for later in case needed - check first, this was just copied from stackoverflow I have no idea if it works yet
+def proper_round(num, dec=0):
+    num = str(num)[:str(num).index('.')+dec+2]
+    if num[-1]>='5':
+      a = num[:-2-(not dec)]       # integer part
+      b = int(num[-2-(not dec)])+1 # decimal part
+      return float(a)+b**(-dec+1) if a and b == 10 else float(a+str(b))
+    return float(num[:-1])

@@ -3,13 +3,20 @@ import jax.numpy as jnp
 import jax
 import equinox as eqx
 
+from utils import mem_conversion
+from utils import colour
+
 class ScalarDomain(eqx.Module):
     """
     A class to hold and generate scalar domains.
     This contains also the method to propagate rays through the scalar domain
     """
 
+    inv_brems: bool
+    phaseshift: bool
     B_on: bool
+
+    probing_direction: str
 
     x_length: jnp.int64
     y_length: jnp.int64
@@ -37,7 +44,11 @@ class ScalarDomain(eqx.Module):
     Te: jax.Array
     Z: jax.Array
 
-    def __init__(self, lengths, dim, *, B_on = False, ne_type = None):
+    region_count: jnp.int64
+    length_backup: jnp.int64
+    dim_backup: jnp.int64
+
+    def __init__(self, lengths, dim, probing_direction, *, inv_brems = False, phaseshift = False, B_on = False, ne_type = None, auto_batching = True):
         """
         Example:
             N_V = 100
@@ -61,7 +72,11 @@ class ScalarDomain(eqx.Module):
         self.Z = None
 
         # Logical switches
+        self.inv_brems = inv_brems
+        self.phaseshift = phaseshift
         self.B_on = B_on
+
+        self.probing_direction = probing_direction
 
         valid_types = (int, float, jnp.int64)
 
@@ -98,12 +113,110 @@ class ScalarDomain(eqx.Module):
         del dim
         del valid_types
 
-        print("Predicted size in memory of domain:", self.dim[0] * self.dim[1] * self.dim[2] * 4 / 1024 ** 2, "MB")
+        predicted_domain_allocation = self.dim[0] * self.dim[1] * self.dim[2] * 4
+        print("Predicted size in memory of domain:", mem_conversion(predicted_domain_allocation))
 
         # define coordinate space
         self.x = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
         self.y = jnp.float32(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n))
         self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
+
+        self.region_count = 1.0
+        self.length_backup = 0.0
+        self.dim_backup = 0.0
+
+        if auto_batching:
+            from jax.lib import xla_bridge
+            running_device = xla_bridge.get_backend().platform
+
+            if running_device == 'cpu':
+                from psutil import virtual_memory
+                free_mem = virtual_memory().available
+                print("Free memory:", mem_conversion(free_mem))
+            elif running_device == 'gpu':
+                import pynvml
+
+                pynvml.nvmlInit()
+
+                h = pynvml.nvmlDeviceGetHandleByIndex(0)
+                info = pynvml.nvmlDeviceGetMemoryInfo(h)
+
+                print(h)
+
+                free_mem = info.free
+                print("Memory prior to domain creation:")
+                print(f'total : {info.total}')
+                print(f'free  : {free_mem}')
+                print(f'used  : {info.used}')
+            elif running_device == 'tpu':
+                free_mem = None
+            else:
+                assert "No suitable device detected when checking ram/vram available."
+
+            ##
+            ## Need to work out the max allocation at any point and that estimated size
+            ##
+
+            # 2 for ne and ne_nc in calc_dndr(...) before ne is deleted
+            # at peak mem usage ne should have been deleted, therefore this contributes only 1 domain
+            # +1 for ne_interp
+            # +2 for the 2 sqeuentially repeated domain sized allocations in dndr(...)
+            allocation_count = 4
+
+            # up to +5 in calc_dndr(...) depending on the number of extra interps
+            if B_on:
+                # there are 4 B based interps
+                # and they also require a ScalarDomain.B domain sized matrice
+                allocation_count += 4
+            if inv_brems:
+                # unsure how many intermediaries exist at peak mem usage for this allocation - need to check and adjust this
+                allocation_count += 1
+            if phaseshift:
+                allocation_count += 1
+
+            # working with 10% leeway in estimate for now
+            estimate_limit = predicted_domain_allocation * allocation_count * 1.1
+            if estimate_limit > free_mem:
+                print(colour.BOLD + "\nESTMATE SUGGESTS DOMAIN CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
+                print("--> Auto-batching domain based on memory available and domain size estimate...")
+
+                ##
+                ## Used backed up information to re-assign to ScalarDomain in propagator
+                ## Then call generate_electron_density_profile(...) and re-do calculations with end of prior domain
+                ##
+
+                from math import ceil
+                self.region_count = ceil(estimate_limit / free_mem)
+
+                # save the intended length and resolution of batching axes for later
+                self.length_backup = self.lengths[['x', 'y', 'z'].index(self.probing_direction)]
+                self.dim_backup = self.dim[['x', 'y', 'z'].index(self.probing_direction)]
+
+                #...# Batching logic
+                self.lengths[['x', 'y', 'z'].index(self.probing_direction)] = self.length_backup % region_count
+                self.dim[['x', 'y', 'z'].index(self.probing_direction)] =  self.dim_backup % region_count
+
+                if self.probing_direction == 'x':
+                    self.x_length = self.lengths[0]
+                    self.x_n = self.dim[0]
+
+                    self.x = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
+                elif self.probing_direction == 'y':
+                    self.y_length = self.lengths[0]
+                    self.y_n = self.dim[0]
+
+                    self.y = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
+                elif self.probing_direction == 'z':
+                    self.z_length = self.lengths[0]
+                    self.z_n = self.dim[0]
+
+                    self.z = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
+                else:
+                    assert colour.BOLD + "Invalid entry for probing_direction!" + colour.END
+
+                print("--> Batching calculation completed. Domain will be split into " + str(region_count) + " parts.")
+                print(colour.BOLD + "\nWARNING:" + colour.END + " This functionality will cause the solver to run slower due to domain regeneration.")
+                print("For optimal performance, increase the memory available to this program.")
 
         if ne_type is not None:
             self.generate_electron_density_profile(ne_type)
@@ -155,11 +268,7 @@ class ScalarDomain(eqx.Module):
 
             self.test_B()
         else:
-            print("\nNo valid profile detected, ensure passed name is correct or call yourself.")
-
-            self.XX = None
-            self.YY = None
-            self.ZZ = None
+            assert "\nNo valid profile detected! Ensure passed name is correct or call yourself."
 
         self.cleanup()
 
