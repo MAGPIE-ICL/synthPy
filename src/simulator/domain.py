@@ -48,7 +48,7 @@ class ScalarDomain(eqx.Module):
     length_backup: jnp.int64
     dim_backup: jnp.int64
 
-    def __init__(self, lengths, dim, probing_direction, *, inv_brems = False, phaseshift = False, B_on = False, ne_type = None, auto_batching = True):
+    def __init__(self, lengths, dim, *, ne_type = None, inv_brems = False, phaseshift = False, B_on = False, probing_direction = 'z', auto_batching = True):
         """
         Example:
             N_V = 100

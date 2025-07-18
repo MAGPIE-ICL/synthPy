@@ -194,6 +194,7 @@ def dsdt(t, s, interps, parallelise, inv_brems, phaseshift, B_on, ne_nc, coordin
             interps['Bz_interp'],
             B_on, r, v, VerdetConst
         )
+    )
 
     del r
     del v
@@ -459,11 +460,9 @@ def solve(s0_import, extent, r_n, coordinates, interps, ne_nc, omega, VerdetCons
 
         # pass s0[:, i] for each ray via a jax.vmap for parallelisation
         start = time()
-        sol = lambda rays: ODE_solve(s0, args)(s0)
-        #sol = jax.block_until_ready(
-        #    jax.vmap(lambda rays: ODE_solve(rays, args))(s0)
-        #)
-        print(sol)
+        sol = jax.block_until_ready(
+            jax.vmap(lambda rays: ODE_solve(rays, args))(s0)
+        )
 
         #sol = jax.block_until_ready(jax.vmap(ODE_solve, in_axes = (0, None))(s0, args))
         #sol = jax.block_until_ready(jax.vmap(lambda s, args: ODE_solve(s, args), in_axes = (0, None))(s0, args))
