@@ -157,13 +157,15 @@ def dsdt(t, s, interps, parallelise, inv_brems, phaseshift, B_on, ne_nc, coordin
     Returns:
         9N float array: flattened array for ode_int
     """
-    
+
+    '''
     if not parallelise:
         # jnp.reshape() auto converts to a jax array rather than having to do after a numpy reshape
         s = jnp.reshape(s, (9, s.size // 9))
     else:
         # forces s to be a matrix even if has the indexes of a 1d array such that dsdt() can be generalised
         s = jnp.reshape(s, (9, 1))  # one ray per vmap iteration if parallelised
+    '''
     
     # unsure as jax array - also passed not created, should be a copy anyway no?
     #del s
@@ -177,15 +179,14 @@ def dsdt(t, s, interps, parallelise, inv_brems, phaseshift, B_on, ne_nc, coordin
     v = s[3:6, :]
 
     # Amplitude, phase and polarisation
-    a = s[6, :]
-    #p = s[7,:]
-    #r = s[8,:]
+    amp = s[6, :]
+    #phase = s[7,:]
+    #pol = s[8,:]
 
-    '''
     sprime = sprime.at[3:6, :].set(dndr(r, ne_nc, *coordinates))
     sprime = sprime.at[:3, :].set(v)
 
-    sprime = sprime.at[6, :].set(atten(interps['kappa_interp'], inv_brems, r) * a)
+    sprime = sprime.at[6, :].set(atten(interps['kappa_interp'], inv_brems, r) * amp)
     sprime = sprime.at[7, :].set(phase(interps['refractive_index_interp'], phaseshift, r, omega))
     sprime = sprime.at[8, :].set(
         neB(
@@ -196,9 +197,6 @@ def dsdt(t, s, interps, parallelise, inv_brems, phaseshift, B_on, ne_nc, coordin
             B_on, r, v, VerdetConst
         )
     )
-    '''
-    sprime = sprime.at[3:6, :].set(r)
-    sprime = sprime.at[:3, :].set(v)
 
     del r
     del v
@@ -338,19 +336,14 @@ def solve(s0_import, extent, r_n, coordinates, interps, ne_nc, omega, VerdetCons
     # Conservative estimate of diagonal across volume
     # Then can backproject to surface of volume
 
-    #self.integration_length = ScalarDomain.lengths[['x', 'y', 'z'].index(self.ScalarDomain.probing_direction)]
-    #self.extent = self.integration_length / 2
-
-    # this was implemented as extent was derived from lengths, which was double its value, we now derive directly from extent so this is unnecessary
-
     t = jnp.linspace(0.0, jnp.sqrt(8.0) * extent / c, 2)
 
     # 8.0^0.5 is an arbritrary factor to ensure rays have enough time to escape the box
     # think we should change this???
 
     if not parallelise:
-        import numpy as np
-        s0 = np.array(jnp.ravel(s0_import))
+        from numpy import array
+        s0 = array(jnp.ravel(s0_import))
         #s0 = s0.flatten() #odeint insists
 
         start = time()
@@ -447,7 +440,7 @@ def solve(s0_import, extent, r_n, coordinates, interps, ne_nc, omega, VerdetCons
                 saveat = saveat,
                 stepsize_controller = stepsize_controller,
                 # set max steps to no. of cells x100
-                max_steps = r_n[0] * r_n[1] * r_n[2] * 100 #10000 - default for solve_ivp?????
+                max_steps = 10000 #r_n[0] * r_n[1] * r_n[2] * 100 #10000 - default for solve_ivp?????
             )
 
         # hardcode to normalise to 1 due to diffrax bug
@@ -458,15 +451,14 @@ def solve(s0_import, extent, r_n, coordinates, interps, ne_nc, omega, VerdetCons
 
             from equinox import filter_jit
             # equinox.filter_jit() (imported as filter_jit()) provides debugging info unlike jax.jit() - it does not like static args though so sticking with jit for now
-            #ODE_solve = jax.jit(ODE_solve, static_argnums = 1)#, device = available_devices[0])
-            ODE_solve = filter_jit(ODE_solve)#, device = available_devices[0])
+            ODE_solve = jax.jit(ODE_solve)#, static_argnums = 1)#, device = available_devices[0])
+            #ODE_solve = filter_jit(ODE_solve)#, device = available_devices[0])
             # not sure about the performance of non-static specified arguments with filter_jit() - only use for debugging not in 'production'
 
             print("\njax compilation of solver took:", time() - start_comp, "seconds")
 
         # passed args must be hashable to be made static for jax.jit, tuple is hashable, array & dict are not
-        #args = (interps, parallelise, inv_brems, phaseshift, B_on, ne_nc, coordinates, omega, VerdetConst)
-        args = (parallelise)
+        args = (interps, parallelise, inv_brems, phaseshift, B_on, ne_nc, coordinates, omega, VerdetConst)
 
         # pass s0[:, i] for each ray via a jax.vmap for parallelisation
         start = time()
