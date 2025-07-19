@@ -1,8 +1,13 @@
+import os
+import sys
 import jax
 import jax.numpy as jnp
+import numpy as np
 
 from scipy.integrate import odeint, solve_ivp
 from time import time
+from datetime import datetime
+from os import system as os_system
 from jax.scipy.interpolate import RegularGridInterpolator
 
 from scipy.constants import c
@@ -33,31 +38,20 @@ def calc_dndr(ScalarDomain, lwl = 1064e-9, *, keep_domain = False):
 
     ne_nc = jnp.array(ScalarDomain.ne / nc, dtype = jnp.float32)
 
-    ##
-    ## keep_domain = True and test commented out due to deletion currently failing - fix later
-    ##
+    interps = interpolations.interpolation_setup(ScalarDomain, omega)
 
-    interps = interpolations.set_up_interps(ScalarDomain, omega, True)
-
-    '''
-    if ScalarDomain.ne is None and ScalarDomain.B is None:
-        print("SUCCESSFULL DELETION!")
-    else:
-        print("del keyword could have worked has failure, checking if you can print anyhing")
-
+    if not keep_domain:
         try:
-            print(ScalarDomain.ne)
+            del ScalarDomain.ne
         except:
-            print("ScalarDomain.ne does not exist!")
+            ScalarDomain.ne = None
 
+    if not keep_domain:
         try:
-            print(ScalarDomain.B)
+            del ScalarDomain.B
         except:
-            print("ScalarDomain.ne does not exist!")
-    '''
+            ScalarDomain.B = None
 
-    # DOUBLE CHECK THINGS ARE PASSED IN THE RIGHT ORDER!!!
-    # python doesn't check data types so this causes silent errors if not sorted...
     return (
         interps,
         ne_nc,
@@ -69,7 +63,7 @@ def calc_dndr(ScalarDomain, lwl = 1064e-9, *, keep_domain = False):
         ScalarDomain.probing_direction
     )
 
-def dndr(r, ne_nc, x, y, z):
+def dndr(r, ne_nc, coordinates):
     """
     Returns the gradient at the locations r
 
@@ -84,22 +78,21 @@ def dndr(r, ne_nc, x, y, z):
 
     #More compact notation is possible here, but we are explicit
     dndx = -0.5 * c ** 2 * jnp.gradient(ne_nc, x, axis = 0)
-    # x, y & z have to passed manually into a tuple rather than pre packed - for some reason ...
-    dndx_interp = RegularGridInterpolator((x, y, z), dndx, bounds_error = False, fill_value = 0.0)
+    dndx_interp = RegularGridInterpolator(coordinates, dndx, bounds_error = False, fill_value = 0.0)
     del dndx
 
     grad = grad.at[0, :].set(dndx_interp(r.T))
     del dndx_interp
 
     dndy = -0.5 * c ** 2 * jnp.gradient(ne_nc, y, axis = 1)
-    dndy_interp = RegularGridInterpolator((x, y, z), dndy, bounds_error = False, fill_value = 0.0)
+    dndy_interp = RegularGridInterpolator(coordinates, dndy, bounds_error = False, fill_value = 0.0)
     del dndy
 
     grad = grad.at[1, :].set(dndy_interp(r.T))
     del dndy_interp
 
     dndz = -0.5 * c ** 2 * jnp.gradient(ne_nc, z, axis = 1)
-    dndz_interp = RegularGridInterpolator((x, y, z), dndz, bounds_error = False, fill_value = 0.0)
+    dndz_interp = RegularGridInterpolator(coordinates, dndz, bounds_error = False, fill_value = 0.0)
     del dndz
 
     grad = grad.at[2, :].set(dndz_interp(r.T))
@@ -130,7 +123,11 @@ def dsdt(t, s, interps, parallelise, inv_brems, phaseshift, B_on, ne_nc, coordin
     else:
         # forces s to be a matrix even if has the indexes of a 1d array such that dsdt() can be generalised
         s = jnp.reshape(s, (9, 1))  # one ray per vmap iteration if parallelised
+    
+    # unsure as jax array - also passed not created, should be a copy anyway no?
+    #del s
 
+    #sprime = jnp.zeros_like(s.reshape(9, s.size // 9))
     sprime = jnp.zeros_like(s)
 
     # Position and velocity
@@ -143,16 +140,9 @@ def dsdt(t, s, interps, parallelise, inv_brems, phaseshift, B_on, ne_nc, coordin
     #phase = s[7,:]
     #pol = s[8,:]
 
-    # was deleting before it needed using before by accident - obviously caused issues (AbstractTerm error)
-    # - fine to delete after used, only one slice of s0 rather than deleting s0
-    # although probably really unnecessary?
-    del s
-
-    # must unpack coordinates tuple here for the sake of dndr, could be earlier but this is easier to pass and more generalised
-    sprime = sprime.at[3:6, :].set(dndr(r, ne_nc, *coordinates))
+    sprime = sprime.at[3:6, :].set(dndr(r, ne_nc, coordinates))
     sprime = sprime.at[:3, :].set(v)
 
-    '''
     # Attenuation due to inverse bremsstrahlung
     if inv_brems:
         sprime = sprime.at[6, :].set(interps.kappa_interp(r.T) * amp)
@@ -183,17 +173,17 @@ def dsdt(t, s, interps, parallelise, inv_brems, phaseshift, B_on, ne_nc, coordin
         )
 
         sprime = sprime.at[8, :].set(VerdetConst * ne_N * Bv_N)
-    '''
 
     del r
     del v
-    del amp
+    del a
 
-    # flattening is not changing its shape, it is a flattened array as its parallelised
-    # solve_ivp expects it flattened anyway so either way this is the correct return format
-    # only issue would be if it is flattened differently this time to the first and to how it was unflattened
-    # - as then data would be in the wrong place
-    return sprime.flatten()
+    return sprime#.flatten()
+
+# wrapper for same reason, diffrax.ODETerm instantiaties this and passes args (this will contain self)
+# diffrax/jax prefers top level functions for tracing purposes
+def dsdt_ODE(t, y, args):
+    return dsdt(t, y, *args) * norm_factor
 
 # Need to backproject to ne volume, then find angles
 def ray_to_Jonesvector(rays, ne_extent, *, probing_direction = 'z', keep_current_plane = False, return_E = False):
@@ -313,7 +303,7 @@ def ray_to_Jonesvector(rays, ne_extent, *, probing_direction = 'z', keep_current
 
     return jnp.array(ray_p), None
 
-def solve(s0_import, coordinates, dim, extent, interps, ne_nc, omega, VerdetConst, inv_brems, phaseshift, B_on, probing_direction, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False):
+def solve(s0_import, extent, r_n, coordinates, interps, ne_nc, omega, VerdetConst, inv_brems, phaseshift, B_on, probing_direction, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False):
     Np = s0_import.shape[1]
 
     print("\nSize in memory of initial rays:", getsizeof(s0_import))
@@ -323,20 +313,9 @@ def solve(s0_import, coordinates, dim, extent, interps, ne_nc, omega, VerdetCons
     # Then can backproject to surface of volume
 
     t = jnp.linspace(0.0, jnp.sqrt(8.0) * extent / c, 2)
-    norm_factor = jnp.max(t)
 
     # 8.0^0.5 is an arbritrary factor to ensure rays have enough time to escape the box
     # think we should change this???
-
-    ##
-    ## CURRENTLY PASSING NONE IN PLACE OF INTERPS
-    ## - get AbstractTerm either when interps are passed, both as dictionary or as an equinox class
-    ## - try to fix later, pass individually perhaps?
-    ## NOTES SAY DICT IS NOT HASHABLE - try as a tuple? - tuple did not work either :(
-    ##
-
-    # passed args must be hashable to be made static for jax.jit, tuple is hashable, array & dict are not
-    args = (interps, parallelise, inv_brems, phaseshift, B_on, ne_nc, coordinates, omega, VerdetConst)
 
     if not parallelise:
         from numpy import array
@@ -345,7 +324,7 @@ def solve(s0_import, coordinates, dim, extent, interps, ne_nc, omega, VerdetCons
 
         start = time()
         # wrapper allows dummy variables t & y to be used by solve_ivp(), self is required by dsdt
-        sol = solve_ivp(lambda t, y: dsdt(t, y, *args), [0, t[-1]], s0, t_eval = t)
+        sol = solve_ivp(lambda t, y: dsdt(t, y, interps, parallelise), [0, t[-1]], s0, t_eval = t)
     else:
         available_devices = jax.devices()
 
@@ -406,10 +385,7 @@ def solve(s0_import, coordinates, dim, extent, interps, ne_nc, omega, VerdetCons
         # optional for aggressive cleanup?
         #jax.clear_caches()
 
-        # wrapper for same reason, diffrax.ODETerm instantiaties this and passes args
-        # I have no idea why, but this has to be defined in solve rather than as a global function - else there is an abstract variable error
-        def dsdt_ODE(t, y, args):
-            return dsdt(t, y, *args) * norm_factor
+        norm_factor = jnp.max(t)
 
         from diffrax import ODETerm, Tsit5, SaveAt, PIDController, diffeqsolve
         #import optax - diffrax uses as a dependency, don't need to import directly
@@ -420,8 +396,7 @@ def solve(s0_import, coordinates, dim, extent, interps, ne_nc, omega, VerdetCons
             """
 
             # We convert our python function to a diffrax ODETerm
-            # should use the function passed into the wrapper - not the local definition
-            term = ODETerm(dydt)
+            term = ODETerm(dsdt_ODE)
             # We chose a solver (time-stepping) method from within diffrax library
             solver = Tsit5() # (RK45 - closest I could find to solve_ivp's default method)
 
@@ -441,7 +416,7 @@ def solve(s0_import, coordinates, dim, extent, interps, ne_nc, omega, VerdetCons
                 saveat = saveat,
                 stepsize_controller = stepsize_controller,
                 # set max steps to no. of cells x100
-                max_steps = dim[0] * dim[1] * dim[2] * 100 #10000 - default for solve_ivp?????
+                max_steps = 10000 #r_n[0] * r_n[1] * r_n[2] * 100 #10000 - default for solve_ivp?????
             )
 
         # hardcode to normalise to 1 due to diffrax bug
@@ -457,6 +432,9 @@ def solve(s0_import, coordinates, dim, extent, interps, ne_nc, omega, VerdetCons
             # not sure about the performance of non-static specified arguments with filter_jit() - only use for debugging not in 'production'
 
             print("\njax compilation of solver took:", time() - start_comp, "seconds")
+
+        # passed args must be hashable to be made static for jax.jit, tuple is hashable, array & dict are not
+        args = (interps, parallelise, inv_brems, phaseshift, B_on, ne_nc, coordinates, omega, VerdetConst)
 
         # pass s0[:, i] for each ray via a jax.vmap for parallelisation
         start = time()
@@ -474,8 +452,6 @@ def solve(s0_import, coordinates, dim, extent, interps, ne_nc, omega, VerdetCons
     del ne_nc
 
     if memory_debug and parallelise:
-        import os
-
         # Visualises sharding, looks cool, but pretty useless - and a pain with higher core counts
         #jax.debug.visualize_array_sharding(sol.ys[:, -1, :])
 
@@ -511,15 +487,11 @@ def solve(s0_import, coordinates, dim, extent, interps, ne_nc, omega, VerdetCons
                 if e.errno != errno.EEXIST:
                     raise
 
-        from datetime import datetime
         path += "memory-domain" + str(ScalarDomain.dim[0]) + "_rays"+ str(s0.shape[1]) + "-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
         jax.profiler.save_device_memory_profile(path)
 
         print("\n", end = '')
         if os.path.isfile(os.path.expanduser("~") + "/go/bin/pprof"):
-            #import sys
-            from os import system as os_system
-
             #os_system(f"~/go/bin/pprof -top {sys.executable} memory_{N}.prof")
             os_system(f"~/go/bin/pprof -top /bin/ls " + path)
             #os_system(f"~/go/bin/pprof --web " + path)
@@ -550,7 +522,7 @@ def solve(s0_import, coordinates, dim, extent, interps, ne_nc, omega, VerdetCons
 
         print("\nParallelised output has resulting 3D matrix of form: [batch_count, 2, 9]:", sol.ys.shape)
         print("\t2 to account for the start and end results")
-        print("\t9 containing the 3 position and veljax.vmap(ODE_solve, in_axes = (0, None))(s0, args)ocity components, amplitude, phase and polarisation")
+        print("\t9 containing the 3 position and velocity components, amplitude, phase and polarisation")
         print("\tIf batch_count is lower than expected, this is likely due to jax's forced integer batch sharding when parallelising over cpu cores.")
         print("\nWe slice the end result and transpose into the form:", rf.shape, "to work with later code.")
         #else:
