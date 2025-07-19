@@ -182,15 +182,14 @@ def set_up_interps(ScalarDomain, omega, keep_domain):
         except:
             ScalarDomain.B = None
 
-    '''
-    return ({
-        "ne_interp": )ne_interp,
+    # runs fine like this so clearly jax doesn't like the RegularGridInterpolator class rather than the format it's in
+    return {
+        "ne_interp": None,
         "Bx_interp": Bx_interp,
         "By_interp": By_interp,
         "Bz_interp": Bz_interp,
         "kappa_interp": kappa_interp,
         "refractive_index_interp": refractive_index_interp
     }
-    '''
 
-    return (ne_interp, Bx_interp, By_interp, Bz_interp, kappa_interp, refractive_index_interp)
+    #return (None, Bx_interp, By_interp, Bz_interp, kappa_interp, refractive_index_interp)

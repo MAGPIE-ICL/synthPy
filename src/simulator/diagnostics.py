@@ -287,8 +287,19 @@ class Diagnostic:
         # these HAVE to stay... for some reason - not entirely sure why you can't just reference self.Beam.r_ directly (or now just rf)
         # if you can make it without the memory duplication work please do, else DON'T REMOVE!
 
-        self.rf = rf
-        self.Jf = Jf
+        # these are created as jax.Array's, yet received as a tuple here?
+        # likely as they are passed externally where jax.numpy module is not loaded
+        # just re-assert type here to fix
+
+        if rf is not None:
+            self.rf = jnp.array(rf)
+        else:
+            assert "rf should not be of Noneype! diffrax clearly failed."
+
+        if Jf is not None:
+            self.Jf = jnp.array(Jf)
+        else:
+            self.Jf = Jf
 
         # however, doesn't have to be done manually now as already sorted in propagator.py, therefore no more duplication
         # still odd though... (hence the keeping of the comment)

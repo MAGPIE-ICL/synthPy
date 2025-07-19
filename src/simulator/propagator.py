@@ -155,9 +155,9 @@ def dsdt(t, s, interps, parallelise, inv_brems, phaseshift, B_on, ne_nc, coordin
     '''
     # Attenuation due to inverse bremsstrahlung
     if inv_brems:
-        sprime = sprime.at[6, :].set(interps.kappa_interp(r.T) * amp)
+        sprime = sprime.at[6, :].set(interps['kappa_interp'](r.T) * amp)
     if phaseshift:
-        sprime = sprime.at[7, :].set(omega * (interps.refractive_index_interp(r.T) - 1.0))
+        sprime = sprime.at[7, :].set(omega * (interps['refractive_index_interp'](r.T) - 1.0))
     if B_on:
         """
         Returns the VerdetConst ne B.v
@@ -170,14 +170,14 @@ def dsdt(t, s, interps, parallelise, inv_brems, phaseshift, B_on, ne_nc, coordin
             N float: N values of ne B.v
         """
 
-        ne_N = interps.ne_interp(r.T)
+        ne_N = interps['ne_interp'](r.T)
 
         Bv_N = jnp.sum(
             jnp.array(
                 [
-                    interps.Bx_interp(r.T),
-                    interps.By_interp(r.T),
-                    interps.Bz_interp(r.T)
+                    interps['Bx_interp'](r.T),
+                    interps['By_interp'](r.T),
+                    interps['Bz_interp'](r.T)
                 ]
             ) * v, axis = 0
         )
@@ -309,9 +309,9 @@ def ray_to_Jonesvector(rays, ne_extent, *, probing_direction = 'z', keep_current
 
     # ray_p [x, phi, y, theta], ray_J [E_x, E_y]
     if return_E:
-        return jnp.array(ray_p), jnp.array(ray_J)
+        return ray_p, ray_J
 
-    return jnp.array(ray_p), None
+    return ray_p, None
 
 def solve(s0_import, coordinates, dim, extent, interps, ne_nc, omega, VerdetConst, inv_brems, phaseshift, B_on, probing_direction, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False):
     Np = s0_import.shape[1]
@@ -456,7 +456,7 @@ def solve(s0_import, coordinates, dim, extent, interps, ne_nc, omega, VerdetCons
             ODE_solve = filter_jit(ODE_solve)#, device = available_devices[0])
             # not sure about the performance of non-static specified arguments with filter_jit() - only use for debugging not in 'production'
 
-            print("\njax compilation of solver took:", time() - start_comp, "seconds")
+            print("\njax compilation of solver took:", time() - start_comp, "seconds", end='')
 
         # pass s0[:, i] for each ray via a jax.vmap for parallelisation
         start = time()
@@ -550,13 +550,13 @@ def solve(s0_import, coordinates, dim, extent, interps, ne_nc, omega, VerdetCons
 
         print("\nParallelised output has resulting 3D matrix of form: [batch_count, 2, 9]:", sol.ys.shape)
         print("\t2 to account for the start and end results")
-        print("\t9 containing the 3 position and veljax.vmap(ODE_solve, in_axes = (0, None))(s0, args)ocity components, amplitude, phase and polarisation")
+        print("\t9 containing the 3 position and velocity components, amplitude, phase and polarisation")
         print("\tIf batch_count is lower than expected, this is likely due to jax's forced integer batch sharding when parallelising over cpu cores.")
         print("\nWe slice the end result and transpose into the form:", rf.shape, "to work with later code.")
         #else:
         #    print("Ray tracer failed. This could be a case of diffrax exceeding max steps again due to apparent 'strictness' compared to solve_ivp, check error log.")
 
-    return ray_to_Jonesvector(rf, extent, probing_direction = probing_direction, return_E = return_E), duration
+    return *ray_to_Jonesvector(rf, extent, probing_direction = probing_direction, return_E = return_E), duration
 
 # need to remove this, replacing main solve function with this option as a flag for part solves in reduced domains
 # (or just if someone wanted that for some reason - doesn't have to be the intended one of course, that's the point of generalisation)
@@ -588,4 +588,4 @@ def solve_at_depth(self, s0_import, z):
 
     print("\nRay trace completed in:\t", self.duration, "s")
 
-    self.rf, _ = ray_to_Jonesvector(sol.y[:,-1].reshape(9, s0.size // 9), self.extent, probing_direction = self.probing_direction)
+    self.rf, _ = *ray_to_Jonesvector(sol.y[:,-1].reshape(9, s0.size // 9), self.extent, probing_direction = self.probing_direction)
