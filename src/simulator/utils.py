@@ -257,3 +257,11 @@ def proper_round(num, dec=0):
       b = int(num[-2-(not dec)])+1 # decimal part
       return float(a)+b**(-dec+1) if a and b == 10 else float(a+str(b))
     return float(num[:-1])
+
+def dalloc(var):
+    try:
+        del var
+        #print(f'del {var}')
+    except:
+        var = None
+        #print(f'set {var = }')

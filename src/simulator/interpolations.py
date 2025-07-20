@@ -2,9 +2,9 @@
 import jax.numpy as jnp
 
 from jax.scipy.interpolate import RegularGridInterpolator
-#from equinox import Module
-
 '''
+from equinox import Module
+
 class interpolation_setup(Module):
     ne_interp: RegularGridInterpolator
 
@@ -37,11 +37,11 @@ class interpolation_setup(Module):
 
         # Inverse Bremsstrahlung
         if(ScalarDomain.inv_brems):
-            self.kappa_interp = RegularGridInterpolator((ScalarDomain.x, ScalarDomain.y, ScalarDomain.z), kappa(ScalarDomain, omega), bounds_error = False, fill_value = 0.0)
+            self.kappa_interp = RegularGridInterpolator((ScalarDomain.x, ScalarDomain.y, ScalarDomain.z), self.kappa(ScalarDomain, omega), bounds_error = False, fill_value = 0.0)
 
         # Phase shift
         if(ScalarDomain.phaseshift):
-            self.refractive_index_interp = RegularGridInterpolator((ScalarDomain.x, ScalarDomain.y, ScalarDomain.z), n_refrac(ScalarDomain.ne, omega), bounds_error = False, fill_value = 1.0)
+            self.refractive_index_interp = RegularGridInterpolator((ScalarDomain.x, ScalarDomain.y, ScalarDomain.z), self.n_refrac(ScalarDomain.ne, omega), bounds_error = False, fill_value = 1.0)
 
         if not keep_domain:
             try:
@@ -70,7 +70,7 @@ class interpolation_setup(Module):
             return 4.19e5 * jnp.sqrt(Te)
 
         def V(ne, Te, Z, omega):
-            o_pe = omega_pe(ne)
+            o_pe = self.omega_pe(ne)
             #o_max = jnp.copy(o_pe)
             #o_max[o_pe < omega] = omega
             o_pe = o_pe.at[:, :].set(jnp.where(o_pe < omega, omega, o_pe))
@@ -86,7 +86,7 @@ class interpolation_setup(Module):
 
         ne_cc = ScalarDomain.ne * 1e-6
         # don't think this is actually used?
-        #o_pe = omega_pe(ne_cc)
+        #o_pe = self.omega_pe(ne_cc)
         CL = coloumbLog(ne_cc, ScalarDomain.Te, ScalarDomain.Z, omega)
 
         result = 3.1e-5 * ScalarDomain.Z * c * jnp.power(ne_cc / omega, 2) * CL * jnp.power(ScalarDomain.Te, -1.5) # 1/s
@@ -96,7 +96,7 @@ class interpolation_setup(Module):
 
     # Plasma refractive index
     def n_refrac(self, ne, omega):
-        return jnp.sqrt(1.0 - (omega_pe(ne * 1e-6) / omega) ** 2)
+        return jnp.sqrt(1.0 - (self.omega_pe(ne * 1e-6) / omega) ** 2)
 '''
 
 def omega_pe(ne):
@@ -184,12 +184,10 @@ def set_up_interps(ScalarDomain, omega, keep_domain):
 
     # runs fine like this so clearly jax doesn't like the RegularGridInterpolator class rather than the format it's in
     return {
-        "ne_interp": None,
+        "ne_interp": ne_interp,
         "Bx_interp": Bx_interp,
         "By_interp": By_interp,
         "Bz_interp": Bz_interp,
         "kappa_interp": kappa_interp,
         "refractive_index_interp": refractive_index_interp
     }
-
-    #return (None, Bx_interp, By_interp, Bz_interp, kappa_interp, refractive_index_interp)

@@ -5,6 +5,7 @@ import equinox as eqx
 
 from utils import mem_conversion
 from utils import colour
+from utils import dalloc
 
 class ScalarDomain(eqx.Module):
     """
@@ -316,7 +317,24 @@ class ScalarDomain(eqx.Module):
             s ([type], optional): scale of exponential growth. Defaults to 2e-3 m.
         """
 
-        self.ne = jnp.float64(n_e0 * 10 ** (self.XX / s) * (1 + jnp.cos(2 * jnp.pi * self.YY / Ly)))
+        self.XX = self.XX.at[:, :].set(self.XX / s)
+        self.XX = self.XX.at[:, :].set(10 ** self.XX)
+
+        self.YY = self.YY.at[:, :].set(self.YY / Ly)
+        self.YY = self.YY.at[:, :].set(jnp.pi * self.YY)
+        self.YY = self.YY.at[:, :].set(2 * self.YY)
+        self.YY = self.YY.at[:, :].set(jnp.cos(self.YY))
+        self.YY = self.YY.at[:, :].set(1 + self.YY) # any difference if float or not? shouldn't be.
+
+        # jnp.float64(), both here and on final assignment
+        # should be float32 surely?
+        # is it needed at all?
+        self.ne = self.XX * self.YY
+        self.cleanup()
+
+        self.ne = self.ne.at[:, :].set(n_e0 * self.ne)
+
+        #self.ne = jnp.float64(n_e0 * 10 ** (self.XX / s) * (1 + jnp.cos(2 * jnp.pi * self.YY / Ly)))
 
     def external_ne(self, ne):
         """
@@ -448,11 +466,8 @@ class ScalarDomain(eqx.Module):
 
     def cleanup(self):
         if self.XX is not None:
-            #del self.XX
-            self.XX = None
+            dalloc(self.XX)
         if self.YY is not None:
-            #del self.YY
-            self.YY = None
+            dalloc(self.YY)
         if self.ZZ is not None:
-            #del self.ZZ
-            self.ZZ = None
+            dalloc(self.ZZ)

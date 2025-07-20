@@ -458,15 +458,23 @@ def solve(s0_import, coordinates, dim, extent, interps, ne_nc, omega, VerdetCons
 
             print("\njax compilation of solver took:", time() - start_comp, "seconds", end='')
 
+        from functools import partial
+
         # pass s0[:, i] for each ray via a jax.vmap for parallelisation
         start = time()
         sol = jax.block_until_ready(
             # in_axes version ensures that vmap doesn't map args parameters, just s0
             #jax.vmap(lambda rays, args: ODE_solve, in_axes = (0, None))(s0, args)
-            jax.vmap(lambda s: ODE_solve(s, args))(s0)
+            # default vmap_method argument is sequential, this is deprecated though and will cause a warning (if debugging) past jax 0.6.0
+            # look into different options for this parameter at a later date
+            #jax.vmap(partial(lambda s: ODE_solve(s, args), vmap_method = "sequential"))(s0)
+            #jax.vmap(partial(ODE_solve, in_axes = (0, None), vmap_method = "sequential"))(s0, args)
+            jax.vmap(ODE_solve, in_axes = (0, None))(s0, args)
         )
 
         #sol = jax.block_until_ready(jax.vmap(ODE_solve, in_axes = (0, None))(s0, args))
+
+        print(interps)
 
     duration = time() - start
 
@@ -588,4 +596,5 @@ def solve_at_depth(self, s0_import, z):
 
     print("\nRay trace completed in:\t", self.duration, "s")
 
-    self.rf, _ = *ray_to_Jonesvector(sol.y[:,-1].reshape(9, s0.size // 9), self.extent, probing_direction = self.probing_direction)
+    # can't use starred expression here
+    self.rf, _ = ray_to_Jonesvector(sol.y[:,-1].reshape(9, s0.size // 9), self.extent, probing_direction = self.probing_direction)

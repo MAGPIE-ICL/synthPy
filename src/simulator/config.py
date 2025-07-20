@@ -90,6 +90,9 @@ def jax_init(force_device = None):
     os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
     os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.9"
 
+    # triggers a jax breakpoint for debugging on error - works with filter_jit not jax.jit
+    #os.environ["EQX_ON_ERROR"] = "breakpoint"
+
     if force_device == "cpu":
         os.environ['JAX_PLATFORM_NAME'] = 'cpu'
     else:
@@ -118,9 +121,3 @@ def jax_init(force_device = None):
 
     available_devices = jax.devices()
     print(f"Available devices: {available_devices}")
-
-def dalloc(var):
-    try:
-        del var
-    except:
-        var = None
