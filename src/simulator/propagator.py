@@ -313,16 +313,20 @@ def ray_to_Jonesvector(rays, ne_extent, *, probing_direction = 'z', keep_current
 
     return ray_p, None
 
-def solve(s0_import, coordinates, dim, extent, interps, ne_nc, omega, VerdetConst, inv_brems, phaseshift, B_on, probing_direction, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False):
+def solve(s0_import, coordinates, dim, probing_depth, interps, ne_nc, omega, VerdetConst, inv_brems, phaseshift, B_on, probing_direction, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False):
     Np = s0_import.shape[1]
 
     print("\nSize in memory of initial rays:", getsizeof(s0_import))
+
+    # if batched: or if auto_batching: etc.
+    # proing_depth /= some integer with some corrections I expect
+    # make logic too loop it and pick up from previous solution
 
     # Need to make sure all rays have left volume
     # Conservative estimate of diagonal across volume
     # Then can backproject to surface of volume
 
-    t = jnp.linspace(0.0, jnp.sqrt(8.0) * extent / c, 2)
+    t = jnp.linspace(0.0, jnp.sqrt(8.0) * probing_depth / c, 2)
     norm_factor = jnp.max(t)
 
     # 8.0^0.5 is an arbritrary factor to ensure rays have enough time to escape the box
@@ -336,6 +340,7 @@ def solve(s0_import, coordinates, dim, extent, interps, ne_nc, omega, VerdetCons
     ##
 
     # passed args must be hashable to be made static for jax.jit, tuple is hashable, array & dict are not
+    interps = {'ne_interp': RegularGridInterpolator((coordinates[0], coordinates[1], coordinates[2]), ne_nc, bounds_error = False, fill_value = 0.0)}
     args = (interps, parallelise, inv_brems, phaseshift, B_on, ne_nc, coordinates, omega, VerdetConst)
 
     if not parallelise:
@@ -564,37 +569,4 @@ def solve(s0_import, coordinates, dim, extent, interps, ne_nc, omega, VerdetCons
         #else:
         #    print("Ray tracer failed. This could be a case of diffrax exceeding max steps again due to apparent 'strictness' compared to solve_ivp, check error log.")
 
-    return *ray_to_Jonesvector(rf, extent, probing_direction = probing_direction, return_E = return_E), duration
-
-# need to remove this, replacing main solve function with this option as a flag for part solves in reduced domains
-# (or just if someone wanted that for some reason - doesn't have to be the intended one of course, that's the point of generalisation)
-def solve_at_depth(self, s0_import, z):
-    """
-    Solve intial rays up until a given depth, z
-    """
-
-    # Need to make sure all rays have left volume
-    # Conservative estimate of diagonal across volume
-    # Then can backproject to surface of volume
-
-    length = self.extent + z
-    t = jnp.linspace(0.0, length / c, 2)
-
-    s0 = s0_import.flatten() #odeint insists
-    del s0_import
-
-    print("\nStarting ray trace.")
-
-    start = time()
-
-    parallelise = False
-    dsdt_ODE = lambda t, y: dsdt(t, y, self, parallelise)
-    sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t)
-
-    finish = time()
-    self.duration = finish - start
-
-    print("\nRay trace completed in:\t", self.duration, "s")
-
-    # can't use starred expression here
-    self.rf, _ = ray_to_Jonesvector(sol.y[:,-1].reshape(9, s0.size // 9), self.extent, probing_direction = self.probing_direction)
+    return *ray_to_Jonesvector(rf, probing_depth, probing_direction = probing_direction, return_E = return_E), duration
