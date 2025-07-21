@@ -73,9 +73,6 @@ def calc_dndr(ScalarDomain, lwl = 1064e-9, *, keep_domain = False):
         VerdetConst = 2.62e-13 * lwl ** 2 # radians per Tesla per m^2
 
     omega = 2 * jnp.pi * c / lwl
-    nc = 3.14207787e-4 * omega ** 2
-
-    ne_nc = jnp.array(ScalarDomain.ne / nc, dtype = jnp.float32)
 
     ##
     ## keep_domain = True and test commented out due to deletion currently failing - fix later
@@ -107,7 +104,6 @@ def calc_dndr(ScalarDomain, lwl = 1064e-9, *, keep_domain = False):
         ScalarDomain.B,
         ScalarDomain.Te,
         ScalarDomain.Z,
-        ne_nc,
         omega,
         VerdetConst,
         ScalarDomain.inv_brems,
@@ -116,7 +112,7 @@ def calc_dndr(ScalarDomain, lwl = 1064e-9, *, keep_domain = False):
         ScalarDomain.probing_direction
     )
 
-def dndr(r, ne_nc, x, y, z):
+def dndr(r, ne, omega, x, y, z):
     """
     Returns the gradient at the locations r
 
@@ -129,22 +125,22 @@ def dndr(r, ne_nc, x, y, z):
 
     grad = jnp.zeros_like(r)
 
-    dndx = -0.5 * c ** 2 * jnp.gradient(ne_nc, x, axis = 0)
+    dndx = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), x, axis = 0)
     grad = grad.at[0, :].set(trilinearInterpolator(x, y, z, dndx, r, fill_value = 0.0))
     del dndx
 
-    dndy = -0.5 * c ** 2 * jnp.gradient(ne_nc, y, axis = 1)
+    dndy = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), y, axis = 1)
     grad = grad.at[1, :].set(trilinearInterpolator(x, y, z, dndy, r, fill_value = 0.0))
     del dndy
 
-    dndz = -0.5 * c ** 2 * jnp.gradient(ne_nc, z, axis = 2)
+    dndz = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), z, axis = 2)
     grad = grad.at[2, :].set(trilinearInterpolator(x, y, z, dndz, r, fill_value = 0.0))
     del dndz
 
     return grad
 
 # ODEs of photon paths, standalone function to support the solve()
-def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, ne_nc, x, y, z, omega, VerdetConst):
+def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, omega, VerdetConst):
     """
     Returns an array with the gradients and velocity per ray for ode_int
 
@@ -183,7 +179,7 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, ne_nc, x,
 
     # must unpack coordinates tuple here for the sake of dndr, could be earlier but this is easier to pass and more generalised
     # r must be transposed within dndr(...) else we get an AbstractTerm error due to the effect on the return value
-    sprime = sprime.at[3:6, :].set(dndr(r, ne_nc, x, y, z))
+    sprime = sprime.at[3:6, :].set(dndr(r, ne, omega, x, y, z))
     sprime = sprime.at[:3, :].set(v)
 
     # Attenuation due to inverse bremsstrahlung
@@ -345,7 +341,7 @@ def ray_to_Jonesvector(rays, ne_extent, *, probing_direction = 'z', keep_current
 
     return ray_p, None
 
-def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, ne_nc, omega, VerdetConst, inv_brems, phaseshift, B_on, probing_direction, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False):
+def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, omega, VerdetConst, inv_brems, phaseshift, B_on, probing_direction, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False):
     Np = s0_import.shape[1]
 
     print("\nSize in memory of initial rays:", getsizeof(s0_import))
@@ -372,7 +368,7 @@ def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, ne_nc, omega
     ##
 
     # passed args must be hashable to be made static for jax.jit, tuple is hashable, array & dict are not
-    args = (parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, ne_nc, *coordinates, omega, VerdetConst)
+    args = (parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, *coordinates, omega, VerdetConst)
 
     if not parallelise:
         from numpy import array
@@ -512,7 +508,7 @@ def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, ne_nc, omega
 
     duration = time() - start
 
-    del ne_nc
+    #del ne_nc
 
     if memory_debug and parallelise:
         import os

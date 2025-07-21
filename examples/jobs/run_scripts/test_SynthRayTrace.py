@@ -68,16 +68,27 @@ import propagator as p
 importlib.reload(p)
 
 with jax.checking_leaks():
-    beam_definition = beam_initialiser.Beam(Np, beam_size, divergence, ne_extent, probing_direction = probing_direction, wavelength = lwl, beam_type = beam_type)
-
-    tracer = p.Propagator(domain, probing_direction = probing_direction, inv_brems = False, phaseshift = False)
-
-    # solve ray trace
-    tracer.calc_dndr(lwl)
+    beam_definition = beam_initialiser.Beam(
+        Np,
+        beam_size,
+        divergence,
+        ne_extent,
+        probing_direction = probing_direction,
+        wavelength = lwl,
+        beam_type = "circular"
+    )
 
     memory_debug = False
     if args.memory is not None:
         memory_debug = True
 
-    tracer.solve(beam_definition.s0, memory_debug = memory_debug)
-    print("\nCompleted ray trace in", np.round(tracer.duration, 3), "seconds.\n\n\n\n\n")
+    rf, Jf, duration = p.solve(
+        beam_definition.s0,
+        (domain.x, domain.y, domain.z),
+        (domain.x_n, domain.y_n, domain.z_n),   # domain.dim - this causes a TracerBoolConversionError, check why later, could be interesting and useful to know
+        ne_extent,
+        *p.calc_dndr(domain, lwl, keep_domain = True),
+        memory_debug = memory_debug
+    )
+
+    print("\nCompleted ray trace in", np.round(duration, 3), "seconds.\n\n\n\n\n")
