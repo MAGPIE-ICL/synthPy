@@ -3,17 +3,61 @@ import jax.numpy as jnp
 
 from scipy.integrate import odeint, solve_ivp
 from time import time
-from jax.scipy.interpolate import RegularGridInterpolator
 
 from scipy.constants import c
 from scipy.constants import e
 #from scipy.constants import hbar
 #from scipy.constants import m_e
 
-import interpolations
-
 from utils import getsizeof
-#from utils import trilinearInterpolator
+from utils import trilinearInterpolator
+
+##
+## Helper functions for calculations
+##
+
+def omega_pe(ne):
+    """Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28"""
+
+    return 5.64e4 * jnp.sqrt(ne)
+
+# NRL formulary inverse brems - cheers Jack Halliday for coding in Python
+# Converted to rate coefficient by multiplying by group velocity in plasma
+def kappa(ne, Te, Z, omega):
+    # Useful subroutines
+    def v_the(Te):
+        """Calculate electron thermal speed. Provide Te in eV. Retrurns result in m/s"""
+
+        return 4.19e5 * jnp.sqrt(Te)
+
+    def V(ne, Te, Z, omega):
+        o_pe = omega_pe(ne)
+        #o_max = jnp.copy(o_pe)
+        #o_max[o_pe < omega] = omega
+        o_pe = o_pe.at[:, :].set(jnp.where(o_pe < omega, omega, o_pe))
+        L_classical = Z * e / Te
+        L_quantum = 2.760428269727312e-10 / jnp.sqrt(Te) # hbar / jnp.sqrt(m_e * e * Te)
+        L_max = jnp.maximum(L_classical, L_quantum)
+
+        #return o_max * L_max
+        return o_pe * L_max
+
+    def coloumbLog(ne, Te, Z, omega):
+        return jnp.maximum(2.0, jnp.log(v_the(Te) / V(ne, Te, Z, omega)))
+
+    ne_cc = ne * 1e-6
+    # don't think this is actually used?
+    #o_pe = omega_pe(ne_cc)
+    CL = coloumbLog(ne_cc, Te, Z, omega)
+
+    result = 3.1e-5 * Z * c * jnp.power(ne_cc / omega, 2) * CL * jnp.power(Te, -1.5) # 1/s
+    del ne_cc
+
+    return result
+
+# Plasma refractive index
+def n_refrac(ne, omega):
+    return jnp.sqrt(1.0 - (omega_pe(ne * 1e-6) / omega) ** 2)
 
 def calc_dndr(ScalarDomain, lwl = 1064e-9, *, keep_domain = False):
     """
@@ -37,7 +81,7 @@ def calc_dndr(ScalarDomain, lwl = 1064e-9, *, keep_domain = False):
     ## keep_domain = True and test commented out due to deletion currently failing - fix later
     ##
 
-    interps = interpolations.set_up_interps(ScalarDomain, omega, True)
+    #interps = interpolations.set_up_interps(ScalarDomain, omega, True)
 
     '''
     if ScalarDomain.ne is None and ScalarDomain.B is None:
@@ -59,7 +103,10 @@ def calc_dndr(ScalarDomain, lwl = 1064e-9, *, keep_domain = False):
     # DOUBLE CHECK THINGS ARE PASSED IN THE RIGHT ORDER!!!
     # python doesn't check data types so this causes silent errors if not sorted...
     return (
-        interps,
+        ScalarDomain.ne,
+        ScalarDomain.B,
+        ScalarDomain.Te,
+        ScalarDomain.Z,
         ne_nc,
         omega,
         VerdetConst,
@@ -82,36 +129,22 @@ def dndr(r, ne_nc, x, y, z):
 
     grad = jnp.zeros_like(r)
 
-    #More compact notation is possible here, but we are explicit
     dndx = -0.5 * c ** 2 * jnp.gradient(ne_nc, x, axis = 0)
-    # x, y & z have to passed manually into a tuple rather than pre packed - for some reason ...
-    dndx_interp = RegularGridInterpolator((x, y, z), dndx, bounds_error = False, fill_value = 0.0)
+    grad = grad.at[0, :].set(trilinearInterpolator(x, y, z, dndx, r, fill_value = 0.0))
     del dndx
 
-    grad = grad.at[0, :].set(dndx_interp(r.T))
-    del dndx_interp
-
     dndy = -0.5 * c ** 2 * jnp.gradient(ne_nc, y, axis = 1)
-    dndy_interp = RegularGridInterpolator((x, y, z), dndy, bounds_error = False, fill_value = 0.0)
+    grad = grad.at[1, :].set(trilinearInterpolator(x, y, z, dndy, r, fill_value = 0.0))
     del dndy
 
-    grad = grad.at[1, :].set(dndy_interp(r.T))
-    del dndy_interp
-
-    dndz = -0.5 * c ** 2 * jnp.gradient(ne_nc, z, axis = 1)
-    dndz_interp = RegularGridInterpolator((x, y, z), dndz, bounds_error = False, fill_value = 0.0)
+    dndz = -0.5 * c ** 2 * jnp.gradient(ne_nc, z, axis = 2)
+    grad = grad.at[2, :].set(trilinearInterpolator(x, y, z, dndz, r, fill_value = 0.0))
     del dndz
-
-    grad = grad.at[2, :].set(dndz_interp(r.T))
-    del dndz_interp
-
-    # reassinging the same variable (so in theory same memory addresses) instead of using x, y, z seperate variables and deleting
-    # is less memory efficient according to benchmarking - would it decrease the likelihood of memory leaks though?
 
     return grad
 
 # ODEs of photon paths, standalone function to support the solve()
-def dsdt(t, s, interps, parallelise, inv_brems, phaseshift, B_on, ne_nc, coordinates, omega, VerdetConst):
+def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, ne_nc, x, y, z, omega, VerdetConst):
     """
     Returns an array with the gradients and velocity per ray for ode_int
 
@@ -149,15 +182,15 @@ def dsdt(t, s, interps, parallelise, inv_brems, phaseshift, B_on, ne_nc, coordin
     del s
 
     # must unpack coordinates tuple here for the sake of dndr, could be earlier but this is easier to pass and more generalised
-    sprime = sprime.at[3:6, :].set(dndr(r, ne_nc, *coordinates))
+    # r must be transposed within dndr(...) else we get an AbstractTerm error due to the effect on the return value
+    sprime = sprime.at[3:6, :].set(dndr(r, ne_nc, x, y, z))
     sprime = sprime.at[:3, :].set(v)
 
-    '''
     # Attenuation due to inverse bremsstrahlung
     if inv_brems:
-        sprime = sprime.at[6, :].set(interps['kappa_interp'](r.T) * amp)
+        sprime = sprime.at[6, :].set(trilinearInterpolator(x, y, z, kappa(ne, Te, Z, omega), r) * amp)
     if phaseshift:
-        sprime = sprime.at[7, :].set(omega * (interps['refractive_index_interp'](r.T) - 1.0))
+        sprime = sprime.at[7, :].set(omega * (trilinearInterpolator(x, y, z, n_refrac(ne, omega), r) - 1.0))
     if B_on:
         """
         Returns the VerdetConst ne B.v
@@ -170,20 +203,19 @@ def dsdt(t, s, interps, parallelise, inv_brems, phaseshift, B_on, ne_nc, coordin
             N float: N values of ne B.v
         """
 
-        ne_N = interps['ne_interp'](r.T)
+        ne_N = trilinearInterpolator(x, y, z, ne, r)
 
         Bv_N = jnp.sum(
             jnp.array(
                 [
-                    interps['Bx_interp'](r.T),
-                    interps['By_interp'](r.T),
-                    interps['Bz_interp'](r.T)
+                    trilinearInterpolator(x, y, z, B[:, :, :, 0], r),
+                    trilinearInterpolator(x, y, z, B[:, :, :, 1], r),
+                    trilinearInterpolator(x, y, z, B[:, :, :, 2], r)
                 ]
             ) * v, axis = 0
         )
 
         sprime = sprime.at[8, :].set(VerdetConst * ne_N * Bv_N)
-    '''
 
     del r
     del v
@@ -313,7 +345,7 @@ def ray_to_Jonesvector(rays, ne_extent, *, probing_direction = 'z', keep_current
 
     return ray_p, None
 
-def solve(s0_import, coordinates, dim, probing_depth, interps, ne_nc, omega, VerdetConst, inv_brems, phaseshift, B_on, probing_direction, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False):
+def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, ne_nc, omega, VerdetConst, inv_brems, phaseshift, B_on, probing_direction, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False):
     Np = s0_import.shape[1]
 
     print("\nSize in memory of initial rays:", getsizeof(s0_import))
@@ -333,15 +365,14 @@ def solve(s0_import, coordinates, dim, probing_depth, interps, ne_nc, omega, Ver
     # think we should change this???
 
     ##
-    ## CURRENTLY PASSING NONE IN PLACE OF INTERPS
+    ## currently NOT passing interps
     ## - get AbstractTerm either when interps are passed, both as dictionary or as an equinox class
     ## - try to fix later, pass individually perhaps?
     ## NOTES SAY DICT IS NOT HASHABLE - try as a tuple? - tuple did not work either :(
     ##
 
     # passed args must be hashable to be made static for jax.jit, tuple is hashable, array & dict are not
-    interps = {'ne_interp': RegularGridInterpolator((coordinates[0], coordinates[1], coordinates[2]), ne_nc, bounds_error = False, fill_value = 0.0)}
-    args = (interps, parallelise, inv_brems, phaseshift, B_on, ne_nc, coordinates, omega, VerdetConst)
+    args = (parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, ne_nc, *coordinates, omega, VerdetConst)
 
     if not parallelise:
         from numpy import array
@@ -479,11 +510,8 @@ def solve(s0_import, coordinates, dim, probing_depth, interps, ne_nc, omega, Ver
 
         #sol = jax.block_until_ready(jax.vmap(ODE_solve, in_axes = (0, None))(s0, args))
 
-        print(interps)
-
     duration = time() - start
 
-    del interps
     del ne_nc
 
     if memory_debug and parallelise:
@@ -525,7 +553,7 @@ def solve(s0_import, coordinates, dim, probing_depth, interps, ne_nc, omega, Ver
                     raise
 
         from datetime import datetime
-        path += "memory-domain" + str(ScalarDomain.dim[0]) + "_rays"+ str(s0.shape[1]) + "-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
+        path += "memory-domain" + str(dim[0]) + "_rays"+ str(s0.shape[1]) + "-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
         jax.profiler.save_device_memory_profile(path)
 
         print("\n", end = '')

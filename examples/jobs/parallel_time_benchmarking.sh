@@ -15,14 +15,14 @@ echo 'packages loaded successfully'
 echo 'starting job'
 
 #mkdir -p /rds/general/user/sm5625/home/synth_ray_trace
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 256 -r 8192
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 256 -r 8192 -f "cpu"
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 64 -r 10000000
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 64 -r 10000000 -f "cpu"
 
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 512 -r 8192
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 512 -r 8192 -f "cpu"
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 128 -r 10000000
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 128 -r 10000000 -f "cpu"
 
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 768 -r 8192
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 768 -r 8192 -f "cpu"
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 256 -r 10000000
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 256 -r 10000000 -f "cpu"
 
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 1024 -r 8192
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 1024 -r 8192 -f "cpu"
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 512 -r 10000000
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 512 -r 10000000 -f "cpu"
