@@ -64,6 +64,33 @@ class ScalarDomain:
 
         self.ne = np.zeros_like(self.XX)
     
+    def josie_test(self, radius, position, n1, n2):
+        """
+        Simple test to compare with Josie's experiments. 
+        A cyclinder (plume) of material with a refractive index n2 within a 
+        box of refractive index n1. Axis of the cylinder is along the y-axis.
+
+        Args:
+            radius (float): radius of cylinder
+            position (tuple): tuple of the form (x-postion, z-position), giving the x-z position of
+                              the centre of the cylinder.
+            n1 (float): refractive index outside the cylinder
+            n2 (float): refractive index inside the cylinder
+        NB: returns refractive index, not electron density
+        """
+        def circular_tophat(radius, position):
+            posx, posz = position
+            result = np.zeros_like(self.XX)
+            for i in range(0,np.size(self.XX, axis=0)):
+                for j in range(0,np.size(self.XX, axis=1)):
+                    for k in range(0,np.size(self.XX, axis=2)):
+                        distance = np.sqrt((self.XX[i,j,k]-posx)**2 + (self.ZZ[i,j,k]-posz)**2)
+                        if distance < radius:
+                            result[i,j,k] = 1
+            return result
+        
+
+        self.refrac_field = np.full_like(self.XX, n1) + (n2-n1)*circular_tophat(radius, position)
     def test_slab(self, s=1, n_e0=2e23):
         """A slab with a linear gradient in x:
         n_e =  n_e0 * (1 + s*x/extent)

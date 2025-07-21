@@ -25,7 +25,7 @@ def omega_pe(ne):
     return 56.35*np.sqrt(ne)
 
 class Propagator:
-    def __init__(self, ScalarDomain, Beam, inv_brems = False, x_ray = False, phaseshift = False, n_refrac = False):
+    def __init__(self, ScalarDomain, Beam, inv_brems = False, x_ray = False, phaseshift = False, refrac_field = False, elec_density = True):
         self.ScalarDomain = ScalarDomain
         self.Beam = Beam
         self.inv_brems = inv_brems
@@ -33,7 +33,8 @@ class Propagator:
         self.phaseshift = phaseshift
         self.prev_x = None
         self.phase_integral = 0
-        self.n_refrac = n_refrac
+        self.refrac_field = refrac_field
+        self.elec_density = elec_density
 
         #Opacity takes into account inverse bremstrahlung. Therefore, if both x_ray and inv_brems are True,
         # then x_ray should remain True and inv_brems should be set to False. 
@@ -73,13 +74,19 @@ class Propagator:
         if (self.ScalarDomain.B_on):
             self.VerdetConst = 2.62e-13*lwl**2 # radians per Tesla per m^2
 
-        self.ne_nc = np.array(self.ScalarDomain.ne / nc, dtype = np.float32) #normalise to critical density
         
+        if self.refrac_field is not True:
+            self.ne_nc = np.array(self.ScalarDomain.ne / nc, dtype = np.float32) #normalise to critical density
+            gradient_term = -0.5 * c**2 * self.ne_nc
+        else:
+            gradient_term = 0.5 * c**2 * self.ScalarDomain.refrac_field**2
+            
+
         #More compact notation is possible here, but we are explicit
         # can we find a way to reduce ram allocation
-        self.dndx = -0.5 *c ** 2 * np.gradient(self.ne_nc, self.ScalarDomain.x, axis=0)
-        self.dndy = -0.5 *c ** 2 * np.gradient(self.ne_nc, self.ScalarDomain.y, axis=1)
-        self.dndz = -0.5 *c ** 2 * np.gradient(self.ne_nc, self.ScalarDomain.z, axis=2)
+        self.dndx = np.gradient(gradient_term, self.ScalarDomain.x, axis=0)
+        self.dndy = np.gradient(gradient_term, self.ScalarDomain.y, axis=1)
+        self.dndz = np.gradient(gradient_term, self.ScalarDomain.z, axis=2)
         
         self.dndx_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndx, bounds_error = False, fill_value = 0.0)
         self.dndy_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.dndy, bounds_error = False, fill_value = 0.0)
@@ -122,7 +129,8 @@ class Propagator:
 
     def set_up_interps(self):
         # Electron density
-        self.ne_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.ne, bounds_error = False, fill_value = 0.0)
+        if (self.elec_density):
+            self.ne_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.ne, bounds_error = False, fill_value = 0.0)
 
         # Magnetic field
         if(self.ScalarDomain.B_on):
@@ -147,7 +155,9 @@ class Propagator:
         # Phase shift
         if(self.phaseshift):
             self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
-    
+        
+        if(self.refrac_field):
+            self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.refrac_field, bounds_error = False, fill_value = 1.0)
     def dndr(self, r):
         """returns the gradient at the locations r
 
@@ -165,6 +175,7 @@ class Propagator:
         grad = grad.at[2, :].set(self.dndz_interp(r.T))
 
         return grad
+        
 
     # Attenuation due to inverse bremsstrahlung
     def atten(self,x):
@@ -261,7 +272,7 @@ class Propagator:
                 saveat = diffrax.SaveAt(ts = jnp.linspace(t0, t1, Nt))
                 # Diffrax uses adaptive time stepping to gain accuracy within certain tolerances
                 # had to reduce relative tolerance to 1 to get it to run, need to compare to see the consequences of this
-                stepsize_controller = diffrax.PIDController(rtol = rtol, atol = atol)
+                stepsize_controller = diffrax.PIDController(rtol = rtol, atol = atol, dtmax = 0.1*self.ScalarDomain.x_length/self.ScalarDomain.x_n/(c*norm_factor))
 
                 return lambda s0, args : diffrax.diffeqsolve(
                     term,
@@ -445,7 +456,7 @@ def dsdt(t, s, Propagator, parallelise):
     x = s[:3, :]
     v = s[3:6, :]
 
-    if Propagator.phase_shift is True:
+    if Propagator.phaseshift is True:
         if Propagator.prev_x is not None:
             dr = distance(x, Propagator.prev_x)
             Propagator.phase_integral -= Propagator.ne_interp(x.T)*dr/Propagator.nc*np.pi/Propagator.Beam.wavelength
@@ -456,10 +467,8 @@ def dsdt(t, s, Propagator, parallelise):
     a = s[6, :]
     p = s[7,:]
     #r = s[8,:]
-    if Propagator.n_refrac is not True:   
-        sprime = sprime.at[3:6, :].set(Propagator.dndr(x))
-    else:
-        sprime = sprime.at[3:6, :].set(Propagator.grad_refrac)
+    
+    sprime = sprime.at[3:6, :].set(Propagator.dndr(x))
     sprime = sprime.at[:3, :].set(v)
     #speed = jnp.sqrt(jnp.sum(v*v, axis=0))
     #print (a)
