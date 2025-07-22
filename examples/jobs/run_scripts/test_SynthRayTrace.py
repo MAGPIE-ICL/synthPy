@@ -15,6 +15,7 @@ parser.add_argument("-d", "--domain", type = int)
 parser.add_argument("-r", "--rays", type = int)
 parser.add_argument("-f", "--force-device", type = str)
 parser.add_argument("-m", "--memory", type = int)
+#parser.add_argument("-a", "--auto-batching", type = Bool)
 args = parser.parse_args()
 
 force_device = None
@@ -51,7 +52,7 @@ import domain as d
 import importlib
 importlib.reload(d)
 
-domain = d.ScalarDomain(lengths, n_cells, ne_type = "test_exponential_cos") # B_on = False by default
+domain = d.ScalarDomain(lengths, n_cells, ne_type = "test_exponential_cos", auto_batching = False) # B_on = False by default
 
 lwl = 1064e-9 #define laser wavelength
 

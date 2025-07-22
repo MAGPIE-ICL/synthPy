@@ -133,7 +133,7 @@ class ScalarDomain(eqx.Module):
             if running_device == 'cpu':
                 from psutil import virtual_memory
                 free_mem = virtual_memory().available
-                print("Free memory:", mem_conversion(free_mem))
+                print("\nFree memory:", mem_conversion(free_mem))
             elif running_device == 'gpu':
                 import pynvml
 
@@ -142,17 +142,16 @@ class ScalarDomain(eqx.Module):
                 h = pynvml.nvmlDeviceGetHandleByIndex(0)
                 info = pynvml.nvmlDeviceGetMemoryInfo(h)
 
-                print(h)
-
                 free_mem = info.free
-                print("Memory prior to domain creation:")
-                print(f'total : {info.total}')
-                print(f'free  : {free_mem}')
-                print(f'used  : {info.used}')
+
+                print("\nMemory prior to domain creation:")
+                print(f'total : {mem_conversion(info.total)}')
+                print(f'free  : {mem_conversion(info.free)}')
+                print(f'used  : {mem_conversion(info.used)}')
             elif running_device == 'tpu':
                 free_mem = None
             else:
-                assert "No suitable device detected when checking ram/vram available."
+                assert "\nNo suitable device detected when checking ram/vram available."
 
             ##
             ## Need to work out the max allocation at any point and that estimated size
@@ -194,8 +193,8 @@ class ScalarDomain(eqx.Module):
                 self.dim_backup = self.dim[['x', 'y', 'z'].index(self.probing_direction)]
 
                 #...# Batching logic
-                self.lengths[['x', 'y', 'z'].index(self.probing_direction)] = self.length_backup % region_count
-                self.dim[['x', 'y', 'z'].index(self.probing_direction)] =  self.dim_backup % region_count
+                self.lengths[['x', 'y', 'z'].index(self.probing_direction)] = self.length_backup % self.region_count
+                self.dim[['x', 'y', 'z'].index(self.probing_direction)] =  self.dim_backup % self.region_count
 
                 if self.probing_direction == 'x':
                     self.x_length = self.lengths[0]
