@@ -132,15 +132,17 @@ class ScalarDomain(eqx.Module):
 
             if running_device == 'cpu':
                 from psutil import virtual_memory
+
                 free_mem = virtual_memory().available
+
                 print("\nFree memory:", mem_conversion(free_mem))
             elif running_device == 'gpu':
-                import pynvml
+                from pynvml import nvmlInit, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
 
-                pynvml.nvmlInit()
+                nvmlInit()
 
-                h = pynvml.nvmlDeviceGetHandleByIndex(0)
-                info = pynvml.nvmlDeviceGetMemoryInfo(h)
+                h = nvmlDeviceGetHandleByIndex(0)
+                info = nvmlDeviceGetMemoryInfo(h)
 
                 free_mem = info.free
 
