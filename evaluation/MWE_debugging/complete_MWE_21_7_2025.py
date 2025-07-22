@@ -1,5 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
 
 import sys
 import os
@@ -70,7 +69,11 @@ class ScalarDomain():
 
         self.ne = self.ne.at[:, :].set(1e24 * self.ne)
 
+jax.print_environment_info()
+
 domain = ScalarDomain(lengths, n_cells)
+
+jax.print_environment_info()
 
 lwl = 1064e-9
 
@@ -114,43 +117,12 @@ def calc_dndr(ne, lwl = 1064e-9):
 
     return jnp.array(ne / nc, dtype = jnp.float32)
 
-def dndr(r, ne_nc, x, y, z):
-    grad = jnp.zeros_like(r)
-
-    dndx = -0.5 * c ** 2 * jnp.gradient(ne_nc, x, axis = 0)
-    dndx_interp = RegularGridInterpolator((x, y, z), dndx, bounds_error = False, fill_value = 0.0)
-    del dndx
-
-    grad = grad.at[0, :].set(dndx_interp(r.T))
-    del dndx_interp
-
-    dndy = -0.5 * c ** 2 * jnp.gradient(ne_nc, y, axis = 1)
-    dndy_interp = RegularGridInterpolator((x, y, z), dndy, bounds_error = False, fill_value = 0.0)
-    del dndy
-
-    grad = grad.at[1, :].set(dndy_interp(r.T))
-    del dndy_interp
-
-    dndz = -0.5 * c ** 2 * jnp.gradient(ne_nc, z, axis = 2)
-    dndz_interp = RegularGridInterpolator((x, y, z), dndz, bounds_error = False, fill_value = 0.0)
-    del dndz
-
-    grad = grad.at[2, :].set(dndz_interp(r.T))
-    del dndz_interp
-
-    return grad
-
 def dsdt(t, s, ne_nc, x, y, z):
     s = jnp.reshape(s, (9, 1))
     sprime = jnp.zeros_like(s)
 
-    r = s[:3, :]
-    v = s[3:6, :]
-
-    a = s[6, :]
-
-    sprime = sprime.at[3:6, :].set(dndr(r, ne_nc, x, y, z))
-    sprime = sprime.at[:3, :].set(v)
+    # ... algorithm to propagate rays ...
+    # irrelevant to issue and lots of code so has been removed
 
     return sprime.flatten()
 
