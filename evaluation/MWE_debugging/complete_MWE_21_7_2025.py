@@ -47,13 +47,6 @@ from scipy.constants import e
 
 class ScalarDomain():
     def __init__(self, lengths, dim):
-        self.ne = None
-
-        # Logical switches
-        self.inv_brems = inv_brems
-        self.phaseshift = phaseshift
-        self.B_on = B_on
-
         self.x_length, self.y_length, self.z_length = lengths[0], lengths[1], lengths[2]
         self.x_n, self.y_n, self.z_n = dim, dim, dim
 
