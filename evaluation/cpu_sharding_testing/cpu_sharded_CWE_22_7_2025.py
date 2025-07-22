@@ -139,8 +139,10 @@ def solve(s0_import, ne_nc, x, y, z, x_n, y_n, z_n, extent):
     del s0_import
 
     if running_device == 'cpu':
-        from multiprocessing import cpu_count
-        core_count = cpu_count()
+        #from multiprocessing import cpu_count
+        #core_count = cpu_count()
+
+        core_count = int(os.environ['XLA_FLAGS'].replace("--xla_force_host_platform_device_count=", ''))
         print(", with:", core_count, "cores.")
 
         from jax.sharding import PartitionSpec as P, NamedSharding

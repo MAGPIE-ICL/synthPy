@@ -1,5 +1,6 @@
 import jax
 import jax.numpy as jnp
+import os
 
 from scipy.integrate import odeint, solve_ivp
 from time import time
@@ -399,8 +400,10 @@ def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, omega, Verde
         del s0_import
 
         if running_device == 'cpu':
-            from multiprocessing import cpu_count
-            core_count = cpu_count()
+            #from multiprocessing import cpu_count
+            #core_count = cpu_count()
+
+            core_count = int(os.environ['XLA_FLAGS'].replace("--xla_force_host_platform_device_count=", ''))
             print(", with:", core_count, "cores.")
 
             from jax.sharding import PartitionSpec as P, NamedSharding
@@ -511,8 +514,6 @@ def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, omega, Verde
     #del ne_nc
 
     if memory_debug and parallelise:
-        import os
-
         # Visualises sharding, looks cool, but pretty useless - and a pain with higher core counts
         #jax.debug.visualize_array_sharding(sol.ys[:, -1, :])
 
@@ -585,7 +586,7 @@ def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, omega, Verde
         #rf = sol.ys[:, -1, :].reshape(9, Np)# / scalar
         rf = sol.ys[:, -1, :].T
 
-        print("\nParallelised output has resulting 3D matrix of form: [batch_count, 2, 9]:", sol.ys.shape)
+        print("\n\nParallelised output has resulting 3D matrix of form: [batch_count, 2, 9]:", sol.ys.shape)
         print("\t2 to account for the start and end results")
         print("\t9 containing the 3 position and velocity components, amplitude, phase and polarisation")
         print("\tIf batch_count is lower than expected, this is likely due to jax's forced integer batch sharding when parallelising over cpu cores.")
