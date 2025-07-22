@@ -10,11 +10,7 @@ assert "jax" not in sys.modules, "jax already imported: you must restart your ru
 os.environ['XLA_FLAGS'] = "--xla_force_host_platform_device_count=" + str(cpu_count())
 os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
 os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.9"
-
-if force_device == "cpu":
-    os.environ['JAX_PLATFORM_NAME'] = 'cpu'
-else:
-    os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"
+os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"
 
 import jax
 
@@ -36,10 +32,6 @@ lengths = 2 * np.array([extent_x, extent_y, extent_z])
 
 import jax.numpy as jnp
 import equinox as eqx
-
-from utils import mem_conversion
-from utils import colour
-from utils import dalloc
 
 from scipy.constants import c
 from scipy.constants import e
@@ -122,11 +114,12 @@ class ScalarDomain(eqx.Module):
         self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
 
         self.XX, self.YY, _ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)#False) - has to be true for jnp
+        self.ZZ = None
 
-        self.XX = self.XX.at[:, :].set(self.XX / s)
+        self.XX = self.XX.at[:, :].set(self.XX / 2e-3)
         self.XX = self.XX.at[:, :].set(10 ** self.XX)
 
-        self.YY = self.YY.at[:, :].set(self.YY / Ly)
+        self.YY = self.YY.at[:, :].set(self.YY / 1e-3)
         self.YY = self.YY.at[:, :].set(jnp.pi * self.YY)
         self.YY = self.YY.at[:, :].set(2 * self.YY)
         self.YY = self.YY.at[:, :].set(jnp.cos(self.YY))
@@ -134,10 +127,7 @@ class ScalarDomain(eqx.Module):
 
         self.ne = self.XX * self.YY
 
-        del self.XX
-        del self.YY
-
-        self.ne = self.ne.at[:, :].set(n_e0 * self.ne)
+        self.ne = self.ne.at[:, :].set(1e24 * self.ne)
 
 domain = ScalarDomain(lengths, n_cells, ne_type = "test_exponential_cos")
 
@@ -152,7 +142,7 @@ beam_type = 'circular'
 def init_beam(Np, beam_size, divergence, ne_extent):
     s0 = jnp.zeros((9, Np))
 
-    t  = 2 * jnp.pi * utils.random_array(Np, seeded)
+    t  = 2 * jnp.pi * np.random.randn(Np)
 
     u  = np.random.randn(Np)
 
@@ -174,12 +164,7 @@ def init_beam(Np, beam_size, divergence, ne_extent):
 
     return s0
 
-beam_definition = beam_init(
-    Np,
-    beam_size,
-    divergence,
-    ne_extent
-)
+beam_definition = init_beam(Np, beam_size, divergence, ne_extent)
 
 from jax.scipy.interpolate import RegularGridInterpolator
 
@@ -272,6 +257,7 @@ def solve(s0_import, ne_nc, x, y, z, x_n, y_n, z_n, extent):
 
     return sol.ys[:, -1, :].T
 
-rf, Jf, duration = solve(beam_definition, (domain.x, domain.y, domain.z), (domain.x_n, domain.y_n, domain.z_n), ne_extent, calc_dndr(domain, lwl))
+ne_nc = calc_dndr(domain.ne, lwl)
+rf, Jf, duration = solve(beam_definition, ne_nc, domain.x, domain.y, domain.z, domain.x_n, domain.y_n, domain.z_n, ne_extent)
 
 print("\nCompleted in", np.round(duration, 3), "seconds.")
