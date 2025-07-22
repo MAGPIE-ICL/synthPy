@@ -15,8 +15,6 @@ os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"
 import jax
 
 jax.config.update('jax_enable_x64', True)
-jax.config.update('jax_captured_constants_report_frames', -1)
-jax.config.update('jax_captured_constants_warn_bytes', 128 * 1024 ** 2)
 jax.config.update('jax_traceback_filtering', 'off')
 
 extent_x = 5e-3
@@ -258,6 +256,7 @@ def solve(s0_import, ne_nc, x, y, z, x_n, y_n, z_n, extent):
     return sol.ys[:, -1, :].T
 
 ne_nc = calc_dndr(domain.ne, lwl)
-rf, Jf, duration = solve(beam_definition, ne_nc, domain.x, domain.y, domain.z, domain.x_n, domain.y_n, domain.z_n, ne_extent)
 
-print("\nCompleted in", np.round(duration, 3), "seconds.")
+jax.print_environment_info()
+
+rf = solve(beam_definition, ne_nc, domain.x, domain.y, domain.z, domain.x_n, domain.y_n, domain.z_n, ne_extent)
