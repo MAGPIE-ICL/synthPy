@@ -14,8 +14,8 @@ echo 'packages loaded successfully'
 
 echo 'starting job'
 
-python -u evaluation/MWE_debugging/cpu_sharded_CWE_22_7_2025.py -d 128 -r 8192
-python -u evaluation/MWE_debugging/cpu_sharded_CWE_22_7_2025.py -d 256 -r 8192
-python -u evaluation/MWE_debugging/cpu_sharded_CWE_22_7_2025.py -d 512 -r 8192
-python -u evaluation/MWE_debugging/cpu_sharded_CWE_22_7_2025.py -d 768 -r 8192
-python -u evaluation/MWE_debugging/cpu_sharded_CWE_22_7_2025.py -d 1024 -r 8192
+python -u evaluation/cpu_sharding_testing/cpu_sharded_CWE_22_7_2025.py -d 128 -r 8192
+python -u evaluation/cpu_sharding_testing/cpu_sharded_CWE_22_7_2025.py -d 256 -r 8192
+python -u evaluation/cpu_sharding_testing/cpu_sharded_CWE_22_7_2025.py -d 512 -r 8192
+python -u evaluation/cpu_sharding_testing/cpu_sharded_CWE_22_7_2025.py -d 768 -r 8192
+python -u evaluation/cpu_sharding_testing/cpu_sharded_CWE_22_7_2025.py -d 1024 -r 8192
