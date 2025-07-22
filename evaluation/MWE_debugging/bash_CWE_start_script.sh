@@ -14,4 +14,6 @@ echo 'packages loaded successfully'
 
 echo 'starting job'
 
-python -u evaluation/MWE_debugging/complete_MWE_21_7_2025.py
+python -u evaluation/MWE_debugging/complete_MWE_21_7_2025.py -d 256
+python -u evaluation/MWE_debugging/complete_MWE_21_7_2025.py -d 512
+python -u evaluation/MWE_debugging/complete_MWE_21_7_2025.py -d 1024
