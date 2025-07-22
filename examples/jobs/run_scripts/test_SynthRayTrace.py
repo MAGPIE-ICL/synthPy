@@ -16,14 +16,19 @@ parser.add_argument("-r", "--rays", type = int)
 parser.add_argument("-f", "--force-device", type = str)
 parser.add_argument("-m", "--memory", type = int)
 #parser.add_argument("-a", "--auto-batching", type = Bool)
+parser.add_argument("-c", "--cores", type = int)
 args = parser.parse_args()
 
 force_device = None
 if args.force_device is not None:
     force_device = args.force_device
 
+cores = None
+if args.cores is not None:
+    cores = args.cores
+
 import config
-config.jax_init(force_device = force_device)
+config.jax_init(force_device = force_device, core_limit = cores)
 
 import jax
 

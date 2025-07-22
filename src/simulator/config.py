@@ -70,7 +70,7 @@ class flags:
         for i, (k, v) in enumerate(self.value_holders):
             self.value_holders[k].value = self.value_holders[k].default
 
-def jax_init(force_device = None):
+def jax_init(force_device = None, core_limit = None, extra_info = False):
     import sys
     import os
 
@@ -84,7 +84,15 @@ def jax_init(force_device = None):
     assert "jax" not in sys.modules, "jax already imported: you must restart your runtime - DO NOT RUN THIS FUNCTION TWICE"
     # bring up issue to see if it can be made a on the run configurable variable
     #jax.config.update('xla_force_host_platform_device_count', self.core_count)
-    os.environ['XLA_FLAGS'] = "--xla_force_host_platform_device_count=" + str(cpu_count())
+
+    core_count = cpu_count()
+    if core_limit is not None:
+        if core_limit > core_count:
+            print("\nWARNING: Core limit was set greater than the number of available cores. Defaulting to max available.")
+        else:
+            core_count = core_limit
+
+    os.environ['XLA_FLAGS'] = "--xla_force_host_platform_device_count=" + str(core_count)
     #os.environ['JAX_ENABLE_X64'] = "True"
     #os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
     os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
@@ -114,7 +122,8 @@ def jax_init(force_device = None):
 
     #jax.config.update('jax_compiler_enable_remat_pass', False)
 
-    jax.print_environment_info()
+    if extra_info:
+        jax.print_environment_info()
 
     # look further into what this actually means...
     print("\nDefault jax backend:", jax.default_backend())
