@@ -11,13 +11,13 @@ parser.add_argument("-d", "--domain", type = int)
 parser.add_argument("-r", "--rays", type = int)
 args = parser.parse_args()
 
-domain = 128
+n_cells = 128
 if args.domain is not None:
-    domain = args.domain
+    n_cells = args.domain
 
-rays = 10000
+Np = 10000
 if args.rays is not None:
-    domain = args.rays
+    Np = args.rays
 
 from multiprocessing import cpu_count
 
@@ -36,97 +36,32 @@ extent_x = 5e-3
 extent_y = 5e-3
 extent_z = 10e-3
 
-n_cells = 128
-
 probing_extent = extent_z
-probing_direction = 'z'
 
 lengths = 2 * np.array([extent_x, extent_y, extent_z])
 
 import jax.numpy as jnp
-import equinox as eqx
 
 from scipy.constants import c
 from scipy.constants import e
 
-class ScalarDomain(eqx.Module):
-    """
-    A class to hold and generate scalar domains.
-    This contains also the method to propagate rays through the scalar domain
-    """
-
-    inv_brems: bool
-    phaseshift: bool
-    B_on: bool
-
-    probing_direction: str
-
-    x_length: jnp.int64
-    y_length: jnp.int64
-    z_length: jnp.int64
-
-    lengths: jax.Array
-
-    x_n: jnp.int64
-    y_n: jnp.int64
-    z_n: jnp.int64
-
-    dim: jax.Array
-
-    x: jax.Array
-    y: jax.Array
-    z: jax.Array
-
-    XX: jax.Array
-    YY: jax.Array
-    ZZ: jax.Array
-
-    ne: jax.Array
-
-    B: jax.Array
-    Te: jax.Array
-    Z: jax.Array
-
-    def __init__(self, lengths, dim, *, ne_type = None, inv_brems = False, phaseshift = False, B_on = False, probing_direction = 'z'):
+class ScalarDomain():
+    def __init__(self, lengths, dim):
         self.ne = None
-        self.B = None
-        self.Te = None
-        self.Z = None
 
         # Logical switches
         self.inv_brems = inv_brems
         self.phaseshift = phaseshift
         self.B_on = B_on
 
-        self.probing_direction = probing_direction
-
-        valid_types = (int, float, jnp.int64)
-
-        if isinstance(lengths, valid_types):
-            self.x_length, self.y_length, self.z_length = lengths, lengths, lengths
-            self.lengths = jnp.array([lengths, lengths, lengths])
-        else:
-            if len(lengths) != 3:
-                raise Exception('lengths must have len = 3: (x,y,z)')
-
-            self.x_length, self.y_length, self.z_length = lengths[0], lengths[1], lengths[2]
-            self.lengths = jnp.array(lengths)
-
-        if isinstance(dim, valid_types):
-            self.x_n, self.y_n, self.z_n = dim, dim, dim
-            self.dim = jnp.array([dim, dim, dim])
-        else:
-            if len(dim) != 3:
-                raise Exception('n must have len = 3: (x_n, y_n, z_n)')
-
-            self.x_n, self.y_n, self.z_n = dim[0], dim[1], dim[2]
-            self.dim = jnp.array(dim)
+        self.x_length, self.y_length, self.z_length = lengths[0], lengths[1], lengths[2]
+        self.x_n, self.y_n, self.z_n = dim, dim, dim
 
         self.x = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
         self.y = jnp.float32(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n))
         self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
 
-        self.XX, self.YY, _ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)#False) - has to be true for jnp
+        self.XX, self.YY, _ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)
         self.ZZ = None
 
         self.XX = self.XX.at[:, :].set(self.XX / 2e-3)
@@ -142,7 +77,7 @@ class ScalarDomain(eqx.Module):
 
         self.ne = self.ne.at[:, :].set(1e24 * self.ne)
 
-domain = ScalarDomain(lengths, n_cells, ne_type = "test_exponential_cos")
+domain = ScalarDomain(lengths, n_cells)
 
 lwl = 1064e-9
 
@@ -161,7 +96,6 @@ def init_beam(Np, beam_size, divergence, ne_extent):
 
     ϕ = jnp.pi * np.random.randn(Np)
     χ = divergence * np.random.randn(Np)
-
 
     s0 = s0.at[0, :].set(beam_size * u * jnp.cos(t))
     s0 = s0.at[1, :].set(beam_size * u * jnp.sin(t))
@@ -270,8 +204,4 @@ def solve(s0_import, ne_nc, x, y, z, x_n, y_n, z_n, extent):
 
     return sol.ys[:, -1, :].T
 
-ne_nc = calc_dndr(domain.ne, lwl)
-
-jax.print_environment_info()
-
-rf = solve(beam_definition, ne_nc, domain.x, domain.y, domain.z, domain.x_n, domain.y_n, domain.z_n, ne_extent)
+rf = solve(beam_definition, calc_dndr(domain.ne, lwl), domain.x, domain.y, domain.z, domain.x_n, domain.y_n, domain.z_n, ne_extent)
