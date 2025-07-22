@@ -390,7 +390,7 @@ def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, omega, Verde
                 print("\njax cannot detect that device if it does exist - try not passing a force_device param and seeing if it runs.")
         '''
 
-        #jax.lib.xla_bridge.get_backend().platform - deprecated
+        #running_device = jax.lib.xla_bridge.get_backend().platform # - deprecated apparently?
         running_device = jax.extend.backend.get_backend().platform
         print("\nRunning device:", running_device, end='')
 

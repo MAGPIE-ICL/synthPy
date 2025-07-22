@@ -18,7 +18,7 @@ Np = 10000
 if args.rays is not None:
     Np = args.rays
 
-print("\nStarting cpu sharding test run with ", n_cells, "cells and ", )
+print("\nStarting cpu sharding test run with", n_cells, "cells and", Np, "rays.")
 
 from multiprocessing import cpu_count
 
