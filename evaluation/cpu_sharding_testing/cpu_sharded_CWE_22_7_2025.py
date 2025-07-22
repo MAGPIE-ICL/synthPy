@@ -18,6 +18,8 @@ Np = 10000
 if args.rays is not None:
     Np = args.rays
 
+print("\nStarting cpu sharding test run with ", n_cells, "cells and ", )
+
 from multiprocessing import cpu_count
 
 assert "jax" not in sys.modules, "jax already imported: you must restart your runtime - DO NOT RUN THIS FUNCTION TWICE"
@@ -69,11 +71,7 @@ class ScalarDomain():
 
         self.ne = self.ne.at[:, :].set(1e24 * self.ne)
 
-jax.print_environment_info()
-
 domain = ScalarDomain(lengths, n_cells)
-
-jax.print_environment_info()
 
 lwl = 1064e-9
 
@@ -134,8 +132,7 @@ def solve(s0_import, ne_nc, x, y, z, x_n, y_n, z_n, extent):
 
     available_devices = jax.devices()
 
-    from jax.lib import xla_bridge
-    running_device = xla_bridge.get_backend().platform
+    running_device = jax.extend.backend.get_backend().platform
     print("\nRunning device:", running_device, end='')
 
     s0_transformed = s0_import.T
@@ -197,3 +194,5 @@ def solve(s0_import, ne_nc, x, y, z, x_n, y_n, z_n, extent):
     return sol.ys[:, -1, :].T
 
 rf = solve(beam_definition, calc_dndr(domain.ne, lwl), domain.x, domain.y, domain.z, domain.x_n, domain.y_n, domain.z_n, ne_extent)
+
+print("\nRun complete!")
