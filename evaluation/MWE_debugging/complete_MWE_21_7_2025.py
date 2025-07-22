@@ -4,6 +4,21 @@ import matplotlib.pyplot as plt
 import sys
 import os
 
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-d", "--domain", type = int)
+parser.add_argument("-r", "--rays", type = int)
+args = parser.parse_args()
+
+domain = 128
+if args.domain is not None:
+    domain = args.domain
+
+rays = 10000
+if args.rays is not None:
+    domain = args.rays
+
 from multiprocessing import cpu_count
 
 assert "jax" not in sys.modules, "jax already imported: you must restart your runtime - DO NOT RUN THIS FUNCTION TWICE"
