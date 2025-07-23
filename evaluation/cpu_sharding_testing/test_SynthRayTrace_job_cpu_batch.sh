@@ -17,5 +17,5 @@ echo 'starting job'
 for i in $(seq 128 2048);
 do
     echo "Domain of $i"
-    python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d $i -r 256 | grep killed &> output.txt
+    python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d $i -r 256 -c 64 | grep killed &> output.txt
 done
