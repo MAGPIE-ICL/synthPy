@@ -552,32 +552,31 @@ def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, omega, Verde
         print("Est. size of solution (bef. JV):", mem_conversion(getsizeof_default(sol) * Np))
 
         folder_name = "memory_benchmarks/"
-        rel_path_to_folder = "../../evaluation/"
+        rel_path_to_folder = "evaluation/"
 
         path = rel_path_to_folder + folder_name
 
-        if os.path.isdir(os.getcwd() + "/" + folder_name):
-            path = folder_name
-        elif os.path.isdir(os.getcwd() + "/" + path):
+        if os.path.isdir(os.getcwd() + "/" + path):
             pass
-            '''
-            elif not os.path.isdir(os.getcwd() + "/" + path):
-                import errno
-
-                try:
-                    os.mkdir(path)
-                except OSError as e:
-                    if e.errno != errno.EEXIST:
-                        raise
-            '''
         else:
             path = os.getcwd() + "/" + folder_name
 
             try:
                 os.mkdir(path)
             except OSError as e:
+                import errno
+
                 if e.errno != errno.EEXIST:
                     raise
+
+                if os.path.isdir(os.getcwd() + "/" + folder_name):
+                    path = folder_name
+                else:
+                    try:
+                        os.mkdir(path)
+                    except OSError as e:
+                        if e.errno != errno.EEXIST:
+                            raise
 
         from datetime import datetime
         path += "memory-domain" + str(dim[0]) + "_rays"+ str(s0.shape[1]) + "-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
