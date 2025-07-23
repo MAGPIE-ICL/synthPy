@@ -575,9 +575,6 @@ def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, omega, Verde
         print("Size in memory of solution class / single ray (?):", getsizeof(sol))
         print("Size in memory of solution:", mem_conversion(getsizeof_default(sol) * Np))
 
-    del s0
-
-    if memory_debug:
         folder_name = "memory_benchmarks/"
         rel_path_to_folder = "../../evaluation/"
 
@@ -620,6 +617,8 @@ def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, omega, Verde
             #os_system(f"~/go/bin/pprof --web " + path)
         else:
             print("No pprof install detected. Please download (using go) to visualise memory usage.")
+
+    del s0
 
     if not parallelise:
         rf = sol.y[:,-1].reshape(9, Np)
