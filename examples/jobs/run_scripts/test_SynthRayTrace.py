@@ -9,7 +9,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-d", "--domain", type = int)
 parser.add_argument("-r", "--rays", type = int)
 parser.add_argument("-f", "--force-device", type = str)
-parser.add_argument("-m", "--memory", type = int)
+parser.add_argument("-m", "--memory", type = str)
 #parser.add_argument("-a", "--auto-batching", type = Bool)
 parser.add_argument("-c", "--cores", type = int)
 args = parser.parse_args()
@@ -81,7 +81,12 @@ with jax.checking_leaks():
 
     memory_debug = False
     if args.memory is not None:
-        memory_debug = True
+        if args.memoruy.upper() == "TRUE":
+            memory_debug = True
+        elif args.memoruy.upper() == "FALSE":
+            memory_debug = False
+        else:
+            pass    # error handling?
 
     rf, Jf, duration = p.solve(
         beam_definition.s0,
