@@ -607,8 +607,7 @@ def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, omega, Verde
                     raise
 
         from datetime import datetime
-        #path += "memory-domain" + str(dim[0]) + "_rays"+ str(s0.shape[1]) + "-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
-        path += "memory-domain" + "-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
+        path += "memory-domain" + str(dim[0]) + "_rays"+ str(s0.shape[1]) + "-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
         jax.profiler.save_device_memory_profile(path)
 
         print("\n", end = '')
