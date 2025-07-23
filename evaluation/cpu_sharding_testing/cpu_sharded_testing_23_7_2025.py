@@ -37,6 +37,8 @@ os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
 os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.9"
 os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"
 
+os.environ['JAX_PLATFORM_NAME'] = 'cpu'
+
 import jax
 
 jax.config.update('jax_enable_x64', True)
@@ -299,90 +301,69 @@ def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, omega, Verde
 
     args = (parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, *coordinates, omega, VerdetConst)
 
-    if not parallelise:
-        from numpy import array
-        s0 = array(jnp.ravel(s0_import))
-        #s0 = s0.flatten() #odeint insists
+    available_devices = jax.devices()
 
-        start = time()
-        # wrapper allows dummy variables t & y to be used by solve_ivp(), self is required by dsdt
-        sol = solve_ivp(lambda t, y: dsdt(t, y, *args), [0, t[-1]], s0, t_eval = t)
-    else:
-        available_devices = jax.devices()
+    running_device = jax.lib.xla_bridge.get_backend().platform
+    print("\nRunning device:", running_device, end='')
 
-        running_device = jax.lib.xla_bridge.get_backend().platform
-        print("\nRunning device:", running_device, end='')
+    s0_transformed = s0_import.T
+    del s0_import
 
-        s0_transformed = s0_import.T
-        del s0_import
+    core_count = int(os.environ['XLA_FLAGS'].replace("--xla_force_host_platform_device_count=", ''))
+    print(", with:", core_count, "cores.")
 
-        if running_device == 'cpu':
-            core_count = int(os.environ['XLA_FLAGS'].replace("--xla_force_host_platform_device_count=", ''))
-            print(", with:", core_count, "cores.")
+    from jax.sharding import PartitionSpec as P, NamedSharding
 
-            from jax.sharding import PartitionSpec as P, NamedSharding
+    mesh = jax.make_mesh((core_count,), ('rows',))
 
-            mesh = jax.make_mesh((core_count,), ('rows',))
+    Np = ((Np // core_count) * core_count)
+    assert Np > 0, "Not enough rays to parallelise over cores, increase to at least " + str(core_count)
 
-            Np = ((Np // core_count) * core_count)
-            assert Np > 0, "Not enough rays to parallelise over cores, increase to at least " + str(core_count)
+    s0 = jax.device_put(s0_transformed[0:Np, :], NamedSharding(mesh, P('rows', None)))  # 'None' means don't shard axis 0
 
-            s0 = jax.device_put(s0_transformed[0:Np, :], NamedSharding(mesh, P('rows', None)))  # 'None' means don't shard axis 0
+    print(s0.sharding)
 
-            print(s0.sharding)
-        elif running_device == 'gpu':
-            gpu_devices = jax.devices('gpu')
-            print("\nThere are", len(gpu_devices), "available GPU devices:", gpu_devices)
-            assert len(gpu_devices) > 0, "Running on GPU yet none detected?"
+    del s0_transformed
 
-            s0 = jax.device_put(s0_transformed, gpu_devices[0])
-        elif running_device == 'tpu':
-            s0 = s0_transformed
-            pass
-        else:
-            assert "No suitable device detected!"
+    def dsdt_ODE(t, y, args):
+        return dsdt(t, y, *args) * norm_factor
 
-        del s0_transformed
+    from diffrax import ODETerm, Tsit5, SaveAt, PIDController, diffeqsolve
 
-        def dsdt_ODE(t, y, args):
-            return dsdt(t, y, *args) * norm_factor
+    def diffrax_solve(dydt, t0, t1, Nt, rtol = 1e-7, atol = 1e-9):
+        term = ODETerm(dydt)
+        solver = Tsit5()
+        saveat = SaveAt(ts = jnp.linspace(t0, t1, Nt))
+        stepsize_controller = PIDController(rtol = rtol, atol = atol)
 
-        from diffrax import ODETerm, Tsit5, SaveAt, PIDController, diffeqsolve
-
-        def diffrax_solve(dydt, t0, t1, Nt, rtol = 1e-7, atol = 1e-9):
-            term = ODETerm(dydt)
-            solver = Tsit5()
-            saveat = SaveAt(ts = jnp.linspace(t0, t1, Nt))
-            stepsize_controller = PIDController(rtol = rtol, atol = atol)
-
-            return lambda s0, args : diffeqsolve(
-                term,
-                solver,
-                y0 = jnp.array(s0),
-                args = args,
-                t0 = t0,
-                t1 = t1,
-                dt0 = (t1 - t0) * norm_factor / Nt,
-                saveat = saveat,
-                stepsize_controller = stepsize_controller,
-                max_steps = dim[0] * dim[1] * dim[2] * 100
-            )
-
-        ODE_solve = diffrax_solve(dsdt_ODE, t[0], t[-1] / norm_factor, save_steps)
-
-        if jitted:
-            start_comp = time()
-
-            from equinox import filter_jit
-            ODE_solve = filter_jit(ODE_solve)
-            print("\njax compilation of solver took:", time() - start_comp, "seconds", end='')
-
-        from functools import partial
-
-        start = time()
-        sol = jax.block_until_ready(
-            jax.vmap(ODE_solve, in_axes = (0, None))(s0, args)
+        return lambda s0, args : diffeqsolve(
+            term,
+            solver,
+            y0 = jnp.array(s0),
+            args = args,
+            t0 = t0,
+            t1 = t1,
+            dt0 = (t1 - t0) * norm_factor / Nt,
+            saveat = saveat,
+            stepsize_controller = stepsize_controller,
+            max_steps = dim[0] * dim[1] * dim[2] * 100
         )
+
+    ODE_solve = diffrax_solve(dsdt_ODE, t[0], t[-1] / norm_factor, save_steps)
+
+    if jitted:
+        start_comp = time()
+
+        from equinox import filter_jit
+        ODE_solve = filter_jit(ODE_solve)
+        print("\njax compilation of solver took:", time() - start_comp, "seconds", end='')
+
+    from functools import partial
+
+    start = time()
+    sol = jax.block_until_ready(
+        jax.vmap(ODE_solve, in_axes = (0, None))(s0, args)
+    )
 
     duration = time() - start
 
