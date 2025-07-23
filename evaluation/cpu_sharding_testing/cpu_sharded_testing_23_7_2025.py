@@ -6,8 +6,6 @@ import os
 sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/simulator')
 
 import importlib
-import propagator as p
-importlib.reload(p)
 
 import argparse
 
@@ -117,6 +115,9 @@ def init_beam(Np, beam_size, divergence, ne_extent):
     return s0
 
 beam_definition = init_beam(Np, beam_size, divergence, ne_extent)
+
+import propagator as p
+importlib.reload(p)
 
 rf, Jf, duration = p.solve(
     s0,
