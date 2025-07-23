@@ -279,6 +279,7 @@ class Beam:
         self.rf = s0
         self.positions = None
         self.amplitudes = None
+        self.phases = None
 
     def save_rays_pos(self, fn = None):
         """

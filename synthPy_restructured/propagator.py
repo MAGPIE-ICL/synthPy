@@ -131,7 +131,9 @@ class Propagator:
         # Electron density
         if (self.elec_density):
             self.ne_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.ne, bounds_error = False, fill_value = 0.0)
-
+            # Phase shift
+            if(self.phaseshift):
+                self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
         # Magnetic field
         if(self.ScalarDomain.B_on):
             self.Bx_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.B[:,:,:,0], bounds_error = False, fill_value = 0.0)
@@ -151,10 +153,8 @@ class Propagator:
             self.Te_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.Te, bounds_error = False, fill_value = 0.0)
             self.rho_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.rho, bounds_error = False, fill_value = 0.0)
             opacity_grid = self.opacity_interp((self.energy, self.ScalarDomain.rho, self.ScalarDomain.Te))
-            self.opacity_spatial_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), opacity_grid, bounds_error = False, fill_value = 0.)
-        # Phase shift
-        if(self.phaseshift):
-            self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
+            self.opacity_spatial_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), opacity_grid, bounds_error = False, fill_value = 0.0)
+        
         
         if(self.refrac_field):
             self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.refrac_field, bounds_error = False, fill_value = 1.0)
@@ -198,7 +198,7 @@ class Propagator:
     # Phase shift introduced by refractive index
     def phase(self,x):
         if(self.phaseshift):
-            self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
+            #self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
             return self.omega*(self.refractive_index_interp(x.T)-1.0)
         else:
             return 0.0
@@ -229,7 +229,7 @@ class Propagator:
 
         return pol
 
-    def solve(self, return_E = False, parallelise = True, jitted = True, Nt = 2, Ntrack = 0):
+    def solve(self, return_E = False, parallelise = True, jitted = True, Nt = 2):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
@@ -258,7 +258,7 @@ class Propagator:
             def dsdt_ODE(t, y, args):
                 return dsdt(t, y, args[0], args[1]) * norm_factor
 
-            def diffrax_solve(dydt, t0, t1, Nt, rtol=1e-3, atol=1e-9):
+            def diffrax_solve(dydt, t0, t1, Nt, rtol=1e-1, atol=1e-5):
                 """
                 Here we wrap the diffrax diffeqsolve function such that we can easily parallelise it
                 """
@@ -272,7 +272,8 @@ class Propagator:
                 saveat = diffrax.SaveAt(ts = jnp.linspace(t0, t1, Nt))
                 # Diffrax uses adaptive time stepping to gain accuracy within certain tolerances
                 # had to reduce relative tolerance to 1 to get it to run, need to compare to see the consequences of this
-                stepsize_controller = diffrax.PIDController(rtol = rtol, atol = atol, dtmax = 0.1*self.ScalarDomain.x_length/self.ScalarDomain.x_n/(c*norm_factor))
+                dtmax = 0.5*self.ScalarDomain.x_length/self.ScalarDomain.x_n/(c*norm_factor)
+                stepsize_controller = diffrax.PIDController(rtol = rtol, atol = atol, dtmax = dtmax)
 
                 return lambda s0, args : diffrax.diffeqsolve(
                     term,
@@ -356,7 +357,8 @@ class Propagator:
             #if sol.result == RESULTS.successful:
             self.Beam.rf = sol.ys[:, -1, :].T
             self.Beam.positions = sol.ys[:, :, :3]
-            self.Beam.amplitudes = sol.ys[:,:,6]
+            self.Beam.amplitudes = sol.ys[:, :, 6]
+            self.Beam.phases = sol.ys[:, :, 7]
             
 
             print("\nParallelised output has resulting 3D matrix of form: [batch_count, 2, 9]:", sol.ys.shape)
@@ -456,12 +458,12 @@ def dsdt(t, s, Propagator, parallelise):
     x = s[:3, :]
     v = s[3:6, :]
 
-    if Propagator.phaseshift is True:
-        if Propagator.prev_x is not None:
-            dr = distance(x, Propagator.prev_x)
-            Propagator.phase_integral -= Propagator.ne_interp(x.T)*dr/Propagator.nc*np.pi/Propagator.Beam.wavelength
+    # if Propagator.phaseshift is True:
+    #     if Propagator.prev_x is not None:
+    #         dr = distance(x, Propagator.prev_x)
+    #         Propagator.phase_integral -= Propagator.ne_interp(x.T)*dr/Propagator.nc*np.pi/Propagator.Beam.wavelength
 
-        Propagator.prev_x = x
+    #     Propagator.prev_x = x
 
     # Amplitude, phase and polarisation
     a = s[6, :]
@@ -473,6 +475,7 @@ def dsdt(t, s, Propagator, parallelise):
     #speed = jnp.sqrt(jnp.sum(v*v, axis=0))
     #print (a)
     #print(-Propagator.atten_x_ray(x)/c)
+    #print(p)
     sprime = sprime.at[6, :].set((Propagator.atten(x) + Propagator.atten_x_ray(x))*a) #add inverse bremsstrahlung and opacity
     sprime = sprime.at[7, :].set(Propagator.phase(x))
     sprime = sprime.at[8, :].set(Propagator.neB(x, v))
