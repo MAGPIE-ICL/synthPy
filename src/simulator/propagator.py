@@ -393,8 +393,8 @@ def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, omega, Verde
                 print("\njax cannot detect that device if it does exist - try not passing a force_device param and seeing if it runs.")
         '''
 
-        #running_device = jax.lib.xla_bridge.get_backend().platform # - deprecated apparently?
-        running_device = jax.extend.backend.get_backend().platform
+        running_device = jax.lib.xla_bridge.get_backend().platform # - deprecated, using still as needed for HPC
+        #running_device = jax.extend.backend.get_backend().platform
         print("\nRunning device:", running_device, end='')
 
         # transposed as jax.vmap() expects form of [batch_idx, items] not [items, batch_idx]

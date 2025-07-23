@@ -137,7 +137,8 @@ def solve(s0_import, ne_nc, x, y, z, x_n, y_n, z_n, extent):
 
     available_devices = jax.devices()
 
-    running_device = jax.extend.backend.get_backend().platform
+    running_device = jax.lib.xla_bridge.get_backend().platform
+    #running_device = jax.extend.backend.get_backend().platform
     print("\nRunning device:", running_device, end='')
 
     s0_transformed = s0_import.T

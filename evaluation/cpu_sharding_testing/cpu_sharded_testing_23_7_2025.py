@@ -5,9 +5,11 @@ import os
 
 sys.path.insert(0, '../../src/simulator')
 
-import propagator as p
 import importlib
+import propagator as p
 importlib.reload(p)
+import domain as d
+importlib.reload(d)
 
 import argparse
 
@@ -57,32 +59,7 @@ import jax.numpy as jnp
 from scipy.constants import c
 from scipy.constants import e
 
-class ScalarDomain():
-    def __init__(self, lengths, dim):
-        self.x_length, self.y_length, self.z_length = lengths[0], lengths[1], lengths[2]
-        self.x_n, self.y_n, self.z_n = dim, dim, dim
-
-        self.x = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
-        self.y = jnp.float32(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n))
-        self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
-
-        self.XX, self.YY, _ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)
-        self.ZZ = None
-
-        self.XX = self.XX.at[:, :].set(self.XX / 2e-3)
-        self.XX = self.XX.at[:, :].set(10 ** self.XX)
-
-        self.YY = self.YY.at[:, :].set(self.YY / 1e-3)
-        self.YY = self.YY.at[:, :].set(jnp.pi * self.YY)
-        self.YY = self.YY.at[:, :].set(2 * self.YY)
-        self.YY = self.YY.at[:, :].set(jnp.cos(self.YY))
-        self.YY = self.YY.at[:, :].set(1 + self.YY)
-
-        self.ne = self.XX * self.YY
-
-        self.ne = self.ne.at[:, :].set(1e24 * self.ne)
-
-domain = ScalarDomain(lengths, n_cells)
+domain = d.ScalarDomain(lengths, n_cells, ne_type = "test_exponential_cos")
 
 lwl = 1064e-9
 
