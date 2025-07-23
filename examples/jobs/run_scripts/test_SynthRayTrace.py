@@ -30,6 +30,8 @@ if args.cores is not None:
 import config
 config.jax_init(force_device = force_device, core_limit = cores)
 
+import jax
+
 n_cells = 512
 if args.domain is not None:
     n_cells = args.domain
