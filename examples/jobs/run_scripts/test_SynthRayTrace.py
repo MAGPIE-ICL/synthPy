@@ -81,9 +81,9 @@ with jax.checking_leaks():
 
     memory_debug = False
     if args.memory is not None:
-        if args.memoruy.upper() == "TRUE":
+        if args.memory.upper() == "TRUE":
             memory_debug = True
-        elif args.memoruy.upper() == "FALSE":
+        elif args.memory.upper() == "FALSE":
             memory_debug = False
         else:
             pass    # error handling?
