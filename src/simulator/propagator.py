@@ -14,6 +14,7 @@ from scipy.constants import e
 from utils import getsizeof
 #from utils import trilinearInterpolator
 from utils import mem_conversion
+from utils import colour
 
 def trilinearInterpolator(x, y, z, values, query_points, *, fill_value = jnp.nan):
     """
@@ -569,7 +570,7 @@ def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, omega, Verde
 
         from utils import domain_estimate
 
-        print(colour.BOLD + "\nMemory summary - total estimate:", mem_conversion(domain_estimate(dim) + (getsizeof_default(s0) + getsizeof_default(sol)) * Np))
+        print(colour.BOLD + "\nMemory summary - total estimate:", mem_conversion(domain_estimate(dim) + (getsizeof_default(s0) + getsizeof_default(sol)) * Np) + colour.END)
         print("\nSize in memory of initial rays:", mem_conversion(getsizeof_default(s0) * Np))
         print("Size in memory of solution class / single ray (?):", getsizeof(sol))
         print("Size in memory of solution:", mem_conversion(getsizeof_default(sol) * Np))
