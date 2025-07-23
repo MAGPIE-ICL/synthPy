@@ -7,8 +7,8 @@ import gc
 import argparse
 
 import sys
-sys.path.insert(0, '/home/administrator/Work/UROP_ICL_Internship/synthPy/src/simulator')
-#sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/simulator')     # import path/to/synthpy
+#sys.path.insert(0, '/home/administrator/Work/UROP_ICL_Internship/synthPy/src/simulator')
+sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/simulator')     # import path/to/synthpy
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-d", "--domain", type = int)
@@ -28,7 +28,7 @@ if args.cores is not None:
     cores = args.cores
 
 import config
-config.jax_init()
+config.jax_init(force_device = force_device, core_limit = cores)
 
 n_cells = 512
 if args.domain is not None:
