@@ -5,11 +5,18 @@ import os
 
 sys.path.insert(0, '../../src/simulator')
 
-import importlib
-import propagator as p
-importlib.reload(p)
+import beam as beam_initialiser
 import domain as d
+import propagator as p
+import diagnostics as diag
+#import utils
+
+import importlib
+importlib.reload(beam_initialiser)
 importlib.reload(d)
+importlib.reload(p)
+importlib.reload(diag)
+#importlib.reload(utils)
 
 import argparse
 
@@ -69,31 +76,7 @@ beam_size = extent_x
 ne_extent = probing_extent
 beam_type = 'circular'
 
-def init_beam(Np, beam_size, divergence, ne_extent):
-    s0 = jnp.zeros((9, Np))
-
-    t  = 2 * jnp.pi * np.random.randn(Np)
-
-    u  = np.random.randn(Np)
-
-    ϕ = jnp.pi * np.random.randn(Np)
-    χ = divergence * np.random.randn(Np)
-
-    s0 = s0.at[0, :].set(beam_size * u * jnp.cos(t))
-    s0 = s0.at[1, :].set(beam_size * u * jnp.sin(t))
-    s0 = s0.at[2, :].set(-ne_extent)
-
-    s0 = s0.at[3, :].set(c * jnp.sin(χ) * jnp.cos(ϕ))
-    s0 = s0.at[4, :].set(c * jnp.sin(χ) * jnp.sin(ϕ))
-    s0 = s0.at[5, :].set(c * jnp.cos(χ))
-
-    s0 = s0.at[6, :].set(1.0)
-    s0 = s0.at[8, :].set(0.0)
-    s0 = s0.at[7, :].set(0.0)
-
-    return s0
-
-beam_definition = init_beam(Np, beam_size, divergence, ne_extent)
+beam_definition = beam_initialiser.Beam(Np, beam_size, divergence, ne_extent)
 
 rf, Jf, duration = p.solve(
     s0,

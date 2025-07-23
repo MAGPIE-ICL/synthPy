@@ -1,5 +1,4 @@
 import numpy as np
-import jax.numpy as jnp
 
 from sys import getsizeof as getsizeof_default
 
@@ -76,50 +75,3 @@ def dalloc(var):
     except:
         var = None
         #print(f'set {var = }')
-
-def trilinearInterpolator(x, y, z, values, query_points, *, fill_value = jnp.nan):
-    """
-    Trilinear interpolation on a 3D regular grid.
-
-    Assumes:
-        - coordinates = (x, y, z) where each is 1D
-        - values.shape == (len(x), len(y), len(z))
-        - query_points.shape == (N, 3)
-    """
-
-    values = jnp.asarray(values)
-    query_points = jnp.asarray(query_points.T)
-
-    def get_indices_and_weights(coord_grid, points):
-        idx = jnp.searchsorted(coord_grid, points, side = 'right') - 1
-        idx = jnp.clip(idx, 0, len(coord_grid) - 2)
-
-        x0 = coord_grid[idx]
-        return idx, (points - x0) / (coord_grid[idx + 1] - x0)
-
-    ix, wx = get_indices_and_weights(x, query_points[:, 0])
-    iy, wy = get_indices_and_weights(y, query_points[:, 1])
-    iz, wz = get_indices_and_weights(z, query_points[:, 2])
-
-    def get_val(dx, dy, dz):
-        return values[ix + dx, iy + dy, iz + dz]
-
-    results = (
-        get_val(0, 0, 0) * (1 - wx) * (1 - wy) * (1 - wz) +
-        get_val(1, 0, 0) * wx       * (1 - wy) * (1 - wz) +
-        get_val(0, 1, 0) * (1 - wx) * wy       * (1 - wz) +
-        get_val(0, 0, 1) * (1 - wx) * (1 - wy) * wz +
-        get_val(1, 1, 0) * wx       * wy       * (1 - wz) +
-        get_val(1, 0, 1) * wx       * (1 - wy) * wz +
-        get_val(0, 1, 1) * (1 - wx) * wy       * wz +
-        get_val(1, 1, 1) * wx       * wy       * wz
-    )
-
-    # Check out-of-bounds
-    oob = (
-        (query_points[:, 0] < x[0]) | (query_points[:, 0] > x[-1]) |
-        (query_points[:, 1] < y[0]) | (query_points[:, 1] > y[-1]) |
-        (query_points[:, 2] < z[0]) | (query_points[:, 2] > z[-1])
-    )
-
-    return jnp.where(oob, fill_value, results)
