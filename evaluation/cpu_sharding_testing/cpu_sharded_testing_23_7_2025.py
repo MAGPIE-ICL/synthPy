@@ -183,53 +183,6 @@ def trilinearInterpolator(x, y, z, values, query_points, *, fill_value = jnp.nan
 
     return jnp.where(oob, fill_value, results)
 
-##
-## Helper functions for calculations
-##
-
-def omega_pe(ne):
-    """Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28"""
-
-    return 5.64e4 * jnp.sqrt(ne)
-
-# NRL formulary inverse brems - cheers Jack Halliday for coding in Python
-# Converted to rate coefficient by multiplying by group velocity in plasma
-def kappa(ne, Te, Z, omega):
-    # Useful subroutines
-    def v_the(Te):
-        """Calculate electron thermal speed. Provide Te in eV. Retrurns result in m/s"""
-
-        return 4.19e5 * jnp.sqrt(Te)
-
-    def V(ne, Te, Z, omega):
-        o_pe = omega_pe(ne)
-        #o_max = jnp.copy(o_pe)
-        #o_max[o_pe < omega] = omega
-        o_pe = o_pe.at[:, :].set(jnp.where(o_pe < omega, omega, o_pe))
-        L_classical = Z * e / Te
-        L_quantum = 2.760428269727312e-10 / jnp.sqrt(Te) # hbar / jnp.sqrt(m_e * e * Te)
-        L_max = jnp.maximum(L_classical, L_quantum)
-
-        #return o_max * L_max
-        return o_pe * L_max
-
-    def coloumbLog(ne, Te, Z, omega):
-        return jnp.maximum(2.0, jnp.log(v_the(Te) / V(ne, Te, Z, omega)))
-
-    ne_cc = ne * 1e-6
-    # don't think this is actually used?
-    #o_pe = omega_pe(ne_cc)
-    CL = coloumbLog(ne_cc, Te, Z, omega)
-
-    result = 3.1e-5 * Z * c * jnp.power(ne_cc / omega, 2) * CL * jnp.power(Te, -1.5) # 1/s
-    del ne_cc
-
-    return result
-
-# Plasma refractive index
-def n_refrac(ne, omega):
-    return jnp.sqrt(1.0 - (omega_pe(ne * 1e-6) / omega) ** 2)
-
 def calc_dndr(ScalarDomain, lwl = 1064e-9, *, keep_domain = False):
     VerdetConst = 0.0
     if (ScalarDomain.B_on):
@@ -250,46 +203,9 @@ def calc_dndr(ScalarDomain, lwl = 1064e-9, *, keep_domain = False):
         ScalarDomain.probing_direction
     )
 
-def dndr(r, ne, omega, x, y, z):
-    grad = jnp.zeros_like(r)
-
-    dndx = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), x, axis = 0)
-    grad = grad.at[0, :].set(trilinearInterpolator(x, y, z, dndx, r, fill_value = 0.0))
-    del dndx
-
-    dndy = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), y, axis = 1)
-    grad = grad.at[1, :].set(trilinearInterpolator(x, y, z, dndy, r, fill_value = 0.0))
-    del dndy
-
-    dndz = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), z, axis = 2)
-    grad = grad.at[2, :].set(trilinearInterpolator(x, y, z, dndz, r, fill_value = 0.0))
-    del dndz
-
-    return grad
-
 def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, omega, VerdetConst):
     s = jnp.reshape(s, (9, 1))
-
     sprime = jnp.zeros_like(s)
-
-    # Position and velocity
-    # needs to be before the reshape to avoid indexing errors
-    r = s[:3, :]
-    v = s[3:6, :]
-
-    # Amplitude, phase and polarisation
-    amp = s[6, :]
-    #phase = s[7,:]
-    #pol = s[8,:]
-
-    del s
-
-    sprime = sprime.at[3:6, :].set(dndr(r, ne, omega, x, y, z))
-    sprime = sprime.at[:3, :].set(v)
-
-    del r
-    del v
-    del amp
 
     return sprime.flatten()
 
@@ -371,7 +287,7 @@ def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, omega, Verde
 
     return sol.ys[:, -1, :].T
 
-rf, Jf, duration = solve(
+rf = solve(
     beam_definition,
     (domain.x, domain.y, domain.z),
     (domain.x_n, domain.y_n, domain.z_n),   # domain.dim - this causes a TracerBoolConversionError, check why later, could be interesting and useful to know
