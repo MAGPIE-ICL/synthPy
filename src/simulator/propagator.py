@@ -499,36 +499,11 @@ def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, omega, Verde
         from diffrax import ODETerm, Tsit5, SaveAt, PIDController, diffeqsolve
         #import optax - diffrax uses as a dependency, don't need to import directly
 
-        def diffrax_solve(dydt, t0, t1, Nt, rtol = 1e-7, atol = 1e-9):
-            """
-            Here we wrap the diffrax diffeqsolve function such that we can easily parallelise it
-            """
+        def diffrax_so
 
-            # We convert our python function to a diffrax ODETerm
-            # should use the function passed into the wrapper - not the local definition
-            term = ODETerm(dydt)
-            # We chose a solver (time-stepping) method from within diffrax library
-            solver = Tsit5() # (RK45 - closest I could find to solve_ivp's default method)
+    del s0
 
-            # At what time points you want to save the solution
-            saveat = SaveAt(ts = jnp.linspace(t0, t1, Nt))
-            # Diffrax uses adaptive time stepping to gain accuracy within certain tolerances
-            stepsize_controller = PIDController(rtol = rtol, atol = atol)
-
-            return lambda s0, args : diffeqsolve(
-                term,
-                solver,
-                y0 = jnp.array(s0),
-                args = args,
-                t0 = t0,
-                t1 = t1,
-                dt0 = (t1 - t0) * norm_factor / Nt,
-                saveat = saveat,
-                stepsize_controller = stepsize_controller,
-                # set max steps to no. of cells x100
-                max_steps = dim[0] * dim[1] * dim[2] * 100 #10000 - default for solve_ivp?????
-            )
-
+    if memory_debug:
         # hardcode to normalise to 1 due to diffrax bug
         ODE_solve = diffrax_solve(dsdt_ODE, t[0], t[-1] / norm_factor, save_steps)
 
@@ -571,9 +546,10 @@ def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, omega, Verde
         from utils import domain_estimate
 
         print(colour.BOLD + "\nMemory summary - total estimate:", mem_conversion(domain_estimate(dim) + (getsizeof_default(s0) + getsizeof_default(sol)) * Np) + colour.END)
-        print("\nSize in memory of initial rays:", mem_conversion(getsizeof_default(s0) * Np))
-        print("Size in memory of solution class / single ray (?):", getsizeof(sol))
-        print("Size in memory of solution:", mem_conversion(getsizeof_default(sol) * Np))
+        print("\nEst. size of domain:", mem_conversion(getsizeof_default(s0) * Np))
+        print("Est. size of initial rays:", mem_conversion(getsizeof_default(s0) * Np))
+        print("Est. size of solution class / single ray (?):", getsizeof(sol))
+        print("Est. size of solution (bef. JV):", mem_conversion(getsizeof_default(sol) * Np))
 
         folder_name = "memory_benchmarks/"
         rel_path_to_folder = "../../evaluation/"
