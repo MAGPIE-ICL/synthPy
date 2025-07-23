@@ -4,6 +4,7 @@ import os
 
 from scipy.integrate import odeint, solve_ivp
 from time import time
+from sys import getsizeof as getsizeof_default
 
 from scipy.constants import c
 from scipy.constants import e
@@ -12,6 +13,7 @@ from scipy.constants import e
 
 from utils import getsizeof
 from utils import trilinearInterpolator
+from utils import mem_conversion
 
 ##
 ## Helper functions for calculations
@@ -345,7 +347,7 @@ def ray_to_Jonesvector(rays, ne_extent, *, probing_direction = 'z', keep_current
 def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, omega, VerdetConst, inv_brems, phaseshift, B_on, probing_direction, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False):
     Np = s0_import.shape[1]
 
-    print("\nSize in memory of initial rays:", getsizeof(s0_import))
+    print("\nSize in memory of initial rays:", mem_conversion(getsizeof_default(s0_import) * Np))
 
     # if batched: or if auto_batching: etc.
     # proing_depth /= some integer with some corrections I expect
