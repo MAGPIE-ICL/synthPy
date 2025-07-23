@@ -255,15 +255,15 @@ def dndr(r, ne, omega, x, y, z):
 
     dndx = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), x, axis = 0)
     grad = grad.at[0, :].set(trilinearInterpolator(x, y, z, dndx, r, fill_value = 0.0))
-    del dndx
+    #del dndx
 
     dndy = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), y, axis = 1)
     grad = grad.at[1, :].set(trilinearInterpolator(x, y, z, dndy, r, fill_value = 0.0))
-    del dndy
+    #del dndy
 
     dndz = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), z, axis = 2)
     grad = grad.at[2, :].set(trilinearInterpolator(x, y, z, dndz, r, fill_value = 0.0))
-    del dndz
+    #del dndz
 
     return grad
 
