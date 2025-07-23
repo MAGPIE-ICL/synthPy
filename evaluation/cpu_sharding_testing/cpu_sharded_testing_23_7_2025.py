@@ -57,6 +57,10 @@ from scipy.constants import e
 
 class ScalarDomain():
     def __init__(self, lengths, dim):
+        self.B_on = False
+        self.inv_brems = False
+        self.phaseshift = False
+
         self.x_length, self.y_length, self.z_length = lengths[0], lengths[1], lengths[2]
         self.x_n, self.y_n, self.z_n = dim, dim, dim
 
