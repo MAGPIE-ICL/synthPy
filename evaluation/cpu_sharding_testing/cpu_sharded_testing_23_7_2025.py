@@ -222,21 +222,7 @@ def dndr(r, ne, omega, x, y, z):
 
 def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, omega, VerdetConst):
     s = jnp.reshape(s, (9, 1))
-
     sprime = jnp.zeros_like(s)
-
-    # Position and velocity
-    # needs to be before the reshape to avoid indexing errors
-    r = s[:3, :]
-    v = s[3:6, :]
-
-    # Amplitude, phase and polarisation
-    amp = s[6, :]
-    #phase = s[7,:]
-    #pol = s[8,:]
-
-    #sprime = sprime.at[3:6, :].set(dndr(r, ne, omega, x, y, z))
-    #sprime = sprime.at[:3, :].set(v)
 
     return sprime.flatten()
 
