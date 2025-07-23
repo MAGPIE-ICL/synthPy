@@ -236,7 +236,7 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
     #pol = s[8,:]
 
     #sprime = sprime.at[3:6, :].set(dndr(r, ne, omega, x, y, z))
-    sprime = sprime.at[:3, :].set(v)
+    #sprime = sprime.at[:3, :].set(v)
 
     return sprime.flatten()
 
