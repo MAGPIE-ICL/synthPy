@@ -74,6 +74,18 @@ def jax_init(force_device = None, core_limit = None, extra_info = False):
     import sys
     import os
 
+    from utils import colour
+    print(colour.BOLD)
+
+    print("\nDisabling python multi-threading...")
+
+    thread_count = str(1)
+    os.environ["OMP_NUM_THREADS"]        = thread_count
+    os.environ["OPENBLAS_NUM_THREADS"]   = thread_count
+    os.environ["MKL_NUM_THREADS"]        = thread_count
+    os.environ["VECLIB_MAXIMUM_THREADS"] = thread_count
+    os.environ["NUMEXPR_NUM_THREADS"]    = thread_count
+
     from multiprocessing import cpu_count
 
     print("\nInitialising jax...\n")
@@ -121,6 +133,8 @@ def jax_init(force_device = None, core_limit = None, extra_info = False):
     # can't set via jax.config.update for some reason
 
     #jax.config.update('jax_compiler_enable_remat_pass', False)
+
+    print(colour.END)
 
     if extra_info:
         jax.print_environment_info()
