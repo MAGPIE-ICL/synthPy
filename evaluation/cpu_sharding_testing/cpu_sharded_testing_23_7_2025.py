@@ -206,17 +206,16 @@ def calc_dndr(ScalarDomain, lwl = 1064e-9, *, keep_domain = False):
 def dndr(r, ne, omega, x, y, z):
     grad = jnp.zeros_like(r)
 
-    dndx = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), x, axis = 0)
-    grad = grad.at[0, :].set(trilinearInterpolator(x, y, z, dndx, r, fill_value = 0.0))
-    del dndx
+    dndr = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), x, axis = 0)
+    grad = grad.at[0, :].set(trilinearInterpolator(x, y, z, dndr, r, fill_value = 0.0))
 
-    dndy = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), y, axis = 1)
-    grad = grad.at[1, :].set(trilinearInterpolator(x, y, z, dndy, r, fill_value = 0.0))
-    del dndy
+    dndr = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), y, axis = 1)
+    grad = grad.at[1, :].set(trilinearInterpolator(x, y, z, dndr, r, fill_value = 0.0))
 
-    dndz = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), z, axis = 2)
-    grad = grad.at[2, :].set(trilinearInterpolator(x, y, z, dndz, r, fill_value = 0.0))
-    del dndz
+    dndr = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), z, axis = 2)
+    grad = grad.at[2, :].set(trilinearInterpolator(x, y, z, dndr, r, fill_value = 0.0))
+
+    del dndr
 
     return grad
 
