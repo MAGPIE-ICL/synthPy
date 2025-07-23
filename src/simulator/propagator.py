@@ -405,6 +405,7 @@ def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, omega, Verde
             #from multiprocessing import cpu_count
             #core_count = cpu_count()
 
+            print(os.environ['XLA_FLAGS'])
             core_count = int(os.environ['XLA_FLAGS'].replace("--xla_force_host_platform_device_count=", ''))
             print(", with:", core_count, "cores.")
 

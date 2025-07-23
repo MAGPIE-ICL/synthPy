@@ -8,6 +8,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("-d", "--domain", type = int)
 parser.add_argument("-r", "--rays", type = int)
+parser.add_argument("-c", "--core", type = int)
 args = parser.parse_args()
 
 n_cells = 128
@@ -20,10 +21,14 @@ if args.rays is not None:
 
 print("\nStarting cpu sharding test run with", n_cells, "cells and", Np, "rays.")
 
-from multiprocessing import cpu_count
+if args.core is not None:
+    core_limit = args.core
+else:
+    from multiprocessing import cpu_count
+    core_limit = cpu_count()
 
 assert "jax" not in sys.modules, "jax already imported: you must restart your runtime - DO NOT RUN THIS FUNCTION TWICE"
-os.environ['XLA_FLAGS'] = "--xla_force_host_platform_device_count=" + str(cpu_count())
+os.environ['XLA_FLAGS'] = "--xla_force_host_platform_device_count=" + str(core_limit)
 os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
 os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.9"
 os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"

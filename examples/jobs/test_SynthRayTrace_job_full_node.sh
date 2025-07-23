@@ -14,12 +14,12 @@ echo 'packages loaded successfully'
 
 echo 'starting job'
 
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 512 -r 8192
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 640 -r 8192
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 768 -r 8192
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 896 -r 8192
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 1024 -r 8192
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 1152 -r 8192
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 1280 -r 8192
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 1408 -r 8192
-python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 1536 -r 8192
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 512 -r 8192 -c 16
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 640 -r 8192 -c 16
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 768 -r 8192 -c 16
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 896 -r 8192 -c 16
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 1024 -r 8192 -c 16
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 1152 -r 8192 -c 16
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 1280 -r 8192 -c 16
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 1408 -r 8192 -c 16
+python -u examples/jobs/run_scripts/test_SynthRayTrace.py -d 1536 -r 8192 -c 16
