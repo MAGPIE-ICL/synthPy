@@ -84,6 +84,12 @@ class ScalarDomain():
 
         self.ne = self.ne.at[:, :].set(1e24 * self.ne)
 
+        self.B = None
+        self.Te = None
+        self.Z = None
+
+        self.probing_direction = 'z'
+
 domain = ScalarDomain(lengths, n_cells)
 
 lwl = 1064e-9
