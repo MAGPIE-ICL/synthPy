@@ -75,3 +75,6 @@ def dalloc(var):
     except:
         var = None
         #print(f'set {var = }')
+
+def domain_estimate(dim):
+    return dim[0] * dim[1] * dim[2] * 4

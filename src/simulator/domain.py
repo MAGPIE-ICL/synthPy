@@ -6,6 +6,7 @@ import equinox as eqx
 from utils import mem_conversion
 from utils import colour
 from utils import dalloc
+from utils import domain_estimate
 
 class ScalarDomain(eqx.Module):
     """
@@ -114,7 +115,7 @@ class ScalarDomain(eqx.Module):
         del dim
         del valid_types
 
-        predicted_domain_allocation = self.dim[0] * self.dim[1] * self.dim[2] * 4
+        predicted_domain_allocation = domain_estimate(dim)
         print("Predicted size in memory of domain:", mem_conversion(predicted_domain_allocation))
 
         # define coordinate space

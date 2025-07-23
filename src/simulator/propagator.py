@@ -562,14 +562,21 @@ def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, omega, Verde
 
     #del ne_nc
 
-    if memory_debug and parallelise:
-        # Visualises sharding, looks cool, but pretty useless - and a pain with higher core counts
-        #jax.debug.visualize_array_sharding(sol.ys[:, -1, :])
+    if memory_debug:
+        if parallelise:
+            # Visualises sharding, looks cool, but pretty useless - and a pain with higher core counts
+            jax.debug.visualize_array_sharding(sol.ys[:, -1, :])
 
-        print("\nSize in memory of initial rays:", getsizeof(s0))
-        print("Size in memory of solution:", getsizeof(sol))
-        print("Size in memory of propagator class:", getsizeof(sol))
+        from utils import domain_estimate
 
+        print(colour.BOLD + "\nMemory summary - total estimate:", mem_conversion(domain_estimate(dim) + (getsizeof_default(s0) + getsizeof_default(sol)) * Np))
+        print("\nSize in memory of initial rays:", mem_conversion(getsizeof_default(s0) * Np))
+        print("Size in memory of solution class / single ray (?):", getsizeof(sol))
+        print("Size in memory of solution:", mem_conversion(getsizeof_default(sol) * Np))
+
+    del s0
+
+    if memory_debug:
         folder_name = "memory_benchmarks/"
         rel_path_to_folder = "../../evaluation/"
 
