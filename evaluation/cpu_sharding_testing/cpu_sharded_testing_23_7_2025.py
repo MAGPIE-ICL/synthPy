@@ -26,6 +26,11 @@ parser.add_argument("-r", "--rays", type = int)
 parser.add_argument("-c", "--core", type = int)
 args = parser.parse_args()
 
+import config
+config.jax_init(force_device = force_device, core_limit = cores)
+
+import jax
+
 n_cells = 128
 if args.domain is not None:
     n_cells = args.domain
@@ -35,23 +40,6 @@ if args.rays is not None:
     Np = args.rays
 
 print("\nStarting cpu sharding test run with", n_cells, "cells and", Np, "rays.")
-
-if args.core is not None:
-    core_limit = args.core
-else:
-    from multiprocessing import cpu_count
-    core_limit = cpu_count()
-
-assert "jax" not in sys.modules, "jax already imported: you must restart your runtime - DO NOT RUN THIS FUNCTION TWICE"
-os.environ['XLA_FLAGS'] = "--xla_force_host_platform_device_count=" + str(core_limit)
-os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
-os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.9"
-os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"
-
-import jax
-
-jax.config.update('jax_enable_x64', True)
-jax.config.update('jax_traceback_filtering', 'off')
 
 extent_x = 5e-3
 extent_y = 5e-3
