@@ -177,11 +177,11 @@ def trilinearInterpolator(coordinates, length, dim, values, query_points, *, fil
     wr = jnp.array(len(points), 3)
 
     for i in range(len(points)):
-        idr[i] = jnp.floor(points[i] * dim / length)
-        wr[i] = (points[i] - coordinates[idr[i]]) / (coordinates[idr[i] + 1] - coordinates[idr[i]])
+        idr = idr.at[i, :].set(jnp.floor(points[i] * dim / length))
+        wr = wr.at[i, :].set((points[i] - coordinates[idr[i]]) / (coordinates[idr[i] + 1] - coordinates[idr[i]]))
 
     def get_val(dx, dy, dz):
-        return values[idr[0] + dx, idr[1] + dy, idr[2] + dz]
+        return values[idr[0, :] + dx, idr[1, :] + dy, idr[2, :] + dz]
 
     return (
         get_val(0, 0, 0) * (1 - wr[0]) * (1 - wr[1]) * (1 - wr[2]) +
