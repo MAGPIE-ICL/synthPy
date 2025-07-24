@@ -174,6 +174,7 @@ with jax.checking_leaks():
         return 0.0
 
     def trilinearInterpolator(coordinates, length, dim, values, query_points, *, fill_value = jnp.nan):
+        '''
         idr = jnp.array(len(points), 3)
         wr = jnp.array(len(points), 3)
 
@@ -194,6 +195,8 @@ with jax.checking_leaks():
             get_val(0, 1, 1) * (1 - wr[0]) *      wr[1]  *      wr[2]  +
             get_val(1, 1, 1) *      wr[0]  *      wr[1]  *      wr[2]
         )
+        '''
+        return 0.0
 
     def calc_dndr(ScalarDomain, lwl = 1064e-9):
         omega = 2 * jnp.pi * c / lwl
