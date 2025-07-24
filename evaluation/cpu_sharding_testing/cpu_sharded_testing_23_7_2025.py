@@ -128,12 +128,12 @@ with jax.checking_leaks():
     #from utils import trilinearInterpolator
     from utils import mem_conversion
 
-    def trilinearInterpolator(coordinates, length, dim, values, query_points, *, fill_value = jnp.nan):
+    def trilinearInterpolator(coordinates, values, query_points, *, fill_value = jnp.nan):
         idr = jnp.array(len(points), 3)
         wr = jnp.array(len(points), 3)
 
         for i in range(len(points)):
-            idr = idr.at[i, :].set(jnp.floor(points[i] * dim / length))
+            idr = idr.at[i, :].set(jnp.floor(points[i]))# * dim / length))
             wr = wr.at[i, :].set((points[i] - coordinates[idr[i]]) / (coordinates[idr[i] + 1] - coordinates[idr[i]]))
 
         def get_val(dx, dy, dz):
@@ -160,15 +160,15 @@ with jax.checking_leaks():
         grad = jnp.zeros_like(r)
 
         dndx = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), x, axis = 0)
-        grad = grad.at[0, :].set(trilinearInterpolator((x, y, z), 1, 1, dndx, r.T, fill_value = 0.0))
+        grad = grad.at[0, :].set(trilinearInterpolator((x, y, z), dndx, r.T, fill_value = 0.0))
         del dndx
 
         dndy = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), y, axis = 1)
-        grad = grad.at[1, :].set(trilinearInterpolator((x, y, z), 1, 1, dndy, r.T, fill_value = 0.0))
+        grad = grad.at[1, :].set(trilinearInterpolator((x, y, z), dndy, r.T, fill_value = 0.0))
         del dndy
 
         dndz = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), z, axis = 2)
-        grad = grad.at[2, :].set(trilinearInterpolator((x, y, z), 1, 1, dndz, r.T, fill_value = 0.0))
+        grad = grad.at[2, :].set(trilinearInterpolator((x, y, z), dndz, r.T, fill_value = 0.0))
         del dndz
 
         return grad
