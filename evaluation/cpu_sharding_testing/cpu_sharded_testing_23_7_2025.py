@@ -3,8 +3,8 @@ import numpy as np
 import sys
 import os
 
-#sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/simulator')
-sys.path.insert(0, 'C:/Users/samma/programming/synthPy/src/simulator')
+sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/simulator')
+#sys.path.insert(0, 'C:/Users/samma/programming/synthPy/src/simulator')
 
 import importlib
 
