@@ -25,7 +25,8 @@ available_devices = jax.devices()
 print(f"Available devices: {available_devices}")
 
 folder_name = "memory_benchmarks/"
-rel_path_to_folder = "../../evaluation/"
+#rel_path_to_folder = "../../evaluation/"
+rel_path_to_folder = "evaluation/"
 
 path = rel_path_to_folder + folder_name
 
