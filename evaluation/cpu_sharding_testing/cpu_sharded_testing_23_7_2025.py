@@ -196,6 +196,7 @@ with jax.checking_leaks():
             get_val(1, 1, 1) *      wr[0]  *      wr[1]  *      wr[2]
         )
         '''
+
         return 0.0
 
     def calc_dndr(ScalarDomain, lwl = 1064e-9):
