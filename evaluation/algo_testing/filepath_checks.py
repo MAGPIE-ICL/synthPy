@@ -29,21 +29,40 @@ rel_path_to_folder = "../../evaluation/"
 
 path = rel_path_to_folder + folder_name
 
-if os.path.isdir(os.getcwd() + "/" + folder_name):
+if os.path.isdir(os.getcwd() + "/" + path):
     print("a")
-    path = folder_name
-elif os.path.isdir(os.getcwd() + "/" + path):
-    print("b")
     pass
 else:
-    print("c")
-    path = os.getcwd() + "/" + folder_name
+    path = os.getcwd() + "/../" + folder_name
 
-    try:
-        os.mkdir(path)
-    except OSError as e:
-        if e.errno != errno.EEXIST:
-            raise
+    if os.path.isdir(path):
+        print("b")
+        pass
+    else:
+        print("c")
+        try:
+            os.mkdir(path)
+        except OSError as e:
+            import errno
+
+            print("\nFailed to create folder above current working directory, attempting in cwd:")
+
+            path = os.getcwd() + "/" + folder_name
+
+            if os.path.isdir(path):
+                print("d")
+                path = folder_name
+            else:
+                print("e")
+                try:
+                    os.mkdir(path)
+                except OSError as e:
+                    print("\nFailed in cwd too! No folder created.")
+                    if e.errno != errno.EEXIST:
+                        raise
+
+                #if e.errno != errno.EEXIST:
+                #    raise
 
 from datetime import datetime
 path += "memory-domain" + " - " + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
