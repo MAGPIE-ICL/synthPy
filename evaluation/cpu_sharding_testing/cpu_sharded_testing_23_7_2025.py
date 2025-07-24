@@ -160,18 +160,15 @@ with jax.checking_leaks():
         grad = jnp.zeros_like(r)
 
         dndx = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), x, axis = 0)
-        #grad = grad.at[0, :].set(trilinearInterpolator(coordinates, length, dim, dndx, r.T, fill_value = 0.0))
-        grad = grad.at[0, :].set(0.0)
+        grad = grad.at[0, :].set(trilinearInterpolator(coordinates, 1, 1, dndx, r.T, fill_value = 0.0))
         del dndx
 
         dndy = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), y, axis = 1)
-        #grad = grad.at[1, :].set(trilinearInterpolator(coordinates, length, dim, dndy, r.T, fill_value = 0.0))
-        grad = grad.at[1, :].set(0.0)
+        grad = grad.at[1, :].set(trilinearInterpolator(coordinates, 1, 1, dndy, r.T, fill_value = 0.0))
         del dndy
 
         dndz = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), z, axis = 2)
-        #grad = grad.at[2, :].set(trilinearInterpolator(coordinates, length, dim, dndz, r.T, fill_value = 0.0))
-        grad = grad.at[2, :].set(0.0)
+        grad = grad.at[2, :].set(trilinearInterpolator(coordinates, 1, 1, dndz, r.T, fill_value = 0.0))
         del dndz
 
         return grad
