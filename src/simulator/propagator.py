@@ -16,19 +16,8 @@ from utils import getsizeof
 from utils import mem_conversion
 from utils import colour
 
-def trilinearInterpolator(x, y, z, values, query_points, *, fill_value = jnp.nan):
-    """
-    Trilinear interpolation on a 3D regular grid.
-
-    Assumes:
-        - coordinates = (x, y, z) where each is 1D
-        - values.shape == (len(x), len(y), len(z))
-        - query_points.shape == (N, 3)
-    """
-
-    values = jnp.asarray(values)
-    query_points = jnp.asarray(query_points.T)
-
+# temporarily used so the code has a working interpolator
+def trilinearInterpolator(coordinates, length, dim, values, query_points, *, fill_value = jnp.nan):
     def get_indices_and_weights(coord_grid, points):
         idx = jnp.searchsorted(coord_grid, points, side = 'right') - 1
         idx = jnp.clip(idx, 0, len(coord_grid) - 2)
@@ -36,32 +25,44 @@ def trilinearInterpolator(x, y, z, values, query_points, *, fill_value = jnp.nan
         x0 = coord_grid[idx]
         return idx, (points - x0) / (coord_grid[idx + 1] - x0)
 
-    ix, wx = get_indices_and_weights(x, query_points[:, 0])
-    iy, wy = get_indices_and_weights(y, query_points[:, 1])
-    iz, wz = get_indices_and_weights(z, query_points[:, 2])
+    ix, wx = get_indices_and_weights(coordinates[:, 0], query_points[:, 0])
+    iy, wy = get_indices_and_weights(coordinates[:, 1], query_points[:, 1])
+    iz, wz = get_indices_and_weights(coordinates[:, 2], query_points[:, 2])
 
-    def get_val(dx, dy, dz):
-        return values[ix + dx, iy + dy, iz + dz]
+    idr = jnp.array([ix, iy, iz]).T
 
-    results = (
-        get_val(0, 0, 0) * (1 - wx) * (1 - wy) * (1 - wz) +
-        get_val(1, 0, 0) * wx       * (1 - wy) * (1 - wz) +
-        get_val(0, 1, 0) * (1 - wx) * wy       * (1 - wz) +
-        get_val(0, 0, 1) * (1 - wx) * (1 - wy) * wz +
-        get_val(1, 1, 0) * wx       * wy       * (1 - wz) +
-        get_val(1, 0, 1) * wx       * (1 - wy) * wz +
-        get_val(0, 1, 1) * (1 - wx) * wy       * wz +
-        get_val(1, 1, 1) * wx       * wy       * wz
-    )
+    offsets = jnp.array([
+        [0, 0, 0],
+        [1, 0, 0],
+        [0, 1, 0],
+        [0, 0, 1],
+        [1, 1, 0],
+        [1, 0, 1],
+        [0, 1, 1],
+        [1, 1, 1]
+    ])  # shape: (8, 3)
 
-    # Check out-of-bounds
-    oob = (
-        (query_points[:, 0] < x[0]) | (query_points[:, 0] > x[-1]) |
-        (query_points[:, 1] < y[0]) | (query_points[:, 1] > y[-1]) |
-        (query_points[:, 2] < z[0]) | (query_points[:, 2] > z[-1])
-    )
+    # idr has shape (N, 3) --> None's convert both arrays to matching shape for 8 3D offsets of N points
+    neighbors = idr[:, None, :] + offsets[None, :, :]   # shape: (N, 8, 3)
 
-    return jnp.where(oob, fill_value, results)
+    val_neighbors = values[
+        neighbors[:, :, 0], 
+        neighbors[:, :, 1], 
+        neighbors[:, :, 2]
+    ]  # shape: (N, 8)
+
+    weights = jnp.stack([
+        (1 - wx) * (1 - wy) * (1 - wz),  # 000
+        wx       * (1 - wy) * (1 - wz),  # 100
+        (1 - wx) * wy       * (1 - wz),  # 010
+        (1 - wx) * (1 - wy) * wz,        # 001
+        wx       * wy       * (1 - wz),  # 110
+        wx       * (1 - wy) * wz,        # 101
+        (1 - wx) * wy       * wz,        # 011
+        wx       * wy       * wz         # 111
+    ], axis = 1)  # shape: (N, 8)
+
+    return jnp.sum(weights * val_neighbors, axis = 1)# / 8
 
 ##
 ## Helper functions for calculations
@@ -160,10 +161,11 @@ def calc_dndr(ScalarDomain, lwl = 1064e-9, *, keep_domain = False):
         ScalarDomain.inv_brems,
         ScalarDomain.phaseshift,
         ScalarDomain.B_on,
-        ScalarDomain.probing_direction
+        ScalarDomain.probing_direction,
+        ScalarDomain.region_count
     )
 
-def dndr(r, ne, omega, x, y, z):
+def dndr(r, ne, omega, coordinates, length, dim):
     """
     Returns the gradient at the locations r
 
@@ -174,24 +176,24 @@ def dndr(r, ne, omega, x, y, z):
         3 x N float: N [dx, dy, dz] electron density gradients
     """
 
-    grad = jnp.zeros_like(r)
+    grad = jnp.zeros_like(r.T)
 
-    dndx = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), x, axis = 0)
-    grad = grad.at[0, :].set(trilinearInterpolator(x, y, z, dndx, r, fill_value = 0.0))
+    dndx = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), coordinates[:, 0], axis = 0)
+    grad = grad.at[0, :].set(trilinearInterpolator(coordinates, length, dim, dndx, r, fill_value = 0.0))
     del dndx
 
-    dndy = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), y, axis = 1)
-    grad = grad.at[1, :].set(trilinearInterpolator(x, y, z, dndy, r, fill_value = 0.0))
+    dndy = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), coordinates[:, 1], axis = 1)
+    grad = grad.at[1, :].set(trilinearInterpolator(coordinates, length, dim, dndy, r, fill_value = 0.0))
     del dndy
 
-    dndz = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), z, axis = 2)
-    grad = grad.at[2, :].set(trilinearInterpolator(x, y, z, dndz, r, fill_value = 0.0))
+    dndz = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), coordinates[:, 2], axis = 2)
+    grad = grad.at[2, :].set(trilinearInterpolator(coordinates, length, dim, dndz, r, fill_value = 0.0))
     del dndz
 
     return grad
 
 # ODEs of photon paths, standalone function to support the solve()
-def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, omega, VerdetConst):
+def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, coordinates, omega, VerdetConst, length, dim):
     """
     Returns an array with the gradients and velocity per ray for ode_int
 
@@ -215,7 +217,7 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
 
     # Position and velocity
     # needs to be before the reshape to avoid indexing errors
-    r = s[:3, :]
+    r = s[:3, :].T  # transposed so it is of the correct shape for interpolators
     v = s[3:6, :]
 
     # Amplitude, phase and polarisation
@@ -230,14 +232,14 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
 
     # must unpack coordinates tuple here for the sake of dndr, could be earlier but this is easier to pass and more generalised
     # r must be transposed within dndr(...) else we get an AbstractTerm error due to the effect on the return value
-    sprime = sprime.at[3:6, :].set(dndr(r, ne, omega, x, y, z))
+    sprime = sprime.at[3:6, :].set(dndr(r, ne, omega, coordinates, length, dim))
     sprime = sprime.at[:3, :].set(v)
 
     # Attenuation due to inverse bremsstrahlung
     if inv_brems:
-        sprime = sprime.at[6, :].set(trilinearInterpolator(x, y, z, kappa(ne, Te, Z, omega), r) * amp)
+        sprime = sprime.at[6, :].set(trilinearInterpolator(coordinates, kappa(ne, Te, Z, omega), r) * amp)
     if phaseshift:
-        sprime = sprime.at[7, :].set(omega * (trilinearInterpolator(x, y, z, n_refrac(ne, omega), r) - 1.0))
+        sprime = sprime.at[7, :].set(omega * (trilinearInterpolator(coordinates, n_refrac(ne, omega), r) - 1.0))
     if B_on:
         """
         Returns the VerdetConst ne B.v
@@ -250,14 +252,14 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
             N float: N values of ne B.v
         """
 
-        ne_N = trilinearInterpolator(x, y, z, ne, r)
+        ne_N = trilinearInterpolator(coordinates, ne, r)
 
         Bv_N = jnp.sum(
             jnp.array(
                 [
-                    trilinearInterpolator(x, y, z, B[:, :, :, 0], r),
-                    trilinearInterpolator(x, y, z, B[:, :, :, 1], r),
-                    trilinearInterpolator(x, y, z, B[:, :, :, 2], r)
+                    trilinearInterpolator(coordinates, B[:, :, :, 0], r),
+                    trilinearInterpolator(coordinates, B[:, :, :, 1], r),
+                    trilinearInterpolator(coordinates, B[:, :, :, 2], r)
                 ]
             ) * v, axis = 0
         )
@@ -392,174 +394,210 @@ def ray_to_Jonesvector(rays, ne_extent, *, probing_direction = 'z', keep_current
 
     return ray_p, None
 
-def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, omega, VerdetConst, inv_brems, phaseshift, B_on, probing_direction, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False):
+def solve(s0_import, coordinates, length, dim, probing_depth, ne, B, Te, Z, omega, VerdetConst, inv_brems, phaseshift, B_on, probing_direction, region_count, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False):
     Np = s0_import.shape[1]
+    dim_split = jnp.asarray(dim)[['x', 'y', 'z'].index(probing_direction)] // region_count
+    #print(jnp.asarray(dim))
+    #print(region_count)
+    #print(dim_split)
 
     print("\nSize in memory of initial rays:", mem_conversion(getsizeof_default(s0_import) * Np))
-
     # if batched: or if auto_batching: etc.
     # proing_depth /= some integer with some corrections I expect
     # make logic too loop it and pick up from previous solution
 
-    # Need to make sure all rays have left volume
-    # Conservative estimate of diagonal across volume
-    # Then can backproject to surface of volume
-
-    t = jnp.linspace(0.0, jnp.sqrt(8.0) * probing_depth / c, 2)
-    norm_factor = jnp.max(t)
-
-    # 8.0^0.5 is an arbritrary factor to ensure rays have enough time to escape the box
-    # think we should change this???
-
-    ##
-    ## currently NOT passing interps
-    ## - get AbstractTerm either when interps are passed, both as dictionary or as an equinox class
-    ## - try to fix later, pass individually perhaps?
-    ## NOTES SAY DICT IS NOT HASHABLE - try as a tuple? - tuple did not work either :(
-    ##
-
-    # passed args must be hashable to be made static for jax.jit, tuple is hashable, array & dict are not
-    args = (parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, *coordinates, omega, VerdetConst)
-
-    if not parallelise:
-        from numpy import array
-        s0 = array(jnp.ravel(s0_import))
-        #s0 = s0.flatten() #odeint insists
-
-        start = time()
-        # wrapper allows dummy variables t & y to be used by solve_ivp(), self is required by dsdt
-        sol = solve_ivp(lambda t, y: dsdt(t, y, *args), [0, t[-1]], s0, t_eval = t)
-    else:
-        available_devices = jax.devices()
-
+    depth_traced = 0.0
+    for i in range(region_count):
+        lower = 0
+        upper = -1
         '''
-        if force_device is not None:
-            try:
-                #jax.default_device = jax.devices(force_device)[0]
-                jax.config.update('jax_platform_name', force_device)
-            except:
-                print("\njax cannot detect that device if it does exist - try not passing a force_device param and seeing if it runs.")
-        '''
-
-        running_device = jax.lib.xla_bridge.get_backend().platform # - deprecated, using still as needed for HPC
-        #running_device = jax.extend.backend.get_backend().platform
-        print("\nRunning device:", running_device, end='')
-
-        # transposed as jax.vmap() expects form of [batch_idx, items] not [items, batch_idx]
-        s0_transformed = s0_import.T
-        del s0_import
-
-        if running_device == 'cpu':
-            #from multiprocessing import cpu_count
-            #core_count = cpu_count()
-
-            core_count = int(os.environ['XLA_FLAGS'].replace("--xla_force_host_platform_device_count=", ''))
-            print(", with:", core_count, "cores.")
-
-            from jax.sharding import PartitionSpec as P, NamedSharding
-
-            # Create a Sharding object to distribute a value across devices:
-            # Assume self.core_count is the no. of core devices available
-            mesh = jax.make_mesh((core_count,), ('rows',))  # 1D mesh for columns
-
-            # Specify sharding: don't split axis 0 (rows), split axis 1 (columns) across devices
-            # then apply sharding to rewrite s0 as a sharded array from it's original matrix
-            # and use jax.device_put to distribute it across devices:
-            Np = ((Np // core_count) * core_count)
-            assert Np > 0, "Not enough rays to parallelise over cores, increase to at least " + str(core_count)
-
-            # if you don't wish to transpose before operation you need to use the old call
-            # s0 = jax.device_put(s0_transformed[:, 0:Np], NamedSharding(mesh, P(None, 'cols')))
-            s0 = jax.device_put(s0_transformed[0:Np, :], NamedSharding(mesh, P('rows', None)))  # 'None' means don't shard axis 0
-
-            print(s0.sharding)            # See the sharding spec
-            #print(s0.addressable_shards)  # Check each device's shard
-            #jax.debug.visualize_array_sharding(s0)
-        elif running_device == 'gpu':
-            gpu_devices = jax.devices('gpu')
-            print("\nThere are", len(gpu_devices), "available GPU devices:", gpu_devices)
-            assert len(gpu_devices) > 0, "Running on GPU yet none detected?"
-
-            s0 = jax.device_put(s0_transformed, gpu_devices[0])
-        elif running_device == 'tpu':
-            s0 = s0_transformed
-            pass
+        lower = i * dim_split
+        if i == region_count - 1:
+            upper = -1
         else:
-            assert "No suitable device detected!"
+            upper = (i + 1) * dim_split
 
-        del s0_transformed
-        # optional for aggressive cleanup?
-        #jax.clear_caches()
+        # Need to make sure all rays have left volume
+        # Conservative estimate of diagonal across volume
+        # Then can backproject to surface of volume
 
-        # wrapper for same reason, diffrax.ODETerm instantiaties this and passes args
-        # I have no idea why, but this has to be defined in solve rather than as a global function - else there is an abstract variable error
-        def dsdt_ODE(t, y, args):
-            return dsdt(t, y, *args) * norm_factor
+        print(upper)
+        print(lower)
+        trace_depth = coordinates[['x', 'y', 'z'].index(probing_direction)][upper] - coordinates[['x', 'y', 'z'].index(probing_direction)][lower]
+        depth_remaining = probing_depth - depth_traced
 
-        from diffrax import ODETerm, Tsit5, SaveAt, PIDController, diffeqsolve
-        #import optax - diffrax uses as a dependency, don't need to import directly
+        if trace_depth > depth_remaining:
+            trace_depth = depth_remaining
 
-        def diffrax_solve(dydt, t0, t1, Nt, rtol = 1e-7, atol = 1e-9):
-            """
-            Here we wrap the diffrax diffeqsolve function such that we can easily parallelise it
-            """
+        del depth_remaining
+        '''
 
-            # We convert our python function to a diffrax ODETerm
-            # should use the function passed into the wrapper - not the local definition
-            term = ODETerm(dydt)
-            # We chose a solver (time-stepping) method from within diffrax library
-            solver = Tsit5() # (RK45 - closest I could find to solve_ivp's default method)
+        t = jnp.linspace(0.0, jnp.sqrt(8.0) * probing_depth / c, 2)#trace_depth / c, 2)
+        norm_factor = jnp.max(t)
 
-            # At what time points you want to save the solution
-            saveat = SaveAt(ts = jnp.linspace(t0, t1, Nt))
-            # Diffrax uses adaptive time stepping to gain accuracy within certain tolerances
-            stepsize_controller = PIDController(rtol = rtol, atol = atol)
+        # 8.0^0.5 is an arbritrary factor to ensure rays have enough time to escape the box
+        # think we should change this???
 
-            return lambda s0, args : diffeqsolve(
-                term,
-                solver,
-                y0 = jnp.array(s0),
-                args = args,
-                t0 = t0,
-                t1 = t1,
-                dt0 = (t1 - t0) * norm_factor / Nt,
-                saveat = saveat,
-                stepsize_controller = stepsize_controller,
-                # set max steps to no. of cells x100
-                max_steps = dim[0] * dim[1] * dim[2] * 100 #10000 - default for solve_ivp?????
+        ##
+        ## currently NOT passing interps
+        ## - get AbstractTerm either when interps are passed, both as dictionary or as an equinox class
+        ## - try to fix later, pass individually perhaps?
+        ## NOTES SAY DICT IS NOT HASHABLE - try as a tuple? - tuple did not work either :(
+        ##
+
+        # passed args must be hashable to be made static for jax.jit, tuple is hashable, array & dict are not
+        '''
+        args = (parallelise, inv_brems, phaseshift, B_on,
+            ne[lower:upper] if ne is not None else None,
+            B[lower:upper] if B is not None else None,
+            Te[lower:upper] if Te is not None else None,
+            Z[lower:upper] if Z is not None else None,
+            *coordinates, omega, VerdetConst
+        )
+        '''
+
+        args = (parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, coordinates, omega, VerdetConst, length, dim)
+
+        if not parallelise:
+            from numpy import array
+            s0 = array(jnp.ravel(s0_import))
+            #s0 = s0.flatten() #odeint insists
+
+            start = time()
+            # wrapper allows dummy variables t & y to be used by solve_ivp(), self is required by dsdt
+            sol = solve_ivp(lambda t, y: dsdt(t, y, *args), [0, t[-1]], s0, t_eval = t)
+        else:
+            available_devices = jax.devices()
+
+            '''
+            if force_device is not None:
+                try:
+                    #jax.default_device = jax.devices(force_device)[0]
+                    jax.config.update('jax_platform_name', force_device)
+                except:
+                    print("\njax cannot detect that device if it does exist - try not passing a force_device param and seeing if it runs.")
+            '''
+
+            running_device = jax.lib.xla_bridge.get_backend().platform # - deprecated, using still as needed for HPC
+            #running_device = jax.extend.backend.get_backend().platform
+            print("\nRunning device:", running_device, end='')
+
+            # transposed as jax.vmap() expects form of [batch_idx, items] not [items, batch_idx]
+            s0_transformed = s0_import.T
+            del s0_import
+
+            if running_device == 'cpu':
+                #from multiprocessing import cpu_count
+                #core_count = cpu_count()
+
+                core_count = int(os.environ['XLA_FLAGS'].replace("--xla_force_host_platform_device_count=", ''))
+                print(", with:", core_count, "cores.")
+
+                from jax.sharding import PartitionSpec as P, NamedSharding
+
+                # Create a Sharding object to distribute a value across devices:
+                # Assume self.core_count is the no. of core devices available
+                mesh = jax.make_mesh((core_count,), ('rows',))  # 1D mesh for columns
+
+                # Specify sharding: don't split axis 0 (rows), split axis 1 (columns) across devices
+                # then apply sharding to rewrite s0 as a sharded array from it's original matrix
+                # and use jax.device_put to distribute it across devices:
+                Np = ((Np // core_count) * core_count)
+                assert Np > 0, "Not enough rays to parallelise over cores, increase to at least " + str(core_count)
+
+                # if you don't wish to transpose before operation you need to use the old call
+                # s0 = jax.device_put(s0_transformed[:, 0:Np], NamedSharding(mesh, P(None, 'cols')))
+                s0 = jax.device_put(s0_transformed[0:Np, :], NamedSharding(mesh, P('rows', None)))  # 'None' means don't shard axis 0
+
+                print(s0.sharding)            # See the sharding spec
+                #print(s0.addressable_shards)  # Check each device's shard
+                #jax.debug.visualize_array_sharding(s0)
+            elif running_device == 'gpu':
+                gpu_devices = jax.devices('gpu')
+                print("\nThere are", len(gpu_devices), "available GPU devices:", gpu_devices)
+                assert len(gpu_devices) > 0, "Running on GPU yet none detected?"
+
+                s0 = jax.device_put(s0_transformed, gpu_devices[0])
+            elif running_device == 'tpu':
+                s0 = s0_transformed
+                pass
+            else:
+                assert "No suitable device detected!"
+
+            del s0_transformed
+            # optional for aggressive cleanup?
+            #jax.clear_caches()
+
+            # wrapper for same reason, diffrax.ODETerm instantiaties this and passes args
+            # I have no idea why, but this has to be defined in solve rather than as a global function - else there is an abstract variable error
+            def dsdt_ODE(t, y, args):
+                return dsdt(t, y, *args) * norm_factor
+
+            from diffrax import ODETerm, Tsit5, SaveAt, PIDController, diffeqsolve
+            #import optax - diffrax uses as a dependency, don't need to import directly
+
+            def diffrax_solve(dydt, t0, t1, Nt, rtol = 1e-7, atol = 1e-9):
+                """
+                Here we wrap the diffrax diffeqsolve function such that we can easily parallelise it
+                """
+
+                # We convert our python function to a diffrax ODETerm
+                # should use the function passed into the wrapper - not the local definition
+                term = ODETerm(dydt)
+                # We chose a solver (time-stepping) method from within diffrax library
+                solver = Tsit5() # (RK45 - closest I could find to solve_ivp's default method)
+
+                # At what time points you want to save the solution
+                saveat = SaveAt(ts = jnp.linspace(t0, t1, Nt))
+                # Diffrax uses adaptive time stepping to gain accuracy within certain tolerances
+                stepsize_controller = PIDController(rtol = rtol, atol = atol)
+
+                return lambda s0, args : diffeqsolve(
+                    term,
+                    solver,
+                    y0 = jnp.array(s0),
+                    args = args,
+                    t0 = t0,
+                    t1 = t1,
+                    dt0 = (t1 - t0) * norm_factor / Nt,
+                    saveat = saveat,
+                    stepsize_controller = stepsize_controller,
+                    # set max steps to no. of cells x100
+                    max_steps = dim[0] * dim[1] * dim[2] * 100 #10000 - default for solve_ivp?????
+                )
+
+            # hardcode to normalise to 1 due to diffrax bug
+            ODE_solve = diffrax_solve(dsdt_ODE, t[0], t[-1] / norm_factor, save_steps)
+
+            if jitted:
+                start_comp = time()
+
+                from equinox import filter_jit
+                # equinox.filter_jit() (imported as filter_jit()) provides debugging info unlike jax.jit() - it does not like static args though so sticking with jit for now
+                #ODE_solve = jax.jit(ODE_solve)#, static_argnums = 1)#, device = available_devices[0])
+                ODE_solve = filter_jit(ODE_solve)#, device = available_devices[0])
+                # not sure about the performance of non-static specified arguments with filter_jit() - only use for debugging not in 'production'
+
+                print("\njax compilation of solver took:", time() - start_comp, "seconds", end='')
+
+            #from functools import partial
+
+            # pass s0[:, i] for each ray via a jax.vmap for parallelisation
+            start = time()
+            sol = jax.block_until_ready(
+                # in_axes version ensures that vmap doesn't map args parameters, just s0
+                #jax.vmap(lambda rays, args: ODE_solve, in_axes = (0, None))(s0, args)
+                # default vmap_method argument is sequential, this is deprecated though and will cause a warning (if debugging) past jax 0.6.0
+                # look into different options for this parameter at a later date
+                #jax.vmap(partial(lambda s: ODE_solve(s, args), vmap_method = "sequential"))(s0)
+                #jax.vmap(partial(ODE_solve, in_axes = (0, None), vmap_method = "sequential"))(s0, args)
+                jax.vmap(ODE_solve, in_axes = (0, None))(s0, args)
             )
 
-        # hardcode to normalise to 1 due to diffrax bug
-        ODE_solve = diffrax_solve(dsdt_ODE, t[0], t[-1] / norm_factor, save_steps)
+            #sol = jax.block_until_ready(jax.vmap(ODE_solve, in_axes = (0, None))(s0, args))
 
-        if jitted:
-            start_comp = time()
-
-            from equinox import filter_jit
-            # equinox.filter_jit() (imported as filter_jit()) provides debugging info unlike jax.jit() - it does not like static args though so sticking with jit for now
-            #ODE_solve = jax.jit(ODE_solve)#, static_argnums = 1)#, device = available_devices[0])
-            ODE_solve = filter_jit(ODE_solve)#, device = available_devices[0])
-            # not sure about the performance of non-static specified arguments with filter_jit() - only use for debugging not in 'production'
-
-            print("\njax compilation of solver took:", time() - start_comp, "seconds", end='')
-
-        #from functools import partial
-
-        # pass s0[:, i] for each ray via a jax.vmap for parallelisation
-        start = time()
-        sol = jax.block_until_ready(
-            # in_axes version ensures that vmap doesn't map args parameters, just s0
-            #jax.vmap(lambda rays, args: ODE_solve, in_axes = (0, None))(s0, args)
-            # default vmap_method argument is sequential, this is deprecated though and will cause a warning (if debugging) past jax 0.6.0
-            # look into different options for this parameter at a later date
-            #jax.vmap(partial(lambda s: ODE_solve(s, args), vmap_method = "sequential"))(s0)
-            #jax.vmap(partial(ODE_solve, in_axes = (0, None), vmap_method = "sequential"))(s0, args)
-            jax.vmap(ODE_solve, in_axes = (0, None))(s0, args)
-        )
-
-        #sol = jax.block_until_ready(jax.vmap(ODE_solve, in_axes = (0, None))(s0, args))
-
-    duration = time() - start
+        duration = time() - start
+        #depth_traced += trace_depth
 
     #del ne_nc
 

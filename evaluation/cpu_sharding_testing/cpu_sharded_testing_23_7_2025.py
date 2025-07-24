@@ -3,8 +3,8 @@ import numpy as np
 import sys
 import os
 
-sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/simulator')
-#sys.path.insert(0, 'C:/Users/samma/programming/synthPy/src/simulator')
+#sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/simulator')
+sys.path.insert(0, 'C:/Users/samma/programming/synthPy/src/simulator')
 
 import importlib
 
@@ -20,7 +20,7 @@ n_cells = 128
 if args.domain is not None:
     n_cells = args.domain
 
-Np = 10000
+Np = 4
 if args.rays is not None:
     Np = args.rays
 
@@ -67,6 +67,7 @@ with jax.checking_leaks():
             self.x = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
             self.y = jnp.float32(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n))
             self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
+            self.coordinates = jnp.stack([self.x, self.y, self.z], axis = 1)
 
             self.XX, self.YY, _ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)
             self.ZZ = None
@@ -88,7 +89,6 @@ with jax.checking_leaks():
 
     lwl = 1064e-9
 
-    Np = 10000
     divergence = 5e-5
     beam_size = extent_x
     ne_extent = probing_extent
@@ -128,27 +128,72 @@ with jax.checking_leaks():
     #from utils import trilinearInterpolator
     from utils import mem_conversion
 
+    #@jax.jit
     def trilinearInterpolator(coordinates, length, dim, values, query_points, *, fill_value = jnp.nan):
-        idr = jnp.array(len(points), 3)
-        wr = jnp.array(len(points), 3)
+        #if query_points.shape[-1] != 3:
+        #    query_points = query_points.T
 
-        for i in range(len(points)):
-            idr = idr.at[i, :].set(jnp.floor(points[i]) * dim / length)
-            wr = wr.at[i, :].set((points[i] - coordinates[idr[i]]) / (coordinates[idr[i] + 1] - coordinates[idr[i]]))
+        #wr = jnp.zeros_like(query_points)
 
-        def get_val(dx, dy, dz):
-            return values[idr[0, :] + dx, idr[1, :] + dy, idr[2, :] + dz]
+        #idr = jnp.floor(query_points * jnp.asarray(dim) / jnp.asarray(length)).astype(jnp.int64) + jnp.asarray(dim) // 2    # enforcing that it should be an array of integers to index with
+        #wr = (query_points - coordinates[idr[:, jnp.arange(3)], jnp.arange(3)]) / (coordinates[idr[:, jnp.arange(3)] + 1, jnp.arange(3)] - coordinates[idr[:, jnp.arange(3)], jnp.arange(3)])
 
-        return (
-            get_val(0, 0, 0) * (1 - wr[0]) * (1 - wr[1]) * (1 - wr[2]) +
-            get_val(1, 0, 0) *      wr[0]  * (1 - wr[1]) * (1 - wr[2]) +
-            get_val(0, 1, 0) * (1 - wr[0]) *      wr[1]  * (1 - wr[2]) +
-            get_val(0, 0, 1) * (1 - wr[0]) * (1 - wr[1]) *      wr[2]  +
-            get_val(1, 1, 0) *      wr[0]  *      wr[1]  * (1 - wr[2]) +
-            get_val(1, 0, 1) *      wr[0]  * (1 - wr[1]) *      wr[2]  +
-            get_val(0, 1, 1) * (1 - wr[0]) *      wr[1]  *      wr[2]  +
-            get_val(1, 1, 1) *      wr[0]  *      wr[1]  *      wr[2]
-        )
+        def get_indices_and_weights(coord_grid, points):
+            idx = jnp.searchsorted(coord_grid, points, side = 'right') - 1
+            idx = jnp.clip(idx, 0, len(coord_grid) - 2)
+
+            x0 = coord_grid[idx]
+            return idx, (points - x0) / (coord_grid[idx + 1] - x0)
+
+        ix, wx = get_indices_and_weights(coordinates[:, 0], query_points[:, 0])
+        iy, wy = get_indices_and_weights(coordinates[:, 1], query_points[:, 1])
+        iz, wz = get_indices_and_weights(coordinates[:, 2], query_points[:, 2])
+
+        idr = jnp.array([ix, iy, iz]).T
+
+        #wr = (query_points - coordinates[jnp.arange(3), idx]) / (coordinates[jnp.arange(3), idx + 1] - coordinates[jnp.arange(3), idx])
+
+        #wr = wr.at[:, 0].set((query_points[:, 0] - coordinates[0][idr[:, 0]]) / (coordinates[0][idr[:, 0] + 1] - coordinates[0][idr[:, 0]]))
+        #wr = wr.at[:, 1].set((query_points[:, 1] - coordinates[1][idr[:, 1]]) / (coordinates[1][idr[:, 1] + 1] - coordinates[1][idr[:, 1]]))
+        #wr = wr.at[:, 2].set((query_points[:, 2] - coordinates[2][idr[:, 2]]) / (coordinates[2][idr[:, 2] + 1] - coordinates[2][idr[:, 2]]))
+
+        ##
+        ## Vectorised version of value/weight calculation
+        ##
+
+        offsets = jnp.array([
+            [0, 0, 0],
+            [1, 0, 0],
+            [0, 1, 0],
+            [0, 0, 1],
+            [1, 1, 0],
+            [1, 0, 1],
+            [0, 1, 1],
+            [1, 1, 1]
+        ])  # shape: (8, 3)
+
+        # idr has shape (N, 3) --> None's convert both arrays to matching shape for 8 3D offsets of N points
+        neighbors = idr[:, None, :] + offsets[None, :, :]   # shape: (N, 8, 3)
+
+        val_neighbors = values[
+            neighbors[:, :, 0], 
+            neighbors[:, :, 1], 
+            neighbors[:, :, 2]
+        ]  # shape: (N, 8)
+
+        #wx, wy, wz = wr[:, 0], wr[:, 1], wr[:, 2]  # shape: (N, 1)
+        weights = jnp.stack([
+            (1 - wx) * (1 - wy) * (1 - wz),  # 000
+            wx       * (1 - wy) * (1 - wz),  # 100
+            (1 - wx) * wy       * (1 - wz),  # 010
+            (1 - wx) * (1 - wy) * wz,        # 001
+            wx       * wy       * (1 - wz),  # 110
+            wx       * (1 - wy) * wz,        # 101
+            (1 - wx) * wy       * wz,        # 011
+            wx       * wy       * wz         # 111
+        ], axis = 1)  # shape: (N, 8)
+
+        return jnp.sum(weights * val_neighbors, axis = 1)# / 8
 
     def calc_dndr(ScalarDomain, lwl = 1064e-9):
         omega = 2 * jnp.pi * c / lwl
@@ -159,16 +204,16 @@ with jax.checking_leaks():
     def dndr(r, ne, omega, coordinates, length, dim):
         grad = jnp.zeros_like(r)
 
-        dndx = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), x, axis = 0)
-        #grad = grad.at[0, :].set(trilinearInterpolator(coordinates, length, dim, dndx, r.T, fill_value = 0.0))
+        dndx = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), coordinates[:, 0], axis = 0)
+        grad = grad.at[0, :].set(trilinearInterpolator(coordinates, length, dim, dndx, r.T, fill_value = 0.0))
         del dndx
 
-        dndy = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), y, axis = 1)
-        #grad = grad.at[1, :].set(trilinearInterpolator(coordinates, length, dim, dndy, r.T, fill_value = 0.0))
+        dndy = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), coordinates[:, 1], axis = 1)
+        grad = grad.at[1, :].set(trilinearInterpolator(coordinates, length, dim, dndy, r.T, fill_value = 0.0))
         del dndy
 
-        dndz = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), z, axis = 2)
-        #grad = grad.at[2, :].set(trilinearInterpolator(coordinates, length, dim, dndz, r.T, fill_value = 0.0))
+        dndz = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), coordinates[:, 2], axis = 2)
+        grad = grad.at[2, :].set(trilinearInterpolator(coordinates, length, dim, dndz, r.T, fill_value = 0.0))
         del dndz
 
         return grad
@@ -264,6 +309,7 @@ with jax.checking_leaks():
         )
 
         duration = time() - start
+        print("Run took:", duration, "secs.")
 
         del s0
 
@@ -271,7 +317,8 @@ with jax.checking_leaks():
 
     rf = solve(
         beam_definition,
-        (domain.x, domain.y, domain.z),
+        domain.coordinates,
+        (domain.x_length, domain.y_length, domain.z_length),
         (domain.x_n, domain.y_n, domain.z_n),   # domain.dim - this causes a TracerBoolConversionError, check why later, could be interesting and useful to know
         ne_extent,
         *calc_dndr(domain, lwl)
