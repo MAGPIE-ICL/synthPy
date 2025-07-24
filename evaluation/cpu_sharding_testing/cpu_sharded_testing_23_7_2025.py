@@ -160,7 +160,7 @@ with jax.checking_leaks():
 
         return (jnp.array(ScalarDomain.ne / nc, dtype = jnp.float32), omega)
 
-    def dndr(r, ne, omega, coordinates, length, dim):
+    def dndr(r, ne, omega, coordinates):
         grad = jnp.zeros_like(r)
 
         dndx = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), x, axis = 0)
@@ -180,7 +180,7 @@ with jax.checking_leaks():
 
         return grad
 
-    def dsdt(t, s, ne, x, y, z, omega, length, dim):
+    def dsdt(t, s, ne, x, y, z, omega):
         s = jnp.reshape(s, (9, 1))
         sprime = jnp.zeros_like(s)
 
@@ -191,7 +191,7 @@ with jax.checking_leaks():
 
         del s
 
-        sprime = sprime.at[3:6, :].set(dndr(r, ne, omega, (x, y, z), length, dim))
+        sprime = sprime.at[3:6, :].set(dndr(r, ne, omega, (x, y, z)))
         sprime = sprime.at[:3, :].set(v)
 
         del r
@@ -200,13 +200,13 @@ with jax.checking_leaks():
 
         return sprime.flatten()
 
-    def solve(s0_import, coordinates, length, dim, probing_depth, ne, omega, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False):
+    def solve(s0_import, coordinates, dim, probing_depth, ne, omega, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False):
         Np = s0_import.shape[1]
 
         t = jnp.linspace(0.0, jnp.sqrt(8.0) * probing_depth / c, 2)
         norm_factor = jnp.max(t)
 
-        args = (ne, *coordinates, omega, length, dim)
+        args = (ne, *coordinates, omega)
 
         available_devices = jax.devices()
 
@@ -279,7 +279,6 @@ with jax.checking_leaks():
     rf = solve(
         beam_definition,
         (domain.x, domain.y, domain.z),
-        (domain.x_length, domain.y_length, domain.z_length),
         (domain.x_n, domain.y_n, domain.z_n),   # domain.dim - this causes a TracerBoolConversionError, check why later, could be interesting and useful to know
         ne_extent,
         *calc_dndr(domain, lwl)
