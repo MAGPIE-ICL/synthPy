@@ -3,7 +3,8 @@ import numpy as np
 import sys
 import os
 
-sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/simulator')
+#sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/simulator')
+sys.path.insert(0, 'C:/Users/samma/programming/synthPy/src/simulator')
 
 import importlib
 
@@ -177,13 +178,7 @@ def calc_dndr(ScalarDomain, lwl = 1064e-9):
     omega = 2 * jnp.pi * c / lwl
     nc = 3.14207787e-4 * omega ** 2
 
-    return (
-        jnp.array(ScalarDomain.ne / nc, dtype = jnp.float32),
-        ScalarDomain.x,
-        ScalarDomain.y,
-        ScalarDomain.z,
-        omega
-    )
+    return (jnp.array(ScalarDomain.ne / nc, dtype = jnp.float32), omega)
 
 def dndr(r, ne, omega, x, y, z):
     grad = jnp.zeros_like(r)
@@ -222,13 +217,13 @@ def dsdt(t, s, ne, x, y, z, omega):
 
     return sprime.flatten()
 
-def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, omega, VerdetConst, inv_brems, phaseshift, B_on, probing_direction, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False):
+def solve(s0_import, coordinates, dim, probing_depth, ne, omega, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False):
     Np = s0_import.shape[1]
 
     t = jnp.linspace(0.0, jnp.sqrt(8.0) * probing_depth / c, 2)
     norm_factor = jnp.max(t)
 
-    args = (parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, *coordinates, omega, VerdetConst)
+    args = (ne, *coordinates, omega)
 
     available_devices = jax.devices()
 
@@ -303,7 +298,7 @@ rf = solve(
     (domain.x, domain.y, domain.z),
     (domain.x_n, domain.y_n, domain.z_n),   # domain.dim - this causes a TracerBoolConversionError, check why later, could be interesting and useful to know
     ne_extent,
-    *calc_dndr(domain, lwl, keep_domain = True)
+    *calc_dndr(domain, lwl)
 )
 
 print("\nRun complete!")
