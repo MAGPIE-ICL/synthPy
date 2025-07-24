@@ -179,6 +179,7 @@ def calc_dndr(ScalarDomain, lwl = 1064e-9):
 
     return (jnp.array(ScalarDomain.ne / nc, dtype = jnp.float32), omega)
 
+@jax.jit
 def dndr(r, ne, omega, x, y, z):
     grad = jnp.zeros_like(r)
 
