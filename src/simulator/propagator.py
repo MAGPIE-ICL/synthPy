@@ -584,24 +584,32 @@ def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, omega, Verde
         if os.path.isdir(os.getcwd() + "/" + path):
             pass
         else:
-            path = os.getcwd() + "/" + folder_name
+            path = os.getcwd() + "/../" + folder_name
 
-            try:
-                os.mkdir(path)
-            except OSError as e:
-                import errno
+            if os.path.isdir(path):
+                pass
+            else:
+                try:
+                    os.mkdir(path)
+                except OSError as e:
+                    import errno
 
-                if e.errno != errno.EEXIST:
-                    raise
+                    print("\nFailed to create folder above current working directory, attempting in cwd:")
 
-                if os.path.isdir(os.getcwd() + "/" + folder_name):
-                    path = folder_name
-                else:
-                    try:
-                        os.mkdir(path)
-                    except OSError as e:
-                        if e.errno != errno.EEXIST:
-                            raise
+                    path = os.getcwd() + "/" + folder_name
+
+                    if os.path.isdir(path):
+                        path = folder_name
+                    else:
+                        try:
+                            os.mkdir(path)
+                        except OSError as e:
+                            print("\nFailed in cwd too! No folder created.")
+                            if e.errno != errno.EEXIST:
+                                raise
+
+                        #if e.errno != errno.EEXIST:
+                        #    raise
 
         from datetime import datetime
         path += "memory-domain" + str(dim[0]) + "_rays"+ str(s0.shape[1]) + "-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
