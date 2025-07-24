@@ -127,6 +127,7 @@ from utils import getsizeof
 #from utils import trilinearInterpolator
 from utils import mem_conversion
 
+@jax.jit
 def trilinearInterpolator(x, y, z, values, query_points, *, fill_value = jnp.nan):
     """
     Trilinear interpolation on a 3D regular grid.
@@ -136,9 +137,6 @@ def trilinearInterpolator(x, y, z, values, query_points, *, fill_value = jnp.nan
         - values.shape == (len(x), len(y), len(z))
         - query_points.shape == (N, 3)
     """
-
-    values = jnp.asarray(values)
-    query_points = jnp.asarray(query_points.T)
 
     def get_indices_and_weights(coord_grid, points):
         idx = jnp.searchsorted(coord_grid, points, side = 'right') - 1
@@ -184,15 +182,15 @@ def dndr(r, ne, omega, x, y, z):
     grad = jnp.zeros_like(r)
 
     dndx = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), x, axis = 0)
-    grad = grad.at[0, :].set(trilinearInterpolator(x, y, z, dndx, r, fill_value = 0.0))
+    grad = grad.at[0, :].set(trilinearInterpolator(x, y, z, dndx, r.T, fill_value = 0.0))
     del dndx
 
     dndy = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), y, axis = 1)
-    grad = grad.at[1, :].set(trilinearInterpolator(x, y, z, dndy, r, fill_value = 0.0))
+    grad = grad.at[1, :].set(trilinearInterpolator(x, y, z, dndy, r.T, fill_value = 0.0))
     del dndy
 
     dndz = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), z, axis = 2)
-    grad = grad.at[2, :].set(trilinearInterpolator(x, y, z, dndz, r, fill_value = 0.0))
+    grad = grad.at[2, :].set(trilinearInterpolator(x, y, z, dndz, r.T, fill_value = 0.0))
     del dndz
 
     return grad
