@@ -499,11 +499,36 @@ def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, omega, Verde
         from diffrax import ODETerm, Tsit5, SaveAt, PIDController, diffeqsolve
         #import optax - diffrax uses as a dependency, don't need to import directly
 
-        def diffrax_so
+        def diffrax_solve(dydt, t0, t1, Nt, rtol = 1e-7, atol = 1e-9):
+            """
+            Here we wrap the diffrax diffeqsolve function such that we can easily parallelise it
+            """
 
-    del s0
+            # We convert our python function to a diffrax ODETerm
+            # should use the function passed into the wrapper - not the local definition
+            term = ODETerm(dydt)
+            # We chose a solver (time-stepping) method from within diffrax library
+            solver = Tsit5() # (RK45 - closest I could find to solve_ivp's default method)
 
-    if memory_debug:
+            # At what time points you want to save the solution
+            saveat = SaveAt(ts = jnp.linspace(t0, t1, Nt))
+            # Diffrax uses adaptive time stepping to gain accuracy within certain tolerances
+            stepsize_controller = PIDController(rtol = rtol, atol = atol)
+
+            return lambda s0, args : diffeqsolve(
+                term,
+                solver,
+                y0 = jnp.array(s0),
+                args = args,
+                t0 = t0,
+                t1 = t1,
+                dt0 = (t1 - t0) * norm_factor / Nt,
+                saveat = saveat,
+                stepsize_controller = stepsize_controller,
+                # set max steps to no. of cells x100
+                max_steps = dim[0] * dim[1] * dim[2] * 100 #10000 - default for solve_ivp?????
+            )
+
         # hardcode to normalise to 1 due to diffrax bug
         ODE_solve = diffrax_solve(dsdt_ODE, t[0], t[-1] / norm_factor, save_steps)
 
@@ -518,7 +543,7 @@ def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, omega, Verde
 
             print("\njax compilation of solver took:", time() - start_comp, "seconds", end='')
 
-        from functools import partial
+        #from functools import partial
 
         # pass s0[:, i] for each ray via a jax.vmap for parallelisation
         start = time()

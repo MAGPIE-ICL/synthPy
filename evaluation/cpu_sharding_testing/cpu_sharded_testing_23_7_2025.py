@@ -59,10 +59,6 @@ from scipy.constants import e
 
 class ScalarDomain():
     def __init__(self, lengths, dim):
-        self.B_on = False
-        self.inv_brems = False
-        self.phaseshift = False
-
         self.x_length, self.y_length, self.z_length = lengths[0], lengths[1], lengths[2]
         self.x_n, self.y_n, self.z_n = dim, dim, dim
 
@@ -85,12 +81,6 @@ class ScalarDomain():
         self.ne = self.XX * self.YY
 
         self.ne = self.ne.at[:, :].set(1e24 * self.ne)
-
-        self.B = None
-        self.Te = None
-        self.Z = None
-
-        self.probing_direction = 'z'
 
 domain = ScalarDomain(lengths, n_cells)
 
@@ -183,71 +173,16 @@ def trilinearInterpolator(x, y, z, values, query_points, *, fill_value = jnp.nan
 
     return jnp.where(oob, fill_value, results)
 
-##
-## Helper functions for calculations
-##
-
-def omega_pe(ne):
-    """Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28"""
-
-    return 5.64e4 * jnp.sqrt(ne)
-
-# NRL formulary inverse brems - cheers Jack Halliday for coding in Python
-# Converted to rate coefficient by multiplying by group velocity in plasma
-def kappa(ne, Te, Z, omega):
-    # Useful subroutines
-    def v_the(Te):
-        """Calculate electron thermal speed. Provide Te in eV. Retrurns result in m/s"""
-
-        return 4.19e5 * jnp.sqrt(Te)
-
-    def V(ne, Te, Z, omega):
-        o_pe = omega_pe(ne)
-        #o_max = jnp.copy(o_pe)
-        #o_max[o_pe < omega] = omega
-        o_pe = o_pe.at[:, :].set(jnp.where(o_pe < omega, omega, o_pe))
-        L_classical = Z * e / Te
-        L_quantum = 2.760428269727312e-10 / jnp.sqrt(Te) # hbar / jnp.sqrt(m_e * e * Te)
-        L_max = jnp.maximum(L_classical, L_quantum)
-
-        #return o_max * L_max
-        return o_pe * L_max
-
-    def coloumbLog(ne, Te, Z, omega):
-        return jnp.maximum(2.0, jnp.log(v_the(Te) / V(ne, Te, Z, omega)))
-
-    ne_cc = ne * 1e-6
-    # don't think this is actually used?
-    #o_pe = omega_pe(ne_cc)
-    CL = coloumbLog(ne_cc, Te, Z, omega)
-
-    result = 3.1e-5 * Z * c * jnp.power(ne_cc / omega, 2) * CL * jnp.power(Te, -1.5) # 1/s
-    del ne_cc
-
-    return result
-
-# Plasma refractive index
-def n_refrac(ne, omega):
-    return jnp.sqrt(1.0 - (omega_pe(ne * 1e-6) / omega) ** 2)
-
-def calc_dndr(ScalarDomain, lwl = 1064e-9, *, keep_domain = False):
-    VerdetConst = 0.0
-    if (ScalarDomain.B_on):
-        VerdetConst = 2.62e-13 * lwl ** 2 # radians per Tesla per m^2
-
+def calc_dndr(ScalarDomain, lwl = 1064e-9):
     omega = 2 * jnp.pi * c / lwl
+    nc = 3.14207787e-4 * omega ** 2
 
     return (
-        ScalarDomain.ne,
-        ScalarDomain.B,
-        ScalarDomain.Te,
-        ScalarDomain.Z,
-        omega,
-        VerdetConst,
-        ScalarDomain.inv_brems,
-        ScalarDomain.phaseshift,
-        ScalarDomain.B_on,
-        ScalarDomain.probing_direction
+        jnp.array(ScalarDomain.ne / nc, dtype = jnp.float32),
+        ScalarDomain.x,
+        ScalarDomain.y,
+        ScalarDomain.z,
+        omega
     )
 
 def dndr(r, ne, omega, x, y, z):
@@ -267,7 +202,7 @@ def dndr(r, ne, omega, x, y, z):
 
     return grad
 
-def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, omega, VerdetConst):
+def dsdt(t, s, ne, x, y, z, omega):
     s = jnp.reshape(s, (9, 1))
     sprime = jnp.zeros_like(s)
 
@@ -351,8 +286,6 @@ def solve(s0_import, coordinates, dim, probing_depth, ne, B, Te, Z, omega, Verde
         from equinox import filter_jit
         ODE_solve = filter_jit(ODE_solve)
         print("\njax compilation of solver took:", time() - start_comp, "seconds", end='')
-
-    from functools import partial
 
     start = time()
     sol = jax.block_until_ready(

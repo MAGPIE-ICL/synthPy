@@ -112,8 +112,6 @@ def init_beam(Np, beam_size, divergence, ne_extent):
 
 beam_definition = init_beam(Np, beam_size, divergence, ne_extent)
 
-from jax.scipy.interpolate import RegularGridInterpolator
-
 def calc_dndr(ne, lwl = 1064e-9):
     omega = 2 * jnp.pi * c / lwl
     nc = 3.14207787e-4 * omega ** 2
