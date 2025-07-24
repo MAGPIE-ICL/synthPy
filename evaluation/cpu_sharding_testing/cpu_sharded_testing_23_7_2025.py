@@ -127,50 +127,27 @@ from utils import getsizeof
 #from utils import trilinearInterpolator
 from utils import mem_conversion
 
-def trilinearInterpolator(x, y, z, values, query_points, *, fill_value = jnp.nan):
-    """
-    Trilinear interpolation on a 3D regular grid.
+def trilinearInterpolator(coordinates, length, dim, values, query_points, *, fill_value = jnp.nan):
+    idr = jnp.array(len(points), 3)
+    wr = jnp.array(len(points), 3)
 
-    Assumes:
-        - coordinates = (x, y, z) where each is 1D
-        - values.shape == (len(x), len(y), len(z))
-        - query_points.shape == (N, 3)
-    """
-
-    def get_indices_and_weights(coord_grid, points):
-        idx = jnp.searchsorted(coord_grid, points, side = 'right') - 1
-        idx = jnp.clip(idx, 0, len(coord_grid) - 2)
-
-        x0 = coord_grid[idx]
-        return idx, (points - x0) / (coord_grid[idx + 1] - x0)
-
-    ix, wx = get_indices_and_weights(x, query_points[:, 0])
-    iy, wy = get_indices_and_weights(y, query_points[:, 1])
-    iz, wz = get_indices_and_weights(z, query_points[:, 2])
+    for i in range(len(points)):
+        idr = idr.at[i, :].set(jnp.floor(points[i] * dim / length))
+        wr = wr.at[i, :].set((points[i] - coordinates[idr[i]]) / (coordinates[idr[i] + 1] - coordinates[idr[i]]))
 
     def get_val(dx, dy, dz):
-        return values[ix + dx, iy + dy, iz + dz]
+        return values[idr[0, :] + dx, idr[1, :] + dy, idr[2, :] + dz]
 
-    results = (
-        get_val(0, 0, 0) * (1 - wx) * (1 - wy) * (1 - wz) +
-        get_val(1, 0, 0) * wx       * (1 - wy) * (1 - wz) +
-        get_val(0, 1, 0) * (1 - wx) * wy       * (1 - wz) +
-        get_val(0, 0, 1) * (1 - wx) * (1 - wy) * wz +
-        get_val(1, 1, 0) * wx       * wy       * (1 - wz) +
-        get_val(1, 0, 1) * wx       * (1 - wy) * wz +
-        get_val(0, 1, 1) * (1 - wx) * wy       * wz +
-        get_val(1, 1, 1) * wx       * wy       * wz
+    return (
+        get_val(0, 0, 0) * (1 - wr[0]) * (1 - wr[1]) * (1 - wr[2]) +
+        get_val(1, 0, 0) *      wr[0]  * (1 - wr[1]) * (1 - wr[2]) +
+        get_val(0, 1, 0) * (1 - wr[0]) *      wr[1]  * (1 - wr[2]) +
+        get_val(0, 0, 1) * (1 - wr[0]) * (1 - wr[1]) *      wr[2]  +
+        get_val(1, 1, 0) *      wr[0]  *      wr[1]  * (1 - wr[2]) +
+        get_val(1, 0, 1) *      wr[0]  * (1 - wr[1]) *      wr[2]  +
+        get_val(0, 1, 1) * (1 - wr[0]) *      wr[1]  *      wr[2]  +
+        get_val(1, 1, 1) *      wr[0]  *      wr[1]  *      wr[2]
     )
-
-    # Check out-of-bounds
-    oob = (
-        (query_points[:, 0] < x[0]) | (query_points[:, 0] > x[-1]) |
-        (query_points[:, 1] < y[0]) | (query_points[:, 1] > y[-1]) |
-        (query_points[:, 2] < z[0]) | (query_points[:, 2] > z[-1])
-    )
-
-    results = jnp.where(oob, fill_value, results)
-    return 0.0
 
 def calc_dndr(ScalarDomain, lwl = 1064e-9):
     omega = 2 * jnp.pi * c / lwl
