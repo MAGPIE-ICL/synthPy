@@ -128,12 +128,12 @@ with jax.checking_leaks():
     #from utils import trilinearInterpolator
     from utils import mem_conversion
 
-    def trilinearInterpolator(coordinates, values, query_points, *, fill_value = jnp.nan):
+    def trilinearInterpolator(coordinates, length, dim, values, query_points, *, fill_value = jnp.nan):
         idr = jnp.array(len(points), 3)
         wr = jnp.array(len(points), 3)
 
         for i in range(len(points)):
-            idr = idr.at[i, :].set(jnp.floor(points[i]))# * dim / length))
+            idr = idr.at[i, :].set(jnp.floor(points[i]) * dim / length)
             wr = wr.at[i, :].set((points[i] - coordinates[idr[i]]) / (coordinates[idr[i] + 1] - coordinates[idr[i]]))
 
         def get_val(dx, dy, dz):
@@ -156,24 +156,24 @@ with jax.checking_leaks():
 
         return (jnp.array(ScalarDomain.ne / nc, dtype = jnp.float32), omega)
 
-    def dndr(r, ne, omega, x, y, z):
+    def dndr(r, ne, omega, coordinates, length, dim):
         grad = jnp.zeros_like(r)
 
         dndx = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), x, axis = 0)
-        #grad = grad.at[0, :].set(trilinearInterpolator((x, y, z), dndx, r.T, fill_value = 0.0))
+        #grad = grad.at[0, :].set(trilinearInterpolator(coordinates, length, dim, dndx, r.T, fill_value = 0.0))
         del dndx
 
         dndy = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), y, axis = 1)
-        #grad = grad.at[1, :].set(trilinearInterpolator((x, y, z), dndy, r.T, fill_value = 0.0))
+        #grad = grad.at[1, :].set(trilinearInterpolator(coordinates, length, dim, dndy, r.T, fill_value = 0.0))
         del dndy
 
         dndz = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), z, axis = 2)
-        #grad = grad.at[2, :].set(trilinearInterpolator((x, y, z), dndz, r.T, fill_value = 0.0))
+        #grad = grad.at[2, :].set(trilinearInterpolator(coordinates, length, dim, dndz, r.T, fill_value = 0.0))
         del dndz
 
         return grad
 
-    def dsdt(t, s, ne, x, y, z, omega):
+    def dsdt(t, s, ne, coordinates, omega, length, dim):
         s = jnp.reshape(s, (9, 1))
         sprime = jnp.zeros_like(s)
 
@@ -184,7 +184,7 @@ with jax.checking_leaks():
 
         del s
 
-        sprime = sprime.at[3:6, :].set(dndr(r, ne, omega, x, y, z))
+        sprime = sprime.at[3:6, :].set(dndr(r, ne, omega, coordinates, length, dim))
         sprime = sprime.at[:3, :].set(v)
 
         del r
@@ -193,13 +193,13 @@ with jax.checking_leaks():
 
         return sprime.flatten()
 
-    def solve(s0_import, coordinates, dim, probing_depth, ne, omega, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False):
+    def solve(s0_import, coordinates, length, dim, probing_depth, ne, omega, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False):
         Np = s0_import.shape[1]
 
         t = jnp.linspace(0.0, jnp.sqrt(8.0) * probing_depth / c, 2)
         norm_factor = jnp.max(t)
 
-        args = (ne, *coordinates, omega)
+        args = (ne, coordinates, omega, length, dim)
 
         available_devices = jax.devices()
 
