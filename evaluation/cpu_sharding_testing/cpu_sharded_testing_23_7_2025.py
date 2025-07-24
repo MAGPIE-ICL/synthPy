@@ -316,7 +316,7 @@ def solve(s0_import, coordinates, length, dim, probing_depth, ne, omega, *, retu
 rf = solve(
     beam_definition,
     (domain.x, domain.y, domain.z),
-    domain.length,
+    (domain.x_length, domain.y_length, domain.z_length),
     (domain.x_n, domain.y_n, domain.z_n),   # domain.dim - this causes a TracerBoolConversionError, check why later, could be interesting and useful to know
     ne_extent,
     *calc_dndr(domain, lwl)
