@@ -170,7 +170,8 @@ def trilinearInterpolator(x, y, z, values, query_points, *, fill_value = jnp.nan
         (query_points[:, 2] < z[0]) | (query_points[:, 2] > z[-1])
     )
 
-    return jnp.where(oob, fill_value, results)
+    results = jnp.where(oob, fill_value, results)
+    return 0.0
 
 def calc_dndr(ScalarDomain, lwl = 1064e-9):
     omega = 2 * jnp.pi * c / lwl
