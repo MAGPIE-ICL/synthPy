@@ -12,6 +12,12 @@ parser.add_argument("-c", "--core", type = int)
 parser.add_argument("-s", "--sharding", type = str)
 args = parser.parse_args()
 
+sharding = True
+if args.sharding.upper() == "FALSE":
+        sharding = False
+
+print("Sharding flag value: ", sharding, args.sharding)
+
 n_cells = 128
 if args.domain is not None:
     n_cells = args.domain
