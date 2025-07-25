@@ -119,10 +119,6 @@ beam_definition = init_beam(Np, beam_size, divergence, ne_extent)
 
 from scipy.integrate import odeint, solve_ivp
 from time import time
-from sys import getsizeof as getsizeof_default
-
-from utils import getsizeof
-from utils import mem_conversion
 
 def trilinearInterpolator(coordinates, length, dim, values, query_points, *, fill_value = jnp.nan):
     def get_indices_and_weights(coord_grid, points):
