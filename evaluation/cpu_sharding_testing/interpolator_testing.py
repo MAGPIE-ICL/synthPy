@@ -128,7 +128,6 @@ with jax.checking_leaks():
     #from utils import trilinearInterpolator
     from utils import mem_conversion
 
-    @jax.jit
     def trilinearInterpolator(coordinates, length, dim, values, query_points, *, fill_value = jnp.nan):
         idr = jnp.clip(jnp.floor(((query_points / jnp.asarray(length)) + 0.5) * (jnp.asarray(dim, dtype = jnp.int64) - 1)).astype(jnp.int64), 0, len(coordinates) - 2)    # enforcing that it should be an array of integers to index with
         r0 = coordinates[idr[:, jnp.arange(3)], jnp.arange(3)]
