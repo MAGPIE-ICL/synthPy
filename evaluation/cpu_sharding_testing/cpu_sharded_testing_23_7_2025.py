@@ -222,20 +222,6 @@ with jax.checking_leaks():
         s = jnp.reshape(s, (9, 1))
         sprime = jnp.zeros_like(s)
 
-        r = s[:3, :]
-        v = s[3:6, :]
-
-        amp = s[6, :]
-
-        del s
-
-        sprime = sprime.at[3:6, :].set(dndr(r, ne, omega, coordinates, length, dim))
-        sprime = sprime.at[:3, :].set(v)
-
-        del r
-        del v
-        del amp
-
         return sprime.flatten()
 
     def solve(s0_import, coordinates, length, dim, probing_depth, ne, omega, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False):
