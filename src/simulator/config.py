@@ -88,7 +88,7 @@ def jax_init(force_device = None, core_limit = None, extra_info = False):
 
     from multiprocessing import cpu_count
 
-    print("\nInitialising jax...\n")
+    print("\nInitialising jax...")
 
     ### THIS NEEDS TO BE SET BEFORE JAX IS INITIALISED IN ANY WAY, INCLUDING IMPORTING
     # - XLA_FLAGS are read WHEN jax is IMPORTED

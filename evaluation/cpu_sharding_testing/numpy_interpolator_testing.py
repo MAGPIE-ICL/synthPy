@@ -72,7 +72,6 @@ with jax.checking_leaks():
             self.XX, self.YY, _ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)
             self.ZZ = None
 
-            '''
             self.XX = self.XX.at[:, :].set(self.XX / 2e-3)
             self.XX = self.XX.at[:, :].set(10 ** self.XX)
 
@@ -85,8 +84,6 @@ with jax.checking_leaks():
             self.ne = self.XX * self.YY
 
             self.ne = self.ne.at[:, :].set(1e24 * self.ne)
-            '''
-            self.ne = self.XX
 
     domain = ScalarDomain(lengths, n_cells)
 
