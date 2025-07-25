@@ -90,6 +90,7 @@ with jax.checking_leaks():
 
     rf, Jf, duration = p.solve(
         beam_definition.s0,
+        domain.coordinates,
         (domain.x, domain.y, domain.z),
         (domain.x_n, domain.y_n, domain.z_n),   # domain.dim - this causes a TracerBoolConversionError, check why later, could be interesting and useful to know
         ne_extent,
