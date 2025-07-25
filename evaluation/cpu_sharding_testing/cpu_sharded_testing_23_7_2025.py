@@ -20,7 +20,7 @@ n_cells = 128
 if args.domain is not None:
     n_cells = args.domain
 
-Np = 4
+Np = 10000000
 if args.rays is not None:
     Np = args.rays
 
@@ -130,36 +130,8 @@ with jax.checking_leaks():
 
     #@jax.jit
     def trilinearInterpolator(coordinates, length, dim, values, query_points, *, fill_value = jnp.nan):
-        #if query_points.shape[-1] != 3:
-        #    query_points = query_points.T
-
-        #wr = jnp.zeros_like(query_points)
-
-        #idr = jnp.floor(query_points * jnp.asarray(dim) / jnp.asarray(length)).astype(jnp.int64) + jnp.asarray(dim) // 2    # enforcing that it should be an array of integers to index with
-        #wr = (query_points - coordinates[idr[:, jnp.arange(3)], jnp.arange(3)]) / (coordinates[idr[:, jnp.arange(3)] + 1, jnp.arange(3)] - coordinates[idr[:, jnp.arange(3)], jnp.arange(3)])
-
-        def get_indices_and_weights(coord_grid, points):
-            idx = jnp.searchsorted(coord_grid, points, side = 'right') - 1
-            idx = jnp.clip(idx, 0, len(coord_grid) - 2)
-
-            x0 = coord_grid[idx]
-            return idx, (points - x0) / (coord_grid[idx + 1] - x0)
-
-        ix, wx = get_indices_and_weights(coordinates[:, 0], query_points[:, 0])
-        iy, wy = get_indices_and_weights(coordinates[:, 1], query_points[:, 1])
-        iz, wz = get_indices_and_weights(coordinates[:, 2], query_points[:, 2])
-
-        idr = jnp.array([ix, iy, iz]).T
-
-        #wr = (query_points - coordinates[jnp.arange(3), idx]) / (coordinates[jnp.arange(3), idx + 1] - coordinates[jnp.arange(3), idx])
-
-        #wr = wr.at[:, 0].set((query_points[:, 0] - coordinates[0][idr[:, 0]]) / (coordinates[0][idr[:, 0] + 1] - coordinates[0][idr[:, 0]]))
-        #wr = wr.at[:, 1].set((query_points[:, 1] - coordinates[1][idr[:, 1]]) / (coordinates[1][idr[:, 1] + 1] - coordinates[1][idr[:, 1]]))
-        #wr = wr.at[:, 2].set((query_points[:, 2] - coordinates[2][idr[:, 2]]) / (coordinates[2][idr[:, 2] + 1] - coordinates[2][idr[:, 2]]))
-
-        ##
-        ## Vectorised version of value/weight calculation
-        ##
+        idr = jnp.clip(jnp.floor(((query_points / jnp.asarray(length)) + 0.5) * (jnp.asarray(dim, dtype = jnp.int64) - 1)).astype(jnp.int64), 0, len(coordinates) - 2)    # enforcing that it should be an array of integers to index with
+        wr = (query_points - coordinates[idr[:, jnp.arange(3)], jnp.arange(3)]) / (coordinates[idr[:, jnp.arange(3)] + 1, jnp.arange(3)] - coordinates[idr[:, jnp.arange(3)], jnp.arange(3)])
 
         offsets = jnp.array([
             [0, 0, 0],
@@ -181,7 +153,7 @@ with jax.checking_leaks():
             neighbors[:, :, 2]
         ]  # shape: (N, 8)
 
-        #wx, wy, wz = wr[:, 0], wr[:, 1], wr[:, 2]  # shape: (N, 1)
+        wx, wy, wz = wr[:, 0], wr[:, 1], wr[:, 2]  # shape: (N, 1)
         weights = jnp.stack([
             (1 - wx) * (1 - wy) * (1 - wz),  # 000
             wx       * (1 - wy) * (1 - wz),  # 100
