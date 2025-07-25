@@ -199,7 +199,8 @@ class Propagator:
     def phase(self,x):
         if(self.phaseshift):
             #self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
-            return self.omega*(self.refractive_index_interp(x.T)-1.0)
+            # return self.omega*(self.refractive_index_interp(x.T)-1.0)
+            return 0.0
         else:
             return 0.0
     
@@ -233,7 +234,8 @@ class Propagator:
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
-
+        self.prev_x = None
+        self.phase_integral = 0
         s0 = self.Beam.s0
 
         # 8.0^0.5 is an arbritrary factor to ensure rays have enough time to escape the box
@@ -258,7 +260,7 @@ class Propagator:
             def dsdt_ODE(t, y, args):
                 return dsdt(t, y, args[0], args[1]) * norm_factor
 
-            def diffrax_solve(dydt, t0, t1, Nt, rtol=1e-1, atol=1e-5):
+            def diffrax_solve(dydt, t0, t1, Nt, rtol=1e-4, atol=1e-5):
                 """
                 Here we wrap the diffrax diffeqsolve function such that we can easily parallelise it
                 """
@@ -326,8 +328,7 @@ class Propagator:
             #print(sol.ys)
             
         print("phase shift from line integral:", self.phase_integral)
-        self.prev_x = None
-        self.phase_integral = 0
+        
 
         finish = time()
         self.duration = finish - start
@@ -458,12 +459,12 @@ def dsdt(t, s, Propagator, parallelise):
     x = s[:3, :]
     v = s[3:6, :]
 
-    # if Propagator.phaseshift is True:
-    #     if Propagator.prev_x is not None:
-    #         dr = distance(x, Propagator.prev_x)
-    #         Propagator.phase_integral -= Propagator.ne_interp(x.T)*dr/Propagator.nc*np.pi/Propagator.Beam.wavelength
+    if Propagator.phaseshift is True:
+        if Propagator.prev_x is not None:
+            dr = distance(x, Propagator.prev_x)
+            Propagator.phase_integral -= Propagator.ne_interp(x.T)*dr/Propagator.nc*np.pi/Propagator.Beam.wavelength
 
-    #     Propagator.prev_x = x
+        Propagator.prev_x = x
 
     # Amplitude, phase and polarisation
     a = s[6, :]

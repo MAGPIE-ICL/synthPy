@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.signal.windows import tukey
 from scipy.interpolate import CloughTocher2DInterpolator as CT2D
+from scipy.interpolate import LinearNDInterpolator as LND
 
 #@staticmethod
 def prepare_field_for_propagation(U0, pad_factor = 2, alpha = 0.4):
@@ -81,10 +82,10 @@ def propagate(Propagator, jones_vector, amplitudes, phases, z, pad_factor = 2):
     x_positions = jones_vector[0]
     y_positions = jones_vector[2]
     amplitudes = amplitudes[:, -1]
-    phases = phases[:, -1]
+    #phases = phases[:, -1]
 
-    phases_interp = CT2D((x_positions, y_positions), phases, fill_value = 0.0)
-    amplitudes_interp = CT2D((x_positions, y_positions), amplitudes, fill_value = 0.0)
+    phases_interp = LND((x_positions, y_positions), phases, fill_value = 0.0)
+    amplitudes_interp = LND((x_positions, y_positions), amplitudes, fill_value = 0.0)
 
     XX, YY = np.meshgrid(Propagator.ScalarDomain.x, Propagator.ScalarDomain.y)
     phase_grid = phases_interp((XX, YY))
