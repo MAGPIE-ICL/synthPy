@@ -120,94 +120,15 @@ beam_definition = init_beam(Np, beam_size, divergence, ne_extent)
 from scipy.integrate import odeint, solve_ivp
 from time import time
 
-def trilinearInterpolator(coordinates, length, dim, values, query_points, *, fill_value = jnp.nan):
-    def get_indices_and_weights(coord_grid, points):
-        idx = jnp.searchsorted(coord_grid, points, side = 'right') - 1
-        idx = jnp.clip(idx, 0, len(coord_grid) - 2)
-
-        x0 = coord_grid[idx]
-        return idx, (points - x0) / (coord_grid[idx + 1] - x0)
-
-    ix, wx = get_indices_and_weights(coordinates[:, 0], query_points[:, 0])
-    iy, wy = get_indices_and_weights(coordinates[:, 1], query_points[:, 1])
-    iz, wz = get_indices_and_weights(coordinates[:, 2], query_points[:, 2])
-
-    idr = jnp.array([ix, iy, iz]).T
-
-    offsets = jnp.array([
-        [0, 0, 0],
-        [1, 0, 0],
-        [0, 1, 0],
-        [0, 0, 1],
-        [1, 1, 0],
-        [1, 0, 1],
-        [0, 1, 1],
-        [1, 1, 1]
-    ])  # shape: (8, 3)
-
-    # idr has shape (N, 3) --> None's convert both arrays to matching shape for 8 3D offsets of N points
-    neighbors = idr[:, None, :] + offsets[None, :, :]   # shape: (N, 8, 3)
-
-    val_neighbors = values[
-        neighbors[:, :, 0], 
-        neighbors[:, :, 1], 
-        neighbors[:, :, 2]
-    ]  # shape: (N, 8)
-
-    #wx, wy, wz = wr[:, 0], wr[:, 1], wr[:, 2]  # shape: (N, 1)
-    weights = jnp.stack([
-        (1 - wx) * (1 - wy) * (1 - wz),  # 000
-        wx       * (1 - wy) * (1 - wz),  # 100
-        (1 - wx) * wy       * (1 - wz),  # 010
-        (1 - wx) * (1 - wy) * wz,        # 001
-        wx       * wy       * (1 - wz),  # 110
-        wx       * (1 - wy) * wz,        # 101
-        (1 - wx) * wy       * wz,        # 011
-        wx       * wy       * wz         # 111
-    ], axis = 1)  # shape: (N, 8)
-
-    return jnp.sum(weights * val_neighbors, axis = 1)# / 8
-
 def calc_dndr(ScalarDomain, lwl = 1064e-9):
     omega = 2 * jnp.pi * c / lwl
     nc = 3.14207787e-4 * omega ** 2
 
     return (jnp.array(ScalarDomain.ne / nc, dtype = jnp.float32), omega)
 
-def dndr(r, ne, omega, coordinates, length, dim):
-    grad = jnp.zeros_like(r)
-
-    dndx = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), coordinates[:, 0], axis = 0)
-    grad = grad.at[0, :].set(trilinearInterpolator(coordinates, length, dim, dndx, r.T, fill_value = 0.0))
-    del dndx
-
-    dndy = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), coordinates[:, 1], axis = 1)
-    grad = grad.at[1, :].set(trilinearInterpolator(coordinates, length, dim, dndy, r.T, fill_value = 0.0))
-    del dndy
-
-    dndz = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), coordinates[:, 2], axis = 2)
-    grad = grad.at[2, :].set(trilinearInterpolator(coordinates, length, dim, dndz, r.T, fill_value = 0.0))
-    del dndz
-
-    return grad
-
 def dsdt(t, s, ne, coordinates, omega, length, dim):
     s = jnp.reshape(s, (9, 1))
     sprime = jnp.zeros_like(s)
-
-    r = s[:3, :]
-    v = s[3:6, :]
-
-    amp = s[6, :]
-
-    del s
-
-    sprime = sprime.at[3:6, :].set(dndr(r, ne, omega, coordinates, length, dim))
-    sprime = sprime.at[:3, :].set(v)
-
-    del r
-    del v
-    del amp
 
     return sprime.flatten()
 

@@ -16,20 +16,13 @@ from utils import getsizeof
 from utils import mem_conversion
 from utils import colour
 
-# temporarily used so the code has a working interpolator
+# is overhead better using jnp.clip or a vectorised(?) if statement?
+# if we can sort out my original solution to this - clip would not be necessary at all
+@jax.jit
 def trilinearInterpolator(coordinates, length, dim, values, query_points, *, fill_value = jnp.nan):
-    def get_indices_and_weights(coord_grid, points):
-        idx = jnp.searchsorted(coord_grid, points, side = 'right') - 1
-        idx = jnp.clip(idx, 0, len(coord_grid) - 2)
-
-        x0 = coord_grid[idx]
-        return idx, (points - x0) / (coord_grid[idx + 1] - x0)
-
-    ix, wx = get_indices_and_weights(coordinates[:, 0], query_points[:, 0])
-    iy, wy = get_indices_and_weights(coordinates[:, 1], query_points[:, 1])
-    iz, wz = get_indices_and_weights(coordinates[:, 2], query_points[:, 2])
-
-    idr = jnp.array([ix, iy, iz]).T
+    idr = jnp.clip(jnp.floor(((query_points / jnp.asarray(length)) + 0.5) * (jnp.asarray(dim, dtype = jnp.int64) - 1)).astype(jnp.int64), 0, len(coordinates) - 2)    # enforcing that it should be an array of integers to index with
+    r0 = coordinates[idr[:, jnp.arange(3)], jnp.arange(3)]
+    wr = (query_points - r0) / (coordinates[idr[:, jnp.arange(3)] + 1, jnp.arange(3)] - r0)
 
     offsets = jnp.array([
         [0, 0, 0],
@@ -51,6 +44,7 @@ def trilinearInterpolator(coordinates, length, dim, values, query_points, *, fil
         neighbors[:, :, 2]
     ]  # shape: (N, 8)
 
+    wx, wy, wz = wr[:, 0], wr[:, 1], wr[:, 2]  # shape: (N, 1)
     weights = jnp.stack([
         (1 - wx) * (1 - wy) * (1 - wz),  # 000
         wx       * (1 - wy) * (1 - wz),  # 100
@@ -62,7 +56,7 @@ def trilinearInterpolator(coordinates, length, dim, values, query_points, *, fil
         wx       * wy       * wz         # 111
     ], axis = 1)  # shape: (N, 8)
 
-    return jnp.sum(weights * val_neighbors, axis = 1)# / 8
+    return jnp.sum(weights * val_neighbors, axis = 1)
 
 ##
 ## Helper functions for calculations
