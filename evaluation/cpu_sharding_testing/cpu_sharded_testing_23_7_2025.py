@@ -20,7 +20,7 @@ n_cells = 128
 if args.domain is not None:
     n_cells = args.domain
 
-Np = 10000000
+Np = 10000
 if args.rays is not None:
     Np = args.rays
 
@@ -128,7 +128,7 @@ with jax.checking_leaks():
     #from utils import trilinearInterpolator
     from utils import mem_conversion
 
-    #@jax.jit
+    @jax.jit
     def trilinearInterpolator(coordinates, length, dim, values, query_points, *, fill_value = jnp.nan):
         idr = jnp.clip(jnp.floor(((query_points / jnp.asarray(length)) + 0.5) * (jnp.asarray(dim, dtype = jnp.int64) - 1)).astype(jnp.int64), 0, len(coordinates) - 2)    # enforcing that it should be an array of integers to index with
         wr = (query_points - coordinates[idr[:, jnp.arange(3)], jnp.arange(3)]) / (coordinates[idr[:, jnp.arange(3)] + 1, jnp.arange(3)] - coordinates[idr[:, jnp.arange(3)], jnp.arange(3)])
