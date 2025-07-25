@@ -72,7 +72,6 @@ with jax.checking_leaks():
             self.XX, self.YY, _ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)
             self.ZZ = None
 
-            '''
             self.XX = self.XX.at[:, :].set(self.XX / 2e-3)
             self.XX = self.XX.at[:, :].set(10 ** self.XX)
 
@@ -85,8 +84,6 @@ with jax.checking_leaks():
             self.ne = self.XX * self.YY
 
             self.ne = self.ne.at[:, :].set(1e24 * self.ne)
-            '''
-            self.ne = self.XX
 
     domain = ScalarDomain(lengths, n_cells)
 
@@ -207,23 +204,37 @@ with jax.checking_leaks():
     def dndr(r, ne, omega, coordinates, length, dim):
         grad = jnp.zeros_like(r)
 
-        #dndx = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), coordinates[:, 0], axis = 0)
-        #grad = grad.at[0, :].set(trilinearInterpolator(coordinates, length, dim, dndx, r.T, fill_value = 0.0))
-        #del dndx
+        dndx = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), coordinates[:, 0], axis = 0)
+        grad = grad.at[0, :].set(trilinearInterpolator(coordinates, length, dim, dndx, r.T, fill_value = 0.0))
+        del dndx
 
-        #dndy = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), coordinates[:, 1], axis = 1)
-        #grad = grad.at[1, :].set(trilinearInterpolator(coordinates, length, dim, dndy, r.T, fill_value = 0.0))
-        #del dndy
+        dndy = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), coordinates[:, 1], axis = 1)
+        grad = grad.at[1, :].set(trilinearInterpolator(coordinates, length, dim, dndy, r.T, fill_value = 0.0))
+        del dndy
 
-        #dndz = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), coordinates[:, 2], axis = 2)
-        #grad = grad.at[2, :].set(trilinearInterpolator(coordinates, length, dim, dndz, r.T, fill_value = 0.0))
-        #del dndz
+        dndz = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), coordinates[:, 2], axis = 2)
+        grad = grad.at[2, :].set(trilinearInterpolator(coordinates, length, dim, dndz, r.T, fill_value = 0.0))
+        del dndz
 
         return grad
 
     def dsdt(t, s, ne, coordinates, omega, length, dim):
         s = jnp.reshape(s, (9, 1))
         sprime = jnp.zeros_like(s)
+
+        r = s[:3, :]
+        v = s[3:6, :]
+
+        amp = s[6, :]
+
+        del s
+
+        sprime = sprime.at[3:6, :].set(dndr(r, ne, omega, coordinates, length, dim))
+        sprime = sprime.at[:3, :].set(v)
+
+        del r
+        del v
+        del amp
 
         return sprime.flatten()
 
