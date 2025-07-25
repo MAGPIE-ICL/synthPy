@@ -18,11 +18,11 @@ from utils import colour
 
 # is overhead better using jnp.clip or a vectorised(?) if statement?
 # if we can sort out my original solution to this - clip would not be necessary at all
+# can we speed this up even further?
 @jax.jit
 def trilinearInterpolator(coordinates, length, dim, values, query_points, *, fill_value = jnp.nan):
     idr = jnp.clip(jnp.floor(((query_points / jnp.asarray(length)) + 0.5) * (jnp.asarray(dim, dtype = jnp.int64) - 1)).astype(jnp.int64), 0, len(coordinates) - 2)    # enforcing that it should be an array of integers to index with
-    r0 = coordinates[idr[:, jnp.arange(3)], jnp.arange(3)]
-    wr = (query_points - r0) / (coordinates[idr[:, jnp.arange(3)] + 1, jnp.arange(3)] - r0)
+    wr = (query_points - coordinates[idr[:, jnp.arange(3)], jnp.arange(3)]) / (coordinates[idr[:, jnp.arange(3)] + 1, jnp.arange(3)] - coordinates[idr[:, jnp.arange(3)], jnp.arange(3)])
 
     offsets = jnp.array([
         [0, 0, 0],
@@ -45,18 +45,17 @@ def trilinearInterpolator(coordinates, length, dim, values, query_points, *, fil
     ]  # shape: (N, 8)
 
     wx, wy, wz = wr[:, 0], wr[:, 1], wr[:, 2]  # shape: (N, 1)
-    weights = jnp.stack([
-        (1 - wx) * (1 - wy) * (1 - wz),  # 000
-        wx       * (1 - wy) * (1 - wz),  # 100
-        (1 - wx) * wy       * (1 - wz),  # 010
-        (1 - wx) * (1 - wy) * wz,        # 001
-        wx       * wy       * (1 - wz),  # 110
-        wx       * (1 - wy) * wz,        # 101
-        (1 - wx) * wy       * wz,        # 011
-        wx       * wy       * wz         # 111
-    ], axis = 1)  # shape: (N, 8)
 
-    return jnp.sum(weights * val_neighbors, axis = 1)
+    return (
+        val_neighbors[:, 0] * (1 - wx) * (1 - wy) * (1 - wz) +
+        val_neighbors[:, 1] * wx       * (1 - wy) * (1 - wz) +
+        val_neighbors[:, 2] * (1 - wx) * wy       * (1 - wz) +
+        val_neighbors[:, 3] * (1 - wx) * (1 - wy) * wz +
+        val_neighbors[:, 4] * wx       * wy       * (1 - wz) +
+        val_neighbors[:, 5] * wx       * (1 - wy) * wz +
+        val_neighbors[:, 6] * (1 - wx) * wy       * wz +
+        val_neighbors[:, 7] * wx       * wy       * wz
+    )
 
 ##
 ## Helper functions for calculations
@@ -104,60 +103,6 @@ def kappa(ne, Te, Z, omega):
 # Plasma refractive index
 def n_refrac(ne, omega):
     return jnp.sqrt(1.0 - (omega_pe(ne * 1e-6) / omega) ** 2)
-
-def calc_dndr(ScalarDomain, lwl = 1064e-9, *, keep_domain = False):
-    """
-    Generate interpolators for derivatives.
-
-    Args:
-        lwl (float, optional): laser wavelength. Defaults to 1064e-9 m.
-    """
-
-    # Find Faraday rotation constant http://farside.ph.utexas.edu/teaching/em/lectures/node101.html
-    VerdetConst = 0.0
-    if (ScalarDomain.B_on):
-        VerdetConst = 2.62e-13 * lwl ** 2 # radians per Tesla per m^2
-
-    omega = 2 * jnp.pi * c / lwl
-
-    ##
-    ## keep_domain = True and test commented out due to deletion currently failing - fix later
-    ##
-
-    #interps = interpolations.set_up_interps(ScalarDomain, omega, True)
-
-    '''
-    if ScalarDomain.ne is None and ScalarDomain.B is None:
-        print("SUCCESSFULL DELETION!")
-    else:
-        print("del keyword could have worked has failure, checking if you can print anyhing")
-
-        try:
-            print(ScalarDomain.ne)
-        except:
-            print("ScalarDomain.ne does not exist!")
-
-        try:
-            print(ScalarDomain.B)
-        except:
-            print("ScalarDomain.ne does not exist!")
-    '''
-
-    # DOUBLE CHECK THINGS ARE PASSED IN THE RIGHT ORDER!!!
-    # python doesn't check data types so this causes silent errors if not sorted...
-    return (
-        ScalarDomain.ne,
-        ScalarDomain.B,
-        ScalarDomain.Te,
-        ScalarDomain.Z,
-        omega,
-        VerdetConst,
-        ScalarDomain.inv_brems,
-        ScalarDomain.phaseshift,
-        ScalarDomain.B_on,
-        ScalarDomain.probing_direction,
-        ScalarDomain.region_count
-    )
 
 def dndr(r, ne, omega, coordinates, length, dim):
     """
@@ -388,11 +333,18 @@ def ray_to_Jonesvector(rays, ne_extent, *, probing_direction = 'z', keep_current
 
     return ray_p, None
 
-def solve(s0_import, coordinates, length, dim, probing_depth, ne, B, Te, Z, omega, VerdetConst, inv_brems, phaseshift, B_on, probing_direction, region_count, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False):
+def solve(s0_import, ScalarDomain, dim, probing_depth, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False, lwl = 1064e-9, keep_domain = False):
+    # Find Faraday rotation constant http://farside.ph.utexas.edu/teaching/em/lectures/node101.html
+    VerdetConst = 0.0
+    if (ScalarDomain.B_on):
+        VerdetConst = 2.62e-13 * lwl ** 2 # radians per Tesla per m^2
+
+    omega = 2 * jnp.pi * c / lwl
+
     Np = s0_import.shape[1]
-    dim_split = jnp.asarray(dim)[['x', 'y', 'z'].index(probing_direction)] // region_count
-    #print(jnp.asarray(dim))
-    #print(region_count)
+    dim_split = jnp.asarray(ScalarDomain.dim)[['x', 'y', 'z'].index(ScalarDomain.probing_direction)] // ScalarDomain.region_count
+    #print(jnp.asarray(ScalarDomain.dim))
+    #print(ScalarDomain.region_count)
     #print(dim_split)
 
     print("\nSize in memory of initial rays:", mem_conversion(getsizeof_default(s0_import) * Np))
@@ -401,12 +353,12 @@ def solve(s0_import, coordinates, length, dim, probing_depth, ne, B, Te, Z, omeg
     # make logic too loop it and pick up from previous solution
 
     depth_traced = 0.0
-    for i in range(region_count):
+    for i in range(ScalarDomain.region_count):
         lower = 0
         upper = -1
         '''
         lower = i * dim_split
-        if i == region_count - 1:
+        if i == ScalarDomain.region_count - 1:
             upper = -1
         else:
             upper = (i + 1) * dim_split
@@ -417,7 +369,7 @@ def solve(s0_import, coordinates, length, dim, probing_depth, ne, B, Te, Z, omeg
 
         print(upper)
         print(lower)
-        trace_depth = coordinates[['x', 'y', 'z'].index(probing_direction)][upper] - coordinates[['x', 'y', 'z'].index(probing_direction)][lower]
+        trace_depth = ScalarDomain.coordinates[['x', 'y', 'z'].index(ScalarDomain.probing_direction)][upper] - ScalarDomain.coordinates[['x', 'y', 'z'].index(ScalarDomain.probing_direction)][lower]
         depth_remaining = probing_depth - depth_traced
 
         if trace_depth > depth_remaining:
@@ -441,16 +393,16 @@ def solve(s0_import, coordinates, length, dim, probing_depth, ne, B, Te, Z, omeg
 
         # passed args must be hashable to be made static for jax.jit, tuple is hashable, array & dict are not
         '''
-        args = (parallelise, inv_brems, phaseshift, B_on,
-            ne[lower:upper] if ne is not None else None,
-            B[lower:upper] if B is not None else None,
-            Te[lower:upper] if Te is not None else None,
-            Z[lower:upper] if Z is not None else None,
-            *coordinates, omega, VerdetConst
+        args = (parallelise, ScalarDomain.inv_brems, ScalarDomain.phaseshift, ScalarDomain.B_on,
+            ScalarDomain.ne[lower:upper] if ScalarDomain.ne is not None else None,
+            ScalarDomain.B[lower:upper] if ScalarDomain.B is not None else None,
+            ScalarDomain.Te[lower:upper] if ScalarDomain.Te is not None else None,
+            ScalarDomain.Z[lower:upper] if ScalarDomain.Z is not None else None,
+            *ScalarDomain.coordinates, omega, VerdetConst
         )
         '''
 
-        args = (parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, coordinates, omega, VerdetConst, length, dim)
+        args = (parallelise, ScalarDomain.inv_brems, ScalarDomain.phaseshift, ScalarDomain.B_on, ScalarDomain.ne, ScalarDomain.B, ScalarDomain.Te, ScalarDomain.Z, ScalarDomain.coordinates, omega, VerdetConst, ScalarDomain.lengths, ScalarDomain.dim)
 
         if not parallelise:
             from numpy import array
@@ -530,7 +482,7 @@ def solve(s0_import, coordinates, length, dim, probing_depth, ne, B, Te, Z, omeg
             from diffrax import ODETerm, Tsit5, SaveAt, PIDController, diffeqsolve
             #import optax - diffrax uses as a dependency, don't need to import directly
 
-            def diffrax_solve(dydt, t0, t1, Nt, rtol = 1e-7, atol = 1e-9):
+            def diffrax_solve(dydt, t0, t1, Nt, *, rtol = 1e-7, atol = 1e-9):
                 """
                 Here we wrap the diffrax diffeqsolve function such that we can easily parallelise it
                 """
@@ -557,6 +509,7 @@ def solve(s0_import, coordinates, length, dim, probing_depth, ne, B, Te, Z, omeg
                     saveat = saveat,
                     stepsize_controller = stepsize_controller,
                     # set max steps to no. of cells x100
+                    # cannot be passed as dim --> causes boolean conversion error, has to be passed directly
                     max_steps = dim[0] * dim[1] * dim[2] * 100 #10000 - default for solve_ivp?????
                 )
 
@@ -591,6 +544,9 @@ def solve(s0_import, coordinates, length, dim, probing_depth, ne, B, Te, Z, omeg
             #sol = jax.block_until_ready(jax.vmap(ODE_solve, in_axes = (0, None))(s0, args))
 
         duration = time() - start
+        # make this round np not jnp?
+        print("\nCompleted ray trace in", jnp.round(duration, 3), "seconds.")
+
         #depth_traced += trace_depth
 
     #del ne_nc
@@ -602,7 +558,7 @@ def solve(s0_import, coordinates, length, dim, probing_depth, ne, B, Te, Z, omeg
 
         from utils import domain_estimate
 
-        print(colour.BOLD + "\nMemory summary - total estimate:", mem_conversion(domain_estimate(dim) + (getsizeof_default(s0) + getsizeof_default(sol)) * Np) + colour.END)
+        print(colour.BOLD + "\nMemory summary - total estimate:", mem_conversion(domain_estimate(ScalarDomain.dim) + (getsizeof_default(s0) + getsizeof_default(sol)) * Np) + colour.END)
         print("\nEst. size of domain:", mem_conversion(getsizeof_default(s0) * Np))
         print("Est. size of initial rays:", mem_conversion(getsizeof_default(s0) * Np))
         print("Est. size of solution class / single ray (?):", getsizeof(sol))
@@ -644,7 +600,7 @@ def solve(s0_import, coordinates, length, dim, probing_depth, ne, B, Te, Z, omeg
                         #    raise
 
         from datetime import datetime
-        path += "memory-domain" + str(dim[0]) + "_rays"+ str(s0.shape[1]) + "-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
+        path += "memory-domain" + str(ScalarDomain.dim[0]) + "_rays"+ str(s0.shape[1]) + "-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
         jax.profiler.save_device_memory_profile(path)
 
         print("\n", end = '')
@@ -690,4 +646,4 @@ def solve(s0_import, coordinates, length, dim, probing_depth, ne, B, Te, Z, omeg
         #else:
         #    print("Ray tracer failed. This could be a case of diffrax exceeding max steps again due to apparent 'strictness' compared to solve_ivp, check error log.")
 
-    return *ray_to_Jonesvector(rf, probing_depth, probing_direction = probing_direction, return_E = return_E), duration
+    return *ray_to_Jonesvector(rf, probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E), duration
