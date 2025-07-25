@@ -204,17 +204,17 @@ with jax.checking_leaks():
     def dndr(r, ne, omega, coordinates, length, dim):
         grad = jnp.zeros_like(r)
 
-        dndx = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), coordinates[:, 0], axis = 0)
+        #dndx = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), coordinates[:, 0], axis = 0)
         #grad = grad.at[0, :].set(trilinearInterpolator(coordinates, length, dim, dndx, r.T, fill_value = 0.0))
-        del dndx
+        #del dndx
 
-        dndy = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), coordinates[:, 1], axis = 1)
+        #dndy = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), coordinates[:, 1], axis = 1)
         #grad = grad.at[1, :].set(trilinearInterpolator(coordinates, length, dim, dndy, r.T, fill_value = 0.0))
-        del dndy
+        #del dndy
 
-        dndz = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), coordinates[:, 2], axis = 2)
+        #dndz = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), coordinates[:, 2], axis = 2)
         #grad = grad.at[2, :].set(trilinearInterpolator(coordinates, length, dim, dndz, r.T, fill_value = 0.0))
-        del dndz
+        #del dndz
 
         return grad
 
