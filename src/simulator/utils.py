@@ -78,3 +78,20 @@ def dalloc(var):
 
 def domain_estimate(dim):
     return dim[0] * dim[1] * dim[2] * 4
+
+def add_integer_postfix(int):
+    if int // 10 == 1:
+        postfix = "th"
+    else:
+        digit = int % 10
+
+        if digit == 1:
+            postfix = "st"
+        elif digit == 2:
+            postfix = "nd"
+        elif digit == 3:
+            postfix = "rd"
+        else:
+            postfix = "th"
+
+    return str(int) + postfix

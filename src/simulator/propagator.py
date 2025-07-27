@@ -15,6 +15,7 @@ from utils import getsizeof
 #from utils import trilinearInterpolator
 from utils import mem_conversion
 from utils import colour
+from utils import add_integer_postfix
 
 # is overhead better using jnp.clip or a vectorised(?) if statement?
 # if we can sort out my original solution to this - clip would not be necessary at all
@@ -353,10 +354,16 @@ def solve(s0_import, ScalarDomain, dim, probing_depth, *, return_E = False, para
     # make logic too loop it and pick up from previous solution
 
     depth_traced = 0.0
-    for i in range(ScalarDomain.region_count):
-        lower = 0
-        upper = -1
-        '''
+    for i in range(1, ScalarDomain.region_count + 1):
+        if i == 1:
+            if ScalarDomain.region_count == 1:
+                print("\nNo need to generate any sections of the domain, batching not utilised.")
+            else:
+                print("\nUsing pre-generated 1st section of domain.")
+        else:
+            print("\nGenerating", add_integer_postfix(i), "section of the domain...")
+            ScalarDomain.generate_next_domain(i)
+
         lower = i * dim_split
         if i == ScalarDomain.region_count - 1:
             upper = -1
@@ -367,16 +374,13 @@ def solve(s0_import, ScalarDomain, dim, probing_depth, *, return_E = False, para
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
 
-        print(upper)
-        print(lower)
-        trace_depth = ScalarDomain.coordinates[['x', 'y', 'z'].index(ScalarDomain.probing_direction)][upper] - ScalarDomain.coordinates[['x', 'y', 'z'].index(ScalarDomain.probing_direction)][lower]
+        trace_depth = ScalarDomain.coordinates[upper, ['x', 'y', 'z'].index(ScalarDomain.probing_direction)] - ScalarDomain.coordinates[lower, ['x', 'y', 'z'].index(ScalarDomain.probing_direction)]
         depth_remaining = probing_depth - depth_traced
 
         if trace_depth > depth_remaining:
             trace_depth = depth_remaining
 
         del depth_remaining
-        '''
 
         t = jnp.linspace(0.0, jnp.sqrt(8.0) * probing_depth / c, 2)#trace_depth / c, 2)
         norm_factor = jnp.max(t)
@@ -384,24 +388,7 @@ def solve(s0_import, ScalarDomain, dim, probing_depth, *, return_E = False, para
         # 8.0^0.5 is an arbritrary factor to ensure rays have enough time to escape the box
         # think we should change this???
 
-        ##
-        ## currently NOT passing interps
-        ## - get AbstractTerm either when interps are passed, both as dictionary or as an equinox class
-        ## - try to fix later, pass individually perhaps?
-        ## NOTES SAY DICT IS NOT HASHABLE - try as a tuple? - tuple did not work either :(
-        ##
-
         # passed args must be hashable to be made static for jax.jit, tuple is hashable, array & dict are not
-        '''
-        args = (parallelise, ScalarDomain.inv_brems, ScalarDomain.phaseshift, ScalarDomain.B_on,
-            ScalarDomain.ne[lower:upper] if ScalarDomain.ne is not None else None,
-            ScalarDomain.B[lower:upper] if ScalarDomain.B is not None else None,
-            ScalarDomain.Te[lower:upper] if ScalarDomain.Te is not None else None,
-            ScalarDomain.Z[lower:upper] if ScalarDomain.Z is not None else None,
-            *ScalarDomain.coordinates, omega, VerdetConst
-        )
-        '''
-
         args = (parallelise, ScalarDomain.inv_brems, ScalarDomain.phaseshift, ScalarDomain.B_on, ScalarDomain.ne, ScalarDomain.B, ScalarDomain.Te, ScalarDomain.Z, ScalarDomain.coordinates, omega, VerdetConst, ScalarDomain.lengths, ScalarDomain.dim)
 
         if not parallelise:
@@ -414,15 +401,6 @@ def solve(s0_import, ScalarDomain, dim, probing_depth, *, return_E = False, para
             sol = solve_ivp(lambda t, y: dsdt(t, y, *args), [0, t[-1]], s0, t_eval = t)
         else:
             available_devices = jax.devices()
-
-            '''
-            if force_device is not None:
-                try:
-                    #jax.default_device = jax.devices(force_device)[0]
-                    jax.config.update('jax_platform_name', force_device)
-                except:
-                    print("\njax cannot detect that device if it does exist - try not passing a force_device param and seeing if it runs.")
-            '''
 
             running_device = jax.lib.xla_bridge.get_backend().platform # - deprecated, using still as needed for HPC
             #running_device = jax.extend.backend.get_backend().platform
