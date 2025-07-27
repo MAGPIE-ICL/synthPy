@@ -37,6 +37,9 @@ class ScalarDomain(eqx.Module):
     x: jax.Array
     y: jax.Array
     z: jax.Array
+
+    max_dim: jnp.int64
+
     coordinates: jax.Array
 
     XX: jax.Array
@@ -206,7 +209,17 @@ class ScalarDomain(eqx.Module):
                 print(colour.BOLD + "\nWARNING:" + colour.END + " This functionality will cause the solver to run slower due to domain regeneration.")
                 print("For optimal performance, increase the memory available to this program.")
 
-        self.coordinates = jnp.stack([self.x, self.y, self.z], axis = 1)
+        self.max_dim = self.dim[0]
+        for dimension in self.dim:
+            if dimension > self.max_dim:
+                self.max_dim = dimension
+
+        # pad coordinates but not arrays themselves, that way only interpolator takes in padded values - no needless extra mem allocation by the domain
+        self.coordinates = jnp.stack([
+                jnp.pad(self.x, (0, self.max_dim - self.x_n), constant_values = jnp.nan),
+                jnp.pad(self.y, (0, self.max_dim - self.y_n), constant_values = jnp.nan),
+                jnp.pad(self.z, (0, self.max_dim - self.z_n), constant_values = jnp.nan)
+            ], axis = 1)
 
         if self.ne_type is not None:
             self.generate_electron_density_profile()
@@ -256,32 +269,37 @@ class ScalarDomain(eqx.Module):
 
     def setup_next_domain(self, i):
         #...# Batching logic
-        self.lengths[['x', 'y', 'z'].index(self.probing_direction)] = self.length_backup // self.region_count
-        self.dim[['x', 'y', 'z'].index(self.probing_direction)] = self.dim_backup // self.region_count
+        self.lengths = self.lengths.at[['x', 'y', 'z'].index(self.probing_direction)].set(self.length_backup // self.region_count)
+        self.dim = self.dim.at[['x', 'y', 'z'].index(self.probing_direction)].set(self.dim_backup // self.region_count)
 
         length_ungenerated = self.length_backup - self.lengths[['x', 'y', 'z'].index(self.probing_direction)] * (i - 1)
         indices_unused = self.dim_backup - self.dim[['x', 'y', 'z'].index(self.probing_direction)] * (i - 1)
         if length_ungenerated < self.lengths[['x', 'y', 'z'].index(self.probing_direction)] or indices_unused < self.dim[['x', 'y', 'z'].index(self.probing_direction)]:
-            self.lengths[['x', 'y', 'z'].index(self.probing_direction)] = length_ungenerated
-            self.dim[['x', 'y', 'z'].index(self.probing_direction)] = indices_unused
+            self.lengths = self.lengths.at[['x', 'y', 'z'].index(self.probing_direction)].set(length_ungenerated)
+            self.dim = self.dim.at[['x', 'y', 'z'].index(self.probing_direction)].set(indices_unused)
 
         # setup proper indexing so that we can set lengths and dim available based on which region we need at the time - WITHOUT MISSING ANY POINTS
+
+        #TracerBoolConversionError: Attempted boolean conversion of traced array with shape bool[].
 
         if self.probing_direction == 'x':
             self.x_length = self.lengths[0]
             self.x_n = self.dim[0]
 
+            self.x = None
             self.x = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
         elif self.probing_direction == 'y':
             self.y_length = self.lengths[0]
             self.y_n = self.dim[0]
 
-            self.y = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
+            self.y = None
+            self.y = jnp.float32(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n))
         elif self.probing_direction == 'z':
             self.z_length = self.lengths[0]
             self.z_n = self.dim[0]
 
-            self.z = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
+            self.z = None
+            self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
         else:
             assert colour.BOLD + "Invalid entry for probing_direction!" + colour.END
 
@@ -289,6 +307,7 @@ class ScalarDomain(eqx.Module):
         self.setup_next_domain(i)
         if self.ne is not None:
             if self.ne_type is not None:
+                self.setup_next_domain(i)
                 self.generate_electron_density_profile()
             else:
                 assert colour.BOLD + "\nne_type must be passed to domain creation in order to utilise auto-batching." + colour.END
