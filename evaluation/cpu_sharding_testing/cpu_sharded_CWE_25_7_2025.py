@@ -16,7 +16,7 @@ sharding = True
 if args.sharding.upper() == "FALSE":
         sharding = False
 
-print("Sharding flag value: ", sharding, args.sharding)
+print("\n\n\n\n\nSharding flag value: ", sharding)
 
 n_cells = 128
 if args.domain is not None:
