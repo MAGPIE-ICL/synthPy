@@ -355,41 +355,46 @@ def solve(s0_import, ScalarDomain, dim, probing_depth, *, return_E = False, para
 
     depth_traced = 0.0
     for i in range(1, ScalarDomain.region_count + 1):
-        if i == 1:
-            if ScalarDomain.region_count == 1:
-                print("\nNo need to generate any sections of the domain, batching not utilised.")
-            else:
-                print("\nUsing pre-generated 1st section of domain.")
+        if ScalarDomain.region_count == 1:
+            print("\nNo need to generate any sections of the domain, batching not utilised.")
+
+            lengths = ScalarDomain.lengths
+            dim = ScalarDomain.dim
+            coordinates = ScalarDomain.coordinates
+
+            trace_depth = probing_depth
         else:
             print("\nGenerating", add_integer_postfix(i), "section of the domain...")
-            ScalarDomain.generate_next_domain(i)
+            lengths, dim, coordinates = ScalarDomain.generate_next_domain(i)
 
-        lower = i * dim_split
-        if i == ScalarDomain.region_count - 1:
-            upper = -1
-        else:
-            upper = (i + 1) * dim_split
+            lower = i * dim_split
+            if i == ScalarDomain.region_count - 1:
+                upper = -1
+            else:
+                upper = (i + 1) * dim_split
 
-        # Need to make sure all rays have left volume
-        # Conservative estimate of diagonal across volume
-        # Then can backproject to surface of volume
+            # Need to make sure all rays have left volume
+            # Conservative estimate of diagonal across volume
+            # Then can backproject to surface of volume
 
-        trace_depth = ScalarDomain.coordinates[upper, ['x', 'y', 'z'].index(ScalarDomain.probing_direction)] - ScalarDomain.coordinates[lower, ['x', 'y', 'z'].index(ScalarDomain.probing_direction)]
-        depth_remaining = probing_depth - depth_traced
+            trace_depth = ScalarDomain.coordinates[upper, ['x', 'y', 'z'].index(ScalarDomain.probing_direction)] - ScalarDomain.coordinates[lower, ['x', 'y', 'z'].index(ScalarDomain.probing_direction)]
+            depth_remaining = probing_depth - depth_traced
 
-        if trace_depth > depth_remaining:
-            trace_depth = depth_remaining
+            if trace_depth > depth_remaining:
+                trace_depth = depth_remaining
 
-        del depth_remaining
+            del depth_remaining
 
-        t = jnp.linspace(0.0, jnp.sqrt(8.0) * probing_depth / c, 2)#trace_depth / c, 2)
+        depth_traced += trace_depth
+
+        t = jnp.linspace(0.0, jnp.sqrt(8.0) * trace_depth / c, 2)
         norm_factor = jnp.max(t)
 
         # 8.0^0.5 is an arbritrary factor to ensure rays have enough time to escape the box
         # think we should change this???
 
         # passed args must be hashable to be made static for jax.jit, tuple is hashable, array & dict are not
-        args = (parallelise, ScalarDomain.inv_brems, ScalarDomain.phaseshift, ScalarDomain.B_on, ScalarDomain.ne, ScalarDomain.B, ScalarDomain.Te, ScalarDomain.Z, ScalarDomain.coordinates, omega, VerdetConst, ScalarDomain.lengths, ScalarDomain.dim)
+        args = (parallelise, ScalarDomain.inv_brems, ScalarDomain.phaseshift, ScalarDomain.B_on, ScalarDomain.ne, ScalarDomain.B, ScalarDomain.Te, ScalarDomain.Z, coordinates, omega, VerdetConst, lengths, dim)
 
         if not parallelise:
             from numpy import array
@@ -524,8 +529,6 @@ def solve(s0_import, ScalarDomain, dim, probing_depth, *, return_E = False, para
         duration = time() - start
         # make this round np not jnp?
         print("\nCompleted ray trace in", jnp.round(duration, 3), "seconds.")
-
-        #depth_traced += trace_depth
 
     #del ne_nc
 
