@@ -54,7 +54,7 @@ def trilinearInterpolator_original(coordinates, length, dim, values, query_point
     )
  
 ### ========== 3. Optimized Version ==========
- 
+
 def get_cube(idr, values):
     return jax.lax.dynamic_slice(values, idr, (2, 2, 2))
  
@@ -83,41 +83,43 @@ def trilinearInterpolator_optimized(coordinates, length, dim, values, query_poin
     return jax.vmap(trilinear)(jax.vmap(get_cube, in_axes=(0, None))(idr, values), wr[:, 0], wr[:, 1], wr[:, 2])
 
 ### ========== 4. Working Version ==========
-
-def get_voxel_index_and_weights(query_points, coordinates, length, dim):
+ 
+def trilinearInterpolator_working(coordinates, length, dim, values, query_points, *, fill_value=jnp.nan):
     norm_pos = ((query_points / jnp.asarray(length)) + 0.5) * (jnp.asarray(dim) - 1)
     idr = jnp.clip(jnp.floor(norm_pos).astype(jnp.int32), 0, jnp.asarray(dim) - 2)
  
-    def compute_weight(axis):
-        i = idr[:, axis]
-        coord0 = coordinates[i, axis]
-        coord1 = coordinates[i + 1, axis]
-        return (query_points[:, axis] - coord0) / (coord1 - coord0)
- 
-    wx = compute_weight(0)
-    wy = compute_weight(1)
-    wz = compute_weight(2)
+    axis = jnp.arange(3)
+    i = idr[:, axis]
+    coord0 = coordinates[i, axis]
+    coord1 = coordinates[i + 1, axis]
+    wr = (query_points[:, axis] - coord0) / (coord1 - coord0)
 
-    return idr, wx, wy, wz
- 
-def get_cube(idr, values):
-    return jax.lax.dynamic_slice(values, idr, (2, 2, 2))
- 
-def trilinear(cube, wx, wy, wz):
+    offsets = jnp.array([
+        [0, 0, 0],
+        [1, 0, 0],
+        [0, 1, 0],
+        [0, 0, 1],
+        [1, 1, 0],
+        [1, 0, 1],
+        [0, 1, 1],
+        [1, 1, 1]
+    ])
+
+    neighbors = idr[:, None, :] + offsets[None, :, :]
+    val_neighbors = values[neighbors[:, :, 0], neighbors[:, :, 1], neighbors[:, :, 2]]
+
+    wx, wy, wz = wr[:, 0], wr[:, 1], wr[:, 2]
+
     return (
-        cube[0, 0, 0] * (1 - wx) * (1 - wy) * (1 - wz) +
-        cube[1, 0, 0] * wx       * (1 - wy) * (1 - wz) +
-        cube[0, 1, 0] * (1 - wx) * wy       * (1 - wz) +
-        cube[0, 0, 1] * (1 - wx) * (1 - wy) * wz       +
-        cube[1, 1, 0] * wx       * wy       * (1 - wz) +
-        cube[1, 0, 1] * wx       * (1 - wy) * wz       +
-        cube[0, 1, 1] * (1 - wx) * wy       * wz       +
-        cube[1, 1, 1] * wx       * wy       * wz
+        val_neighbors[:, 0] * (1 - wx) * (1 - wy) * (1 - wz) +
+        val_neighbors[:, 1] * wx       * (1 - wy) * (1 - wz) +
+        val_neighbors[:, 2] * (1 - wx) * wy       * (1 - wz) +
+        val_neighbors[:, 3] * (1 - wx) * (1 - wy) * wz       +
+        val_neighbors[:, 4] * wx       * wy       * (1 - wz) +
+        val_neighbors[:, 5] * wx       * (1 - wy) * wz       +
+        val_neighbors[:, 6] * (1 - wx) * wy       * wz       +
+        val_neighbors[:, 7] * wx       * wy       * wz
     )
-
-def trilinearInterpolator_optimized(coordinates, length, dim, values, query_points, *, fill_value=jnp.nan):
-    idr, wx, wy, wz = get_voxel_index_and_weights(query_points, coordinates, length, dim)
-    return jax.vmap(trilinear)(jax.vmap(get_cube, in_axes=(0, None))(idr, values), wx, wy, wz)
  
 ### ========== 5. Benchmarking Helper ==========
  
@@ -136,7 +138,7 @@ print("Running trilinear interpolation benchmark...\n")
 # JIT versions
 #jit_original = jax.jit(trilinearInterpolator_original)
 jit_optimized = jax.jit(trilinearInterpolator_optimized)
-#jit_working = jax.jit(trilinearInterpolator_working)
+jit_working = jax.jit(trilinearInterpolator_working)
  
 # Partial bind fixed args for cleaner timing
 args = (coordinates, length, dim, values, query_points)
@@ -144,5 +146,5 @@ args = (coordinates, length, dim, values, query_points)
 #benchmark(lambda: jit_original(*args),                      "Original (JIT)")
 benchmark(lambda: trilinearInterpolator_optimized(*args),   "Optimized (No JIT)")
 benchmark(lambda: jit_optimized(*args),                     "Optimized (JIT)")
-#benchmark(lambda: trilinearInterpolator_working(*args),     "Working (No JIT)")
-#benchmark(lambda: jit_working(*args),                       "Working (JIT)")
+benchmark(lambda: trilinearInterpolator_working(*args),     "Working (No JIT)")
+benchmark(lambda: jit_working(*args),                       "Working (JIT)")
