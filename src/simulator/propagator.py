@@ -36,7 +36,7 @@ def trilinear(cube, wx, wy, wz):
     )
 
 @jax.jit
-def trilinearInterpolator_optimized(coordinates, length, dim, values, query_points, *, fill_value = jnp.nan):
+def trilinearInterpolator(coordinates, length, dim, values, query_points, *, fill_value = jnp.nan):
     idr = jnp.clip(jnp.floor(((query_points / jnp.asarray(length)) + 0.5) * (jnp.asarray(dim) - 1)).astype(jnp.int32), 0, jnp.asarray(dim) - 2)
  
     axis = jnp.arange(3)
