@@ -13,7 +13,8 @@ parser.add_argument("-s", "--sharding", type = str)
 args = parser.parse_args()
 
 sharding = True
-if args.sharding.upper() == "FALSE":
+if args.sharding is not None:
+    if args.sharding.upper() == "FALSE":
         sharding = False
 
 print("\n\n\n\n\nSharding flag value: ", sharding)
