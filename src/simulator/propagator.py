@@ -343,10 +343,7 @@ def solve(s0_import, ScalarDomain, dim, probing_depth, *, return_E = False, para
     omega = 2 * jnp.pi * c / lwl
 
     Np = s0_import.shape[1]
-    dim_split = jnp.asarray(ScalarDomain.dim)[['x', 'y', 'z'].index(ScalarDomain.probing_direction)] // ScalarDomain.region_count
-    #print(jnp.asarray(ScalarDomain.dim))
-    #print(ScalarDomain.region_count)
-    #print(dim_split)
+    dim_split = jnp.asarray(ScalarDomain.dims)[['x', 'y', 'z'].index(ScalarDomain.probing_direction)] // ScalarDomain.region_count
 
     print("\nSize in memory of initial rays:", mem_conversion(getsizeof_default(s0_import) * Np))
     # if batched: or if auto_batching: etc.
@@ -358,14 +355,13 @@ def solve(s0_import, ScalarDomain, dim, probing_depth, *, return_E = False, para
         if ScalarDomain.region_count == 1:
             print("\nNo need to generate any sections of the domain, batching not utilised.")
 
-            lengths = ScalarDomain.lengths
-            dim = ScalarDomain.dim
-            coordinates = ScalarDomain.coordinates
-
             trace_depth = probing_depth
         else:
-            print("\nGenerating", add_integer_postfix(i), "section of the domain...")
-            lengths, dim, coordinates = ScalarDomain.generate_next_domain(i)
+            if i == 1:
+                print("\nUsing pre-generated 1st section of domain.")
+            else:
+                print("\nGenerating", add_integer_postfix(i), "section of the domain...")
+                ScalarDomain.generate_next_domain(i)
 
             lower = i * dim_split
             if i == ScalarDomain.region_count - 1:
@@ -394,7 +390,7 @@ def solve(s0_import, ScalarDomain, dim, probing_depth, *, return_E = False, para
         # think we should change this???
 
         # passed args must be hashable to be made static for jax.jit, tuple is hashable, array & dict are not
-        args = (parallelise, ScalarDomain.inv_brems, ScalarDomain.phaseshift, ScalarDomain.B_on, ScalarDomain.ne, ScalarDomain.B, ScalarDomain.Te, ScalarDomain.Z, coordinates, omega, VerdetConst, lengths, dim)
+        args = (parallelise, ScalarDomain.inv_brems, ScalarDomain.phaseshift, ScalarDomain.B_on, ScalarDomain.ne, ScalarDomain.B, ScalarDomain.Te, ScalarDomain.Z, ScalarDomain.coordinates, omega, VerdetConst, ScalarDomain.lengths, ScalarDomain.dims)
 
         if not parallelise:
             from numpy import array
@@ -539,7 +535,7 @@ def solve(s0_import, ScalarDomain, dim, probing_depth, *, return_E = False, para
 
         from utils import domain_estimate
 
-        print(colour.BOLD + "\nMemory summary - total estimate:", mem_conversion(domain_estimate(ScalarDomain.dim) + (getsizeof_default(s0) + getsizeof_default(sol)) * Np) + colour.END)
+        print(colour.BOLD + "\nMemory summary - total estimate:", mem_conversion(domain_estimate(ScalarDomain.dims) + (getsizeof_default(s0) + getsizeof_default(sol)) * Np) + colour.END)
         print("\nEst. size of domain:", mem_conversion(getsizeof_default(s0) * Np))
         print("Est. size of initial rays:", mem_conversion(getsizeof_default(s0) * Np))
         print("Est. size of solution class / single ray (?):", getsizeof(sol))
@@ -581,7 +577,7 @@ def solve(s0_import, ScalarDomain, dim, probing_depth, *, return_E = False, para
                         #    raise
 
         from datetime import datetime
-        path += "memory-domain" + str(ScalarDomain.dim[0]) + "_rays"+ str(s0.shape[1]) + "-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
+        path += "memory-domain" + str(ScalarDomain.dims[0]) + "_rays"+ str(s0.shape[1]) + "-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".prof"
         jax.profiler.save_device_memory_profile(path)
 
         print("\n", end = '')
