@@ -18,8 +18,16 @@ python -u evaluation/cpu_sharding_testing/cpu_sharded_CWE_25_7_2025.py -d 128 -r
 python -u evaluation/cpu_sharding_testing/cpu_sharded_CWE_25_7_2025.py -d 256 -r 8192 -s "False" -c 8
 python -u evaluation/cpu_sharding_testing/cpu_sharded_CWE_25_7_2025.py -d 512 -r 8192 -s "False" -c 8
 python -u evaluation/cpu_sharding_testing/cpu_sharded_CWE_25_7_2025.py -d 1024 -r 8192 -s "False" -c 8
+python -u evaluation/cpu_sharding_testing/cpu_sharded_CWE_25_7_2025.py -d 1152 -r 8192 -s "False" -c 8
+python -u evaluation/cpu_sharding_testing/cpu_sharded_CWE_25_7_2025.py -d 1280 -r 8192 -s "False" -c 8
+python -u evaluation/cpu_sharding_testing/cpu_sharded_CWE_25_7_2025.py -d 1408 -r 8192 -s "False" -c 8
+python -u evaluation/cpu_sharding_testing/cpu_sharded_CWE_25_7_2025.py -d 1536 -r 8192 -s "False" -c 8
 
 python -u evaluation/cpu_sharding_testing/cpu_sharded_CWE_25_7_2025.py -d 128 -r 8192 -s "True" -c 8
 python -u evaluation/cpu_sharding_testing/cpu_sharded_CWE_25_7_2025.py -d 256 -r 8192 -s "True" -c 8
 python -u evaluation/cpu_sharding_testing/cpu_sharded_CWE_25_7_2025.py -d 512 -r 8192 -s "True" -c 8
 python -u evaluation/cpu_sharding_testing/cpu_sharded_CWE_25_7_2025.py -d 1024 -r 8192 -s "True" -c 8
+python -u evaluation/cpu_sharding_testing/cpu_sharded_CWE_25_7_2025.py -d 1152 -r 8192 -s "True" -c 8
+python -u evaluation/cpu_sharding_testing/cpu_sharded_CWE_25_7_2025.py -d 1280 -r 8192 -s "True" -c 8
+python -u evaluation/cpu_sharding_testing/cpu_sharded_CWE_25_7_2025.py -d 1408 -r 8192 -s "True" -c 8
+python -u evaluation/cpu_sharding_testing/cpu_sharded_CWE_25_7_2025.py -d 1536 -r 8192 -s "True" -c 8
