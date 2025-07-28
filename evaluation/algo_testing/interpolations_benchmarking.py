@@ -71,19 +71,19 @@ def trilinear(cube, wx, wy, wz):
     )
  
 def trilinearInterpolator_optimized(coordinates, length, dim, values, query_points, *, fill_value=jnp.nan):
-    norm_pos = ((query_points / jnp.asarray(length)) + 0.5) * (jnp.asarray(dim) - 1)
-    idr = jnp.clip(jnp.floor(norm_pos).astype(jnp.int32), 0, jnp.asarray(dim) - 2)
+    idr = jnp.clip(jnp.floor(((query_points / jnp.asarray(length)) + 0.5) * (jnp.asarray(dim) - 1)).astype(jnp.int32), 0, jnp.asarray(dim) - 2)
  
     axis = jnp.arange(3)
     i = idr[:, axis]
+
     coord0 = coordinates[i, axis]
-    coord1 = coordinates[i + 1, axis]
-    wr = (query_points[:, axis] - coord0) / (coord1 - coord0)
+
+    wr = (query_points[:, axis] - coord0) / (coordinates[i + 1, axis] - coord0)
 
     return jax.vmap(trilinear)(jax.vmap(get_cube, in_axes=(0, None))(idr, values), wr[:, 0], wr[:, 1], wr[:, 2])
 
 ### ========== 4. Working Version ==========
- 
+
 def trilinearInterpolator_working(coordinates, length, dim, values, query_points, *, fill_value=jnp.nan):
     norm_pos = ((query_points / jnp.asarray(length)) + 0.5) * (jnp.asarray(dim) - 1)
     idr = jnp.clip(jnp.floor(norm_pos).astype(jnp.int32), 0, jnp.asarray(dim) - 2)

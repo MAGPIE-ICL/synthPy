@@ -20,43 +20,33 @@ from utils import add_integer_postfix
 # is overhead better using jnp.clip or a vectorised(?) if statement?
 # if we can sort out my original solution to this - clip would not be necessary at all
 # can we speed this up even further?
-@jax.jit
-def trilinearInterpolator(coordinates, length, dim, values, query_points, *, fill_value = jnp.nan):
-    idr = jnp.clip(jnp.floor(((query_points / jnp.asarray(length)) + 0.5) * (jnp.asarray(dim, dtype = jnp.int64) - 1)).astype(jnp.int64), 0, len(coordinates) - 2)    # enforcing that it should be an array of integers to index with
-    wr = (query_points - coordinates[idr[:, jnp.arange(3)], jnp.arange(3)]) / (coordinates[idr[:, jnp.arange(3)] + 1, jnp.arange(3)] - coordinates[idr[:, jnp.arange(3)], jnp.arange(3)])
-
-    offsets = jnp.array([
-        [0, 0, 0],
-        [1, 0, 0],
-        [0, 1, 0],
-        [0, 0, 1],
-        [1, 1, 0],
-        [1, 0, 1],
-        [0, 1, 1],
-        [1, 1, 1]
-    ])  # shape: (8, 3)
-
-    # idr has shape (N, 3) --> None's convert both arrays to matching shape for 8 3D offsets of N points
-    neighbors = idr[:, None, :] + offsets[None, :, :]   # shape: (N, 8, 3)
-
-    val_neighbors = values[
-        neighbors[:, :, 0], 
-        neighbors[:, :, 1], 
-        neighbors[:, :, 2]
-    ]  # shape: (N, 8)
-
-    wx, wy, wz = wr[:, 0], wr[:, 1], wr[:, 2]  # shape: (N, 1)
-
+def get_cube(idr, values):
+    return jax.lax.dynamic_slice(values, idr, (2, 2, 2))
+ 
+def trilinear(cube, wx, wy, wz):
     return (
-        val_neighbors[:, 0] * (1 - wx) * (1 - wy) * (1 - wz) +
-        val_neighbors[:, 1] * wx       * (1 - wy) * (1 - wz) +
-        val_neighbors[:, 2] * (1 - wx) * wy       * (1 - wz) +
-        val_neighbors[:, 3] * (1 - wx) * (1 - wy) * wz +
-        val_neighbors[:, 4] * wx       * wy       * (1 - wz) +
-        val_neighbors[:, 5] * wx       * (1 - wy) * wz +
-        val_neighbors[:, 6] * (1 - wx) * wy       * wz +
-        val_neighbors[:, 7] * wx       * wy       * wz
+        cube[0, 0, 0] * (1 - wx) * (1 - wy) * (1 - wz) +
+        cube[1, 0, 0] * wx       * (1 - wy) * (1 - wz) +
+        cube[0, 1, 0] * (1 - wx) * wy       * (1 - wz) +
+        cube[0, 0, 1] * (1 - wx) * (1 - wy) * wz       +
+        cube[1, 1, 0] * wx       * wy       * (1 - wz) +
+        cube[1, 0, 1] * wx       * (1 - wy) * wz       +
+        cube[0, 1, 1] * (1 - wx) * wy       * wz       +
+        cube[1, 1, 1] * wx       * wy       * wz
     )
+
+@jax.jit
+def trilinearInterpolator_optimized(coordinates, length, dim, values, query_points, *, fill_value = jnp.nan):
+    idr = jnp.clip(jnp.floor(((query_points / jnp.asarray(length)) + 0.5) * (jnp.asarray(dim) - 1)).astype(jnp.int32), 0, jnp.asarray(dim) - 2)
+ 
+    axis = jnp.arange(3)
+    i = idr[:, axis]
+
+    coord0 = coordinates[i, axis]
+
+    wr = (query_points[:, axis] - coord0) / (coordinates[i + 1, axis] - coord0)
+
+    return jax.vmap(trilinear)(jax.vmap(get_cube, in_axes=(0, None))(idr, values), wr[:, 0], wr[:, 1], wr[:, 2])
 
 ##
 ## Helper functions for calculations
