@@ -8,7 +8,7 @@ import sys
 import os
 
 sys.path.append('../../utils')
-
+jax.config.update("jax_enable_x64", True)
 from scipy.integrate import odeint, solve_ivp
 from time import time
 from jax.scipy.interpolate import RegularGridInterpolator
@@ -131,6 +131,7 @@ class Propagator:
         # Electron density
         if (self.elec_density):
             self.ne_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.ne, bounds_error = False, fill_value = 0.0)
+            self.ne_nc_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.ne/self.nc, bounds_error = False, fill_value = 0.0)
             # Phase shift
             if(self.phaseshift):
                 self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
@@ -199,8 +200,9 @@ class Propagator:
     def phase(self,x):
         if(self.phaseshift):
             #self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
-            # return self.omega*(self.refractive_index_interp(x.T)-1.0)
-            return 0.0
+            return jnp.array(-0.5 * self.ne_interp(x.T)/(3.14207787e-4*self.omega), dtype = jnp.float64)
+            #return -0.5 * self.omega *self.ne_nc_interp(x.T)
+            
         else:
             return 0.0
     
@@ -260,7 +262,7 @@ class Propagator:
             def dsdt_ODE(t, y, args):
                 return dsdt(t, y, args[0], args[1]) * norm_factor
 
-            def diffrax_solve(dydt, t0, t1, Nt, rtol=1e-4, atol=1e-5):
+            def diffrax_solve(dydt, t0, t1, Nt, rtol=1e-2, atol=1e-5):
                 """
                 Here we wrap the diffrax diffeqsolve function such that we can easily parallelise it
                 """
@@ -327,7 +329,7 @@ class Propagator:
             #sol = jax.vmap(ODE_solve_2)(s0.T, mask)
             #print(sol.ys)
             
-        print("phase shift from line integral:", self.phase_integral)
+        #print("phase shift from line integral:", self.phase_integral)
         
 
         finish = time()
@@ -459,12 +461,12 @@ def dsdt(t, s, Propagator, parallelise):
     x = s[:3, :]
     v = s[3:6, :]
 
-    if Propagator.phaseshift is True:
-        if Propagator.prev_x is not None:
-            dr = distance(x, Propagator.prev_x)
-            Propagator.phase_integral -= Propagator.ne_interp(x.T)*dr/Propagator.nc*np.pi/Propagator.Beam.wavelength
+    # if Propagator.phaseshift is True:
+    #     if Propagator.prev_x is not None:
+    #         dr = distance(x, Propagator.prev_x)
+    #         Propagator.phase_integral -= Propagator.ne_interp(x.T)*dr/Propagator.nc*np.pi/Propagator.Beam.wavelength
 
-        Propagator.prev_x = x
+    #     Propagator.prev_x = x
 
     # Amplitude, phase and polarisation
     a = s[6, :]

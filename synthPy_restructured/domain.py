@@ -127,7 +127,7 @@ class ScalarDomain:
 
         self.ne = n_e0*10**(self.XX/s)*(1+np.cos(2*np.pi*self.YY/Ly))
         
-    def test_onaxis_sin(self, ne0 = 1e24, A = 0.5):
+    def test_onaxis_sin(self, ne0 = 1e24, A = 0.5, m_max = 50):
         """
         Electron density that varies sinusoidally in the z direction. the frequency of oscillation
         increases linearly in the x direction. 
@@ -135,11 +135,13 @@ class ScalarDomain:
             ne0 (float, optional): mean electron density. Defaults to 1e24 m^-3.
             A (float, optional): amplitude of oscillations.
         """
-        m = np.zeros((self.x_n, self.y_n, self.z_n))
-        for i in range (0, self.x_n):
-            m[i, :, :] = np.full((self.y_n, self.z_n), i+1)
-
-        self.ne = ne0*(1 + A*np.sin(2*np.pi*m*self.ZZ/self.z_length))
+        # m = np.zeros((self.x_n, self.y_n, self.z_n))
+        # for i in range (0, self.x_n):
+        #     m[i, :, :] = np.full((self.y_n, self.z_n), i+1)
+        x_vals = np.linspace(1, m_max, self.x_n).reshape(self.x_n, 1, 1)
+        x_vals3d = np.floor(np.ones((self.x_n, self.y_n, self.z_n)) * x_vals)
+        
+        self.ne = ne0*(1 + A*np.sin(2*np.pi*x_vals3d*self.ZZ/self.z_length))
 
     def double_gaussian(self, ne0 = 1e24, sigma = 0.5e-3, d = 1e-3):
         gauss1 = np.exp(-((self.XX - d)**2 + self.YY**2) / (2 * sigma**2))

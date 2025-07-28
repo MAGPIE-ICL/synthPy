@@ -82,7 +82,7 @@ def propagate(Propagator, jones_vector, amplitudes, phases, z, pad_factor = 2):
     x_positions = jones_vector[0]
     y_positions = jones_vector[2]
     amplitudes = amplitudes[:, -1]
-    #phases = phases[:, -1]
+    phases = phases[:, -1]
 
     phases_interp = LND((x_positions, y_positions), phases, fill_value = 0.0)
     amplitudes_interp = LND((x_positions, y_positions), amplitudes, fill_value = 0.0)
