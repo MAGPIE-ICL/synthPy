@@ -2,6 +2,8 @@ import numpy as np
 from scipy.signal.windows import tukey
 from scipy.interpolate import CloughTocher2DInterpolator as CT2D
 from scipy.interpolate import LinearNDInterpolator as LND
+from scipy.interpolate import NearestNDInterpolator as NND
+from scipy.interpolate import RegularGridInterpolator as RGI
 
 #@staticmethod
 def prepare_field_for_propagation(U0, pad_factor = 2, alpha = 0.4):
@@ -68,7 +70,7 @@ def propagate(Propagator, jones_vector, amplitudes, phases, z, pad_factor = 2):
     # print(f"Selected energy: {self.selected_energies} eV. Using closest data block at {actual_energy:.2f} eV.")
 
     # wavelength = self.ev_to_wavelength(Propagator.energy)
-    k = 2 * np.pi / wavelength
+    # k = 2 * np.pi / wavelength
     N_f = (Propagator.ScalarDomain.x_length)**2 / (wavelength * z)
     print(f"Fresnel Number: {N_f:.4f}")
 
@@ -84,14 +86,30 @@ def propagate(Propagator, jones_vector, amplitudes, phases, z, pad_factor = 2):
     amplitudes = amplitudes[:, -1]
     phases = phases[:, -1]
 
-    phases_interp = LND((x_positions, y_positions), phases, fill_value = 0.0)
-    amplitudes_interp = LND((x_positions, y_positions), amplitudes, fill_value = 0.0)
+    # phases_interp = LND((x_positions, y_positions), phases, fill_value = 0.0)
+    # amplitudes_interp = LND((x_positions, y_positions), amplitudes, fill_value = 0.0)
+
+    x_bins = Propagator.ScalarDomain.x
+    y_bins = Propagator.ScalarDomain.y
+
+    field_grid = np.zeros((len(x_bins)-1, len(y_bins)-1), dtype = complex)
+    
+    x_indices = np.digitize(x_positions, x_bins) - 1
+    y_indices = np.digitize(y_positions, y_bins) - 1
+    
+    for i in range(0, len(x_positions)):
+        if x_indices[i] < field_grid.shape[0] and y_indices[i] < field_grid.shape[1]:
+            field_grid[y_indices[i], x_indices[i]] += amplitudes[i] * np.exp(-1j * phases[i])
+        
+
+
 
     XX, YY = np.meshgrid(Propagator.ScalarDomain.x, Propagator.ScalarDomain.y)
-    phase_grid = phases_interp((XX, YY))
-    amplitude_grid = amplitudes_interp((XX, YY))
+    # phase_grid = phases_interp((XX, YY))
+    # amplitude_grid = amplitudes_interp((XX, YY))
     # U_0 = np.exp(-1j * k * (phase_slice - 1j * attenuation_slice))
-    U_0 = amplitude_grid * np.exp(-1j  * phase_grid)
+    # U_0 = amplitude_grid * np.exp(-1j  * phase_grid)
+    U_0 = field_grid
     U_0_prepared = prepare_field_for_propagation(U_0, pad_factor = pad_factor)
     
     # Pass the dynamically calculated FWHM to the propagation function
