@@ -70,21 +70,22 @@ class flags:
         for i, (k, v) in enumerate(self.value_holders):
             self.value_holders[k].value = self.value_holders[k].default
 
-def jax_init(force_device = None, core_limit = None, extra_info = False):
+def jax_init(force_device = None, core_limit = None, extra_info = False, python_multithreading = True):
     import sys
     import os
 
     #from utils import colour
     print("\033[1m")
 
-    print("\nDisabling python multi-threading...")
+    if not python_multithreading:
+        print("\nDisabling python multi-threading...")
 
-    thread_count = str(1)
-    os.environ["OMP_NUM_THREADS"]        = thread_count
-    os.environ["OPENBLAS_NUM_THREADS"]   = thread_count
-    os.environ["MKL_NUM_THREADS"]        = thread_count
-    os.environ["VECLIB_MAXIMUM_THREADS"] = thread_count
-    os.environ["NUMEXPR_NUM_THREADS"]    = thread_count
+        thread_count = str(1)
+        os.environ["OMP_NUM_THREADS"]        = thread_count
+        os.environ["OPENBLAS_NUM_THREADS"]   = thread_count
+        os.environ["MKL_NUM_THREADS"]        = thread_count
+        os.environ["VECLIB_MAXIMUM_THREADS"] = thread_count
+        os.environ["NUMEXPR_NUM_THREADS"]    = thread_count
 
     from multiprocessing import cpu_count
 
@@ -106,17 +107,17 @@ def jax_init(force_device = None, core_limit = None, extra_info = False):
 
     os.environ['XLA_FLAGS'] = "--xla_force_host_platform_device_count=" + str(core_count)
     #os.environ['JAX_ENABLE_X64'] = "True"
-    #os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
-    os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
-    os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.9"
 
     # triggers a jax breakpoint for debugging on error - works with filter_jit not jax.jit
     # if this is causing erroneous errors see equinox issue #1047: https://github.com/patrick-kidger/equinox/issues/1047
-    os.environ["EQX_ON_ERROR"] = "breakpoint"
+    #os.environ["EQX_ON_ERROR"] = "breakpoint"
 
     if force_device == "cpu":
         os.environ['JAX_PLATFORM_NAME'] = 'cpu'
     else:
+        #os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
+        os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
+        os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.9"
         os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"
         #os.environ["TF_CUDA_MALLOC_ASYNC_SUPPORTED_PREALLOC"] = "0.95"
 
@@ -127,7 +128,7 @@ def jax_init(force_device = None, core_limit = None, extra_info = False):
     # HPC doesn't recognise this config option
     #jax.config.update('jax_captured_constants_report_frames', -1)
     #jax.config.update('jax_captured_constants_warn_bytes', 128 * 1024 ** 2)
-    jax.config.update('jax_traceback_filtering', 'off')
+    #jax.config.update('jax_traceback_filtering', 'off')
     # https://docs.jax.dev/en/latest/gpu_memory_allocation.html
     #jax.config.update('xla_python_client_preallocate', False)
     #jax.config.update('xla_python_client_allocator', '\"platform\"')
