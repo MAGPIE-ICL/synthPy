@@ -6,6 +6,7 @@ import jax.numpy as jnp
 import jax
 import sys
 import os
+import spherical
 
 sys.path.append('../../utils')
 jax.config.update("jax_enable_x64", True)
@@ -151,11 +152,11 @@ class Propagator:
             opa_max=self.ScalarDomain.x_n/(self.ScalarDomain.x_length)
             opa_data_capped=np.minimum(opa_max, opa_data)
             self.opacity_interp = RegularGridInterpolator((grp_centres, rho, Te), opa_data_capped, bounds_error = False, fill_value = 0.0)
-            self.Te_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.Te, bounds_error = False, fill_value = 0.0)
-            self.rho_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.rho, bounds_error = False, fill_value = 0.0)
+            # self.Te_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.Te, bounds_error = False, fill_value = 0.0)
+            self.rho_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.rho, bounds_error = False, fill_value = 0.0, method = "nearest")
             opacity_grid = self.opacity_interp((self.energy, self.ScalarDomain.rho, self.ScalarDomain.Te))
             self.opacity_spatial_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), opacity_grid, bounds_error = False, fill_value = 0.0)
-        
+
         
         if(self.refrac_field):
             self.refractive_index_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.refrac_field, bounds_error = False, fill_value = 1.0)
@@ -188,10 +189,14 @@ class Propagator:
 
     def atten_x_ray(self, x):
         if(self.x_ray):
-            # rho = self.rho_interp(x.T)
-            # Te = self.Te_interp(x.T)
-            opacity = self.opacity_spatial_interp(x.T)
-            return -1*opacity*c
+            if self.ScalarDomain.spherical is True:
+                coeff = spherical.spherical_atten(self, x)
+                return coeff
+            else:   
+                # rho = self.rho_interp(x.T)
+                # Te = self.Te_interp(x.T)
+                opacity = self.opacity_spatial_interp(x.T)
+                return -opacity*c
         else:
             return 0.0
 
