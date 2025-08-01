@@ -1,4 +1,5 @@
 import numpy as np
+import jax.numpy as jnp
 
 from sys import getsizeof as getsizeof_default
 
@@ -20,7 +21,7 @@ def count_nans(matrix, axes = [0, 2]):
         y = r2[2, :]
 
         print("\nrf size expected: (", len(x), ", ", len(y), ")", sep='')
-        mask = ~np.isnan(x) & ~np.isnan(y)
+        mask = ~jnp.isnan(x) & ~jnp.isnan(y)
 
         x = x[mask]
         y = y[mask]
@@ -95,3 +96,16 @@ def add_integer_postfix(int):
             postfix = "th"
 
     return str(int) + postfix
+
+def find_sig_n(x, n):
+    '''
+    ValueError: Non-hashable static arguments are not supported. An error occurred while trying to hash an object of type <class 'jaxlib.xla_extension.ArrayImpl'>, 5. The error was:
+    TypeError: unhashable type: 'jaxlib.xla_extension.ArrayImpl'
+
+    using jnp.int32 instead of regular int conversion causes issues - why does jnp.round not support standard jax data types?
+    '''
+
+    return n - int(jnp.floor(jnp.log10(abs(x)))) - 1
+
+def round_to_n(x, n):
+    return jnp.round(x, find_sig_n(x, n))

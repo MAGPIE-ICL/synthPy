@@ -3,7 +3,7 @@ import re
 import os
 
 import argparse
-#import string?
+import string
 
 # call script from directory of relevant .py output and pass arge of filename
 parser = argparse.ArgumentParser()
@@ -11,8 +11,13 @@ parser.add_argument("-f", "--file", help="Name of file to parse.")
 
 args = parser.parse_args()
 
+if args.file is not None:
+    filename = args.file
+else:
+    filename = "error"
+
 # Load JSON data from a file
-with open(string(args[0]), "r") as f:
+with open(filename, "r") as f:
     data = json.load(f)
 
 # Extract and decode the fields

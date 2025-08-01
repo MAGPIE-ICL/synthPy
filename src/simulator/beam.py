@@ -65,7 +65,7 @@ class Beam:
 
             #u  = utils.random_array(Np)+utils.random_array(Np) # radial coordinate of position
             #u[u > 1] = 2-u[u > 1]
-            u  = utils.random_array(Np, seeded) # radial coordinate of position
+            u = utils.random_array(Np, seeded) # radial coordinate of position
 
             # angle
             ϕ = jnp.pi * utils.random_array(Np) #azimuthal angle of velocity

@@ -22,6 +22,8 @@ class ScalarDomain(eqx.Module):
 
     ne_type: str
 
+    leeway_factor: jnp.float64
+
     x_length: jnp.int64
     y_length: jnp.int64
     z_length: jnp.int64
@@ -38,8 +40,6 @@ class ScalarDomain(eqx.Module):
     y: jax.Array
     z: jax.Array
 
-    max_dim: jnp.int64
-
     coordinates: jax.Array
 
     XX: jax.Array
@@ -54,11 +54,12 @@ class ScalarDomain(eqx.Module):
 
     region_count: jnp.int64
 
-    length_backup: jnp.int64
-    dim_backup: jnp.int64
     coord_backup: jax.Array
+    future_dims: jax.Array
 
-    def __init__(self, lengths, dims, *, ne_type = None, inv_brems = False, phaseshift = False, B_on = False, probing_direction = 'z', auto_batching = True):
+    debug: bool
+
+    def __init__(self, lengths, dims, *, ne_type = None, inv_brems = False, phaseshift = False, B_on = False, probing_direction = 'z', auto_batching = True, iteration = 1, region_count = 1, leeway_factor = None, coord_backup = None, future_dims = None, debug = False):
         """
         Example:
             N_V = 100
@@ -89,6 +90,14 @@ class ScalarDomain(eqx.Module):
         self.probing_direction = probing_direction
 
         self.ne_type = ne_type
+
+        # working with 10% leeway in estimate for now
+        if leeway_factor is not None:
+            self.leeway_factor = leeway_factor
+        else:
+            self.leeway_factor = 1.1
+
+        self.debug = debug
 
         valid_types = (int, float, jnp.int64)
 
@@ -128,26 +137,7 @@ class ScalarDomain(eqx.Module):
         predicted_domain_allocation = domain_estimate(self.dims)
         print("Predicted size in memory of domain:", mem_conversion(predicted_domain_allocation))
 
-        # define coordinate space
-        self.x = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
-        self.y = jnp.float32(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n))
-        self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
-
-        self.max_dim = self.dims[0]
-        for dimension in self.dims:
-            if dimension > self.max_dim:
-                self.max_dim = dimension
-
-        # pad coordinates but not arrays themselves, that way only interpolator takes in padded values - no needless extra mem allocation by the domain
-        self.coordinates = jnp.stack([
-                jnp.pad(self.x, (0, self.max_dim - self.x_n), constant_values = jnp.nan),
-                jnp.pad(self.y, (0, self.max_dim - self.y_n), constant_values = jnp.nan),
-                jnp.pad(self.z, (0, self.max_dim - self.z_n), constant_values = jnp.nan)
-            ], axis = 1)
-
-        self.region_count = 1
-
-        if auto_batching:
+        if iteration == 1 and auto_batching:
             from jax.lib import xla_bridge
             running_device = xla_bridge.get_backend().platform
 
@@ -197,11 +187,11 @@ class ScalarDomain(eqx.Module):
             if phaseshift:
                 allocation_count += 1
 
-            # working with 10% leeway in estimate for now
-            estimate_limit = predicted_domain_allocation * allocation_count * 1.1 #300
-            print(mem_conversion(estimate_limit))
+            estimate_limit = predicted_domain_allocation * allocation_count * self.leeway_factor
+            print("Est. memory limit: {} --> inc. +{}% variance margin.".format(mem_conversion(estimate_limit), jnp.int64((self.leeway_factor - 1) * 100)))
+
             if estimate_limit > free_mem:
-                print(colour.BOLD + "\nESTMATE SUGGESTS DOMAIN CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
+                print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
                 print("--> Auto-batching domain based on memory available and domain size estimate...")
 
                 ##
@@ -212,35 +202,160 @@ class ScalarDomain(eqx.Module):
                 from math import ceil
                 self.region_count = ceil(estimate_limit / free_mem)
 
-                # save the intended length and resolution of batching axes for later
-                self.length_backup = self.lengths[['x', 'y', 'z'].index(self.probing_direction)]
-                self.dim_backup = self.dims[['x', 'y', 'z'].index(self.probing_direction)]
-                self.coord_backup = self.coordinates[['x', 'y', 'z'].index(self.probing_direction)]
+                self.coord_backup = jnp.float32(jnp.linspace(
+                   -self.lengths[['x', 'y', 'z'].index(self.probing_direction)] / 2,
+                    self.lengths[['x', 'y', 'z'].index(self.probing_direction)] / 2,
+                       self.dims[['x', 'y', 'z'].index(self.probing_direction)]
+                ))
 
-                self.setup_next_domain(1)
+                dim_per_region = self.dims[['x', 'y', 'z'].index(self.probing_direction)] // self.region_count
+                self.future_dims = jnp.concatenate([
+                    jnp.expand_dims(0, axis = 0), jnp.array([dim_per_region] * self.region_count),
+                    jnp.array([self.dims[['x', 'y', 'z'].index(self.probing_direction)] - dim_per_region * self.region_count])
+                ])
 
-                print("--> Batching calculation completed. Domain will be split into " + str(self.region_count) + " parts.")
-                print(colour.BOLD + "\nWARNING:" + colour.END + " This functionality will cause the solver to run slower due to domain regeneration.")
-                print("For optimal performance, increase the memory available to this program.")
-        
+                print("--> Batching calculation completed. Domain will be split into " + str(self.region_count) + " regions with " + str(dim_per_region) + " dims per region.")
+                print(colour.BOLD + "\nWARNING:" + colour.END + " This functionality will cause the solver to run slower due to domain regeneration, for optimal performance, increase the memory available to this program.")
+            else:
+                self.region_count = 1
+        else:
+            self.region_count = region_count
+
         if self.region_count == 1:
-            self.length_backup = None
-            self.dim_backup = None
             self.coord_backup = None
+            self.future_dims = None
+
+            # define coordinate space
+            self.x = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
+            self.y = jnp.float32(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n))
+            self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
+        else:
+            if iteration != 1:
+                self.coord_backup = coord_backup
+                self.future_dims = future_dims
+
+            if iteration == 1:
+                lower = 0
+                upper = 65#self.future_dims[1] + 1
+            else:
+                lower = 64#jnp.sum(self.future_dims[0:iteration])
+                upper = 128#lower + self.future_dims[iteration]
+
+            if self.probing_direction == 'x':
+                # define coordinate space
+                self.x = self.coord_backup[lower:upper]
+                self.y = jnp.float32(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n))
+                self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
+
+                self.x_length = self.x[-1] - self.x[0]
+                self.lengths = self.lengths.at[0].set(self.x_length)
+
+                self.x_n = len(self.x)
+                self.dims = self.dims.at[0].set(self.x_n)
+            elif self.probing_direction == 'y':
+                # define coordinate space
+                self.x = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
+                self.y = self.coord_backup[lower:upper]
+                self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
+
+                self.y_length = self.y[-1] - self.y[0]
+                self.lengths = self.lengths.at[1].set(self.y_length)
+
+                self.y_n = len(self.y)
+                self.dims = self.dims.at[1].set(self.y_n)
+            elif self.probing_direction == 'z':
+                # define coordinate space
+                self.x = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
+                self.y = jnp.float32(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n))
+                self.z = self.coord_backup[lower:upper]
+
+                self.z_length = self.z[-1] - self.z[0]
+                self.lengths = self.lengths.at[2].set(self.z_length)
+
+                self.z_n = len(self.z)
+                self.dims = self.dims.at[2].set(self.z_n)
+            else:
+                assert colour.BOLD + "Invalid entry for probing_direction!" + colour.END
+
+        print("\nCoordinates have shape of ({}, {}, {})".format(len(self.x), len(self.y), len(self.z)), end = " --> ")
+
+        if self.x.shape == self.y.shape and self.y.shape == self.z.shape and self.z.shape == self.x.shape:
+            self.coordinates = jnp.stack([self.x, self.y, self.z], axis = 1)
+
+            print("no padding required.")
+        else:
+            max_dim = self.dims[0]
+            for dimension in self.dims:
+                if dimension > max_dim:
+                    max_dim = dimension
+
+            # pad coordinates but not arrays themselves, that way only interpolator takes in padded values - no needless extra mem allocation by the domain
+            self.coordinates = jnp.stack([
+                    jnp.pad(self.x, (0, max_dim - self.x_n), constant_values = jnp.nan),
+                    jnp.pad(self.y, (0, max_dim - self.y_n), constant_values = jnp.nan),
+                    jnp.pad(self.z, (0, max_dim - self.z_n), constant_values = jnp.nan)
+                ], axis = 1)
+
+            print("padded up-to {} entries.".format(max_dim))
+            print(" --> x padded with: {} nan's".format(max_dim - self.x_n))
+            print(" --> y padded with: {} nan's".format(max_dim - self.y_n))
+            print(" --> z padded with: {} nan's".format(max_dim - self.z_n))
 
         if self.ne_type is not None:
             self.generate_electron_density_profile()
         else:
+            assert auto_batching == True, colour.BOLD + "\nne_type must be passed to domain creation in order to utilise auto-batching." + colour.END
+
             print("\nWARNING: Electron density profile to generate not passed. You will need to initialise this yourself with a call to this library.")
             print("If you run low on memory, you can enforce a manual domain cleanup with a call to ScalarDomain.cleanup()")
+
             self.XX, self.YY, self.ZZ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)#False) - has to be true for jnp
 
-        print("")
-        jax.print_environment_info()
+        if self.debug:
+            from utils import round_to_n
+
+            print(colour.BOLD + "\nScalarDomain object attribute info:" + colour.END)
+            print(" --> lengths: {}, {}, {}".format(self.x_length, self.y_length, self.z_length))
+            print(" --> lengths: {}".format(self.lengths))
+        
+            print("\n --> dims: {}, {}, {}".format(self.x_n, self.y_n, self.z_n))
+            print(" --> dims: {}".format(self.dims))
+
+            #arr = jnp.array([self.x[0], self.x[-1], self.y[0], self.y[-1], self.z[0], self.z[-1]])
+            aim = 3
+
+            '''
+            round_to = find_sig_n(arr[0], aim)
+            for i in arr:
+                cache = find_sig_n(i, aim)
+                if abs(cache) > abs(round_to):
+                    round_to = cache
+
+            for i in range(len(arr)):
+                arr = arr.at[i].set(jnp.round(arr[i], round_to))
+            '''
+
+            print("\n --> x, y, z (s,e): [{}, {}], [{}, {}], [{}, {}]".format(
+                round_to_n(self.x[0], aim),
+                round_to_n(self.x[-1], aim),
+                round_to_n(self.y[0], aim),
+                round_to_n(self.y[-1], aim),
+                round_to_n(self.z[0], aim),
+                round_to_n(self.z[-1], aim)))
+            print(" --> their len's: {}, {}, {}".format(len(self.x), len(self.y), len(self.z)))
+
+            if self.region_count != 1 and auto_batching:
+                print("\n --> coord_backup: {}".format(
+                    round_to_n(self.coord_backup[0], aim),
+                    round_to_n(self.coord_backup[-1], aim)))
+                print(" --> it's len: {}".format(len(self.coord_backup)))
+
+                print("\n --> future dims: {}".format(self.future_dims))
 
     def generate_electron_density_profile(self):
+        print("\nGenerating test", end = " ")
         if self.ne_type == "test_null":
-            print("\nGenerating test null -e field.")
+            print("null -e field...")
             self.XX, _, _ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)
 
             self.YY = None
@@ -248,7 +363,7 @@ class ScalarDomain(eqx.Module):
 
             self.test_null()
         elif self.ne_type == "test_slab":
-            print("\nGenerating test slab -e field.")
+            print("slab -e field...")
             self.XX, _, _ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)
 
             self.YY = None
@@ -256,14 +371,14 @@ class ScalarDomain(eqx.Module):
 
             self.test_slab()
         elif self.ne_type == "test_linear_cos":
-            print("\nGenerating test linear decay periodic -e field.")
+            print("linear decay periodic -e field...")
             self.XX, self.YY, _ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)
 
             self.ZZ = None
 
             self.test_linear_cos()
         elif self.ne_type == "test_exponential_cos":
-            print("\nGenerating test exponential decay periodic -e field.")
+            print("exponential decay periodic -e field...")
             self.XX, self.YY, _ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)
 
             self.ZZ = None
@@ -274,59 +389,6 @@ class ScalarDomain(eqx.Module):
 
         self.cleanup()
 
-    def setup_next_domain(self, i):
-        #...# Batching logic
-        self.lengths = self.lengths.at[['x', 'y', 'z'].index(self.probing_direction)].set(self.length_backup // self.region_count)
-        self.dims = self.dims.at[['x', 'y', 'z'].index(self.probing_direction)].set(self.dim_backup // self.region_count)
-
-        length_ungenerated = self.length_backup - self.lengths[['x', 'y', 'z'].index(self.probing_direction)] * (i - 1)
-        indices_unused = self.dim_backup - self.dims[['x', 'y', 'z'].index(self.probing_direction)] * (i - 1)
-        if length_ungenerated < self.lengths[['x', 'y', 'z'].index(self.probing_direction)] or indices_unused < self.dims[['x', 'y', 'z'].index(self.probing_direction)]:
-            self.lengths = self.lengths.at[['x', 'y', 'z'].index(self.probing_direction)].set(length_ungenerated)
-            self.dims = self.dims.at[['x', 'y', 'z'].index(self.probing_direction)].set(indices_unused)
-
-        # setup proper indexing so that we can set lengths and dim available based on which region we need at the time - WITHOUT MISSING ANY POINTS
-        #TracerBoolConversionError: Attempted boolean conversion of traced array with shape bool[].
-
-        '''
-        if self.probing_direction == 'x':
-            self.x_length = length
-            self.x_n = dim
-
-            self.x = self.x.at[:self.x_n].set(jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n)))
-            self.x = self.x.at[self.x_n:].set(jnp.nan)
-        elif self.probing_direction == 'y':
-            self.y_length = length
-            self.y_n = dim
-
-            self.y = self.u.at[:self.y_n].set(jnp.float32(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n)))
-            self.y = self.y.at[self.y_n:].set(jnp.nan)
-        elif self.probing_direction == 'z':
-            self.z_length = length
-            self.z_n = dim
-
-            self.z = self.z.at[:self.z_n].set(np.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n)))
-            self.z = self.z.at[self.z_n:].set(jnp.nan)
-        else:
-            assert colour.BOLD + "Invalid entry for probing_direction!" + colour.END
-        '''
-
-    def generate_next_domain(self, i):
-        self.setup_next_domain(i)
-
-        if self.ne is not None:
-            if self.ne_type is not None:
-                self.generate_electron_density_profile()
-            else:
-                assert colour.BOLD + "\nne_type must be passed to domain creation in order to utilise auto-batching." + colour.END
-        # do the equivalent for these later
-        if self.B is not None:
-            pass
-        if self.Te is not None:
-            pass
-        if self.Z is not None:
-            pass
-
     def test_null(self):
         """
         Null test, an empty cube
@@ -334,39 +396,39 @@ class ScalarDomain(eqx.Module):
 
         self.ne = jnp.zeros_like(self.XX)
     
-    def test_slab(self, s = 1, n_e0 = 2e23):
+    def test_slab(self, s = 1, ne_0 = 2e23):
         """
         A slab with a linear gradient in x:
-        n_e =  n_e0 * (1 + s*x/extent)
+        n_e =  ne_0 * (1 + s*x/extent)
 
         Will cause a ray deflection in x
 
         Args:
             s (int, optional): scale factor. Defaults to 1.
-            n_e0 ([type], optional): mean density. Defaults to 2e23 m^-3.
+            ne_0 ([type], optional): mean density. Defaults to 2e23 m^-3.
         """
 
-        self.ne = n_e0 * (1.0 + s * self.XX / self.x_length)
+        self.ne = ne_0 * (1.0 + s * self.XX / self.x_length)
 
-    def test_linear_cos(self, s1 = 0.1, s2 = 0.1, n_e0 = 2e23, Ly = 1):
+    def test_linear_cos(self, s1 = 0.1, s2 = 0.1, ne_0 = 2e23, Ly = 1):
         """
         Linearly growing sinusoidal perturbation
 
         Args:
             s1 (float, optional): scale of linear growth. Defaults to 0.1.
             s2 (float, optional): amplitude of sinusoidal perturbation. Defaults to 0.1.
-            n_e0 ([type], optional): mean electron density. Defaults to 2e23 m^-3.
+            ne_0 ([type], optional): mean electron density. Defaults to 2e23 m^-3.
             Ly (int, optional): spatial scale of sinusoidal perturbation. Defaults to 1.
         """
 
-        self.ne = n_e0 * (1.0 + s1 * self.XX / self.x_length) * (1 + s2 * jnp.cos(2 * jnp.pi * self.YY / Ly))
+        self.ne = ne_0 * (1.0 + s1 * self.XX / self.x_length) * (1 + s2 * jnp.cos(2 * jnp.pi * self.YY / Ly))
     
-    def test_exponential_cos(self, n_e0 = 1e24, Ly = 1e-3, s = 2e-3):
+    def test_exponential_cos(self, ne_0 = 1e24, Ly = 1e-3, s = 2e-3):
         """
         Exponentially growing sinusoidal perturbation
 
         Args:
-            n_e0 ([type], optional): mean electron density. Defaults to 1e24 m^-3.
+            ne_0 ([type], optional): mean electron density. Defaults to 1e24 m^-3.
             Ly (int, optional): spatial scale of sinusoidal perturbation. Defaults to 1e-3 m.
             s ([type], optional): scale of exponential growth. Defaults to 2e-3 m.
         """
@@ -386,9 +448,9 @@ class ScalarDomain(eqx.Module):
         self.ne = self.XX * self.YY
         self.cleanup()
 
-        self.ne = self.ne.at[:, :].set(n_e0 * self.ne)
+        self.ne = self.ne.at[:, :].set(ne_0 * self.ne)
 
-        #self.ne = jnp.float64(n_e0 * 10 ** (self.XX / s) * (1 + jnp.cos(2 * jnp.pi * self.YY / Ly)))
+        #self.ne = jnp.float64(ne_0 * 10 ** (self.XX / s) * (1 + jnp.cos(2 * jnp.pi * self.YY / Ly)))
 
     def external_ne(self, ne):
         """

@@ -22,8 +22,9 @@ from utils import add_integer_postfix
 # can we speed this up even further?
 def get_cube(idr, values):
     return jax.lax.dynamic_slice(values, idr, (2, 2, 2))
- 
-def trilinear(cube, wx, wy, wz):
+
+def trilinear(values, idr, wx, wy, wz):
+    '''
     return (
         cube[0, 0, 0] * (1 - wx) * (1 - wy) * (1 - wz) +
         cube[1, 0, 0] * wx       * (1 - wy) * (1 - wz) +
@@ -34,19 +35,57 @@ def trilinear(cube, wx, wy, wz):
         cube[0, 1, 1] * (1 - wx) * wy       * wz       +
         cube[1, 1, 1] * wx       * wy       * wz
     )
+    '''
+    '''
+    return (
+        values[idr[0], idr[1], idr[2]] * (1 - wx) * (1 - wy) * (1 - wz) +
+        values[idr[0], idr[1], idr[2] + 1] * (1 - wx) * (1 - wy) * wz       +
+        values[idr[0], idr[1] + 1, idr[2]] * (1 - wx) * wy       * (1 - wz) +
+        values[idr[0], idr[1] + 1, idr[2] + 1] * (1 - wx) * wy       * wz       +
+        values[idr[0] + 1, idr[1], idr[2]] * wx       * (1 - wy) * (1 - wz) +
+        values[idr[0] + 1, idr[1], idr[2] + 1] * wx       * (1 - wy) * wz       +
+        values[idr[0] + 1, idr[1] + 1, idr[2]] * wx       * wy       * (1 - wz) +
+        values[idr[0] + 1, idr[1] + 1, idr[2] + 1] * wx       * wy       * wz
+    )
+    '''
+    return (
+        values[idr[:, 0], idr[:, 1], idr[:, 2]] * (1 - wx) * (1 - wy) * (1 - wz) +
+        values[idr[:, 0], idr[:, 1], idr[:, 2] + 1] * (1 - wx) * (1 - wy) * wz       +
+        values[idr[:, 0], idr[:, 1] + 1, idr[:, 2]] * (1 - wx) * wy       * (1 - wz) +
+        values[idr[:, 0], idr[:, 1] + 1, idr[:, 2] + 1] * (1 - wx) * wy       * wz       +
+        values[idr[:, 0] + 1, idr[:, 1], idr[:, 2]] * wx       * (1 - wy) * (1 - wz) +
+        values[idr[:, 0] + 1, idr[:, 1], idr[:, 2] + 1] * wx       * (1 - wy) * wz       +
+        values[idr[:, 0] + 1, idr[:, 1] + 1, idr[:, 2]] * wx       * wy       * (1 - wz) +
+        values[idr[:, 0] + 1, idr[:, 1] + 1, idr[:, 2] + 1] * wx       * wy       * wz
+    )
+    '''
+    return (
+        values[0,0,0] +
+        values[0,0,0] +
+        values[0,0,0] +
+        values[0,0,0] +
+        values[0,0,0] +
+        values[0,0,0] +
+        values[0,0,0] +
+        values[0,0,0]
+    )
+    '''
 
 @jax.jit
-def trilinearInterpolator(coordinates, length, dim, values, query_points, *, fill_value = jnp.nan):
-    idr = jnp.clip(jnp.floor(((query_points / jnp.asarray(length)) + 0.5) * (jnp.asarray(dim) - 1)).astype(jnp.int32), 0, jnp.asarray(dim) - 2)
- 
-    axis = jnp.arange(3)
-    i = idr[:, axis]
+def trilinearInterpolator(x, y, z, lengths, dims, values, query_points, *, fill_value = jnp.nan):
+    idr = jnp.clip(
+        jnp.floor(
+            ((query_points / jnp.asarray(lengths)) + 0.5) * (jnp.asarray(dims) - 1)
+        ).astype(jnp.int32),
+        0, jnp.asarray(dims) - 2
+    )
 
-    coord0 = coordinates[i, axis]
+    wx = (query_points[:, 0] - x[idr[:, 0]]) / (x[idr[:, 0] + 1] - x[idr[:, 0]])
+    wy = (query_points[:, 1] - y[idr[:, 1]]) / (y[idr[:, 1] + 1] - y[idr[:, 1]])
+    wz = (query_points[:, 2] - z[idr[:, 2]]) / (z[idr[:, 2] + 1] - z[idr[:, 2]])
 
-    wr = (query_points[:, axis] - coord0) / (coordinates[i + 1, axis] - coord0)
-
-    return jax.vmap(trilinear)(jax.vmap(get_cube, in_axes=(0, None))(idr, values), wr[:, 0], wr[:, 1], wr[:, 2])
+    #return jax.vmap(trilinear)(jax.vmap(get_cube, in_axes=(0, None))(idr, values), wx, wy, wz)
+    return trilinear(values, idr, wx, wy, wz)
 
 ##
 ## Helper functions for calculations
@@ -95,7 +134,7 @@ def kappa(ne, Te, Z, omega):
 def n_refrac(ne, omega):
     return jnp.sqrt(1.0 - (omega_pe(ne * 1e-6) / omega) ** 2)
 
-def dndr(r, ne, omega, coordinates, length, dim):
+def dndr(r, ne, omega, x, y, z, lengths, dims):
     """
     Returns the gradient at the locations r
 
@@ -108,22 +147,22 @@ def dndr(r, ne, omega, coordinates, length, dim):
 
     grad = jnp.zeros_like(r.T)
 
-    dndx = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), coordinates[:, 0], axis = 0)
-    grad = grad.at[0, :].set(trilinearInterpolator(coordinates, length, dim, dndx, r, fill_value = 0.0))
+    dndx = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), x, axis = 0)
+    grad = grad.at[0, :].set(trilinearInterpolator(x, y, z, lengths, dims, dndx, r, fill_value = 0.0))
     del dndx
 
-    dndy = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), coordinates[:, 1], axis = 1)
-    grad = grad.at[1, :].set(trilinearInterpolator(coordinates, length, dim, dndy, r, fill_value = 0.0))
+    dndy = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), y, axis = 1)
+    grad = grad.at[1, :].set(trilinearInterpolator(x, y, z, lengths, dims, dndy, r, fill_value = 0.0))
     del dndy
 
-    dndz = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), coordinates[:, 2], axis = 2)
-    grad = grad.at[2, :].set(trilinearInterpolator(coordinates, length, dim, dndz, r, fill_value = 0.0))
+    dndz = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), z, axis = 2)
+    grad = grad.at[2, :].set(trilinearInterpolator(x, y, z, lengths, dims, dndz, r, fill_value = 0.0))
     del dndz
 
     return grad
 
 # ODEs of photon paths, standalone function to support the solve()
-def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, coordinates, omega, VerdetConst, length, dim):
+def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, omega, VerdetConst, lengths, dims):
     """
     Returns an array with the gradients and velocity per ray for ode_int
 
@@ -160,16 +199,16 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, coordinat
     # although probably really unnecessary?
     del s
 
-    # must unpack coordinates tuple here for the sake of dndr, could be earlier but this is easier to pass and more generalised
+    # must unpack x, y, z tuple here for the sake of dndr, could be earlier but this is easier to pass and more generalised
     # r must be transposed within dndr(...) else we get an AbstractTerm error due to the effect on the return value
-    sprime = sprime.at[3:6, :].set(dndr(r, ne, omega, coordinates, length, dim))
+    sprime = sprime.at[3:6, :].set(dndr(r, ne, omega, x, y, z, lengths, dims))
     sprime = sprime.at[:3, :].set(v)
 
     # Attenuation due to inverse bremsstrahlung
     if inv_brems:
-        sprime = sprime.at[6, :].set(trilinearInterpolator(coordinates, kappa(ne, Te, Z, omega), r) * amp)
+        sprime = sprime.at[6, :].set(trilinearInterpolator(x, y, z, kappa(ne, Te, Z, omega), r) * amp)
     if phaseshift:
-        sprime = sprime.at[7, :].set(omega * (trilinearInterpolator(coordinates, n_refrac(ne, omega), r) - 1.0))
+        sprime = sprime.at[7, :].set(omega * (trilinearInterpolator(x, y, z, n_refrac(ne, omega), r) - 1.0))
     if B_on:
         """
         Returns the VerdetConst ne B.v
@@ -182,14 +221,14 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, coordinat
             N float: N values of ne B.v
         """
 
-        ne_N = trilinearInterpolator(coordinates, ne, r)
+        ne_N = trilinearInterpolator(x, y, z, ne, r)
 
         Bv_N = jnp.sum(
             jnp.array(
                 [
-                    trilinearInterpolator(coordinates, B[:, :, :, 0], r),
-                    trilinearInterpolator(coordinates, B[:, :, :, 1], r),
-                    trilinearInterpolator(coordinates, B[:, :, :, 2], r)
+                    trilinearInterpolator(x, y, z, B[:, :, :, 0], r),
+                    trilinearInterpolator(x, y, z, B[:, :, :, 1], r),
+                    trilinearInterpolator(x, y, z, B[:, :, :, 2], r)
                 ]
             ) * v, axis = 0
         )
@@ -219,7 +258,7 @@ def ray_to_Jonesvector(rays, ne_extent, *, probing_direction = 'z', keep_current
 
     Args:
         rays (6xN float): N rays in (x,y,z,vx,vy,vz) format, m and m/s and amplitude, phase and polarisation
-        ne_extent (float): edge length of shape (cuboid) in probing direction, m
+        ne_extent (float): edge lengths of shape (cuboid) in probing direction, m
         probing_direction (str): x, y or z.
         keep_current_plane (boolean): flag to enable compatability (via True) with use in diagnostics.py, defaults to False
 
@@ -318,13 +357,68 @@ def ray_to_Jonesvector(rays, ne_extent, *, probing_direction = 'z', keep_current
 
     del Np
 
+    #return_E_test = True
+    #if return_E_test:
+    #    return ray_p, rays[6], rays[7]
+
     # ray_p [x, phi, y, theta], ray_J [E_x, E_y]
     if return_E:
         return ray_p, ray_J
 
     return ray_p, None
 
-def solve(s0_import, ScalarDomain, dim, probing_depth, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False, lwl = 1064e-9, keep_domain = False):
+def back_propogate(rays, ne_extent, probing_direction):
+    Np = rays.shape[1] # number of photons
+
+    x, y, z, vx, vy, vz = rays[0], rays[1], rays[2], rays[3], rays[4], rays[5]
+
+    # Resolve distances and angles
+    # YZ plane
+    if(probing_direction == 'x'):
+        t_bp = (x - ne_extent) / vx
+
+        # Positions on plane
+        rays = rays.at[0].set(ne_extent)
+        rays = rays.at[1].set(y - vy * t_bp)
+        rays = rays.at[2].set(z - vz * t_bp)
+    # XZ plane
+    elif(probing_direction == 'y'):
+        t_bp = (y - ne_extent) / vy
+
+        #
+        # I have switched x & z for the sake of consistent ordering of the axes
+        # Standardised in keeping with positive 'forward' notation, etc. x * y = z but don't do y * x = -z
+        # If memory is not a concern then will instead create a class to cover directions
+        # This would entail both the array and a self.dir parameter of type char - containing 'x', 'y' or 'z'
+        #
+
+        # Positions on plane
+        rays = rays.at[0].set(z - vz * t_bp)
+        rays = rays.at[1].set(ne_extent)
+        rays = rays.at[2].set(x - vx * t_bp)
+    # XY plane
+    elif(probing_direction == 'z'):
+        t_bp = (z - ne_extent) / vz
+
+        # Positions on plane
+        rays = rays.at[0].set(x - vx * t_bp)
+        rays = rays.at[1].set(y - vy * t_bp)
+        rays = rays.at[2].set(ne_extent)
+    else:
+        print("\nIncorrect probing direction. Use: x, y or z.")
+
+    del x
+    del vx
+
+    del y
+    del vy
+
+    del z
+    del vz
+
+    return rays
+
+def solve(s0_import, ScalarDomain, dims, probing_depth, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False, lwl = 1064e-9, keep_domain = False):
     # Find Faraday rotation constant http://farside.ph.utexas.edu/teaching/em/lectures/node101.html
     VerdetConst = 0.0
     if (ScalarDomain.B_on):
@@ -333,7 +427,6 @@ def solve(s0_import, ScalarDomain, dim, probing_depth, *, return_E = False, para
     omega = 2 * jnp.pi * c / lwl
 
     Np = s0_import.shape[1]
-    dim_split = jnp.asarray(ScalarDomain.dims)[['x', 'y', 'z'].index(ScalarDomain.probing_direction)] // ScalarDomain.region_count
 
     print("\nSize in memory of initial rays:", mem_conversion(getsizeof_default(s0_import) * Np))
     # if batched: or if auto_batching: etc.
@@ -351,27 +444,82 @@ def solve(s0_import, ScalarDomain, dim, probing_depth, *, return_E = False, para
                 print("\nUsing pre-generated 1st section of domain.")
             else:
                 print("\nGenerating", add_integer_postfix(i), "section of the domain...")
-                ScalarDomain.generate_next_domain(i)
 
-            lower = i * dim_split
-            if i == ScalarDomain.region_count - 1:
-                upper = -1
-            else:
-                upper = (i + 1) * dim_split
+                lengths = ScalarDomain.lengths
+                dims = ScalarDomain.dims
+
+                ne_type = ScalarDomain.ne_type
+
+                inv_brems = ScalarDomain.inv_brems
+                phaseshift = ScalarDomain.phaseshift
+                B_on = ScalarDomain.B_on
+
+                probing_direction = ScalarDomain.probing_direction
+
+                region_count = ScalarDomain.region_count
+
+                leeway_factor = ScalarDomain.leeway_factor
+
+                coord_backup = ScalarDomain.coord_backup
+                future_dims = ScalarDomain.future_dims
+
+                debug = ScalarDomain.debug
+
+                try:
+                    del ScalarDomain
+                except:
+                    ScalarDomain = None
+
+                import domain as d
+                ScalarDomain = d.ScalarDomain(
+                    lengths, dims,
+                    ne_type = ne_type,
+                    inv_brems = inv_brems,
+                    phaseshift = phaseshift,
+                    B_on = B_on,
+                    probing_direction = probing_direction,
+                    auto_batching = True,
+                    iteration = i,
+                    region_count = region_count,
+                    leeway_factor = leeway_factor,
+                    coord_backup = coord_backup,
+                    future_dims = future_dims,
+                    debug = debug
+                )
+
+                del lengths
+                del dims
+
+                del ne_type
+
+                del inv_brems
+                del phaseshift
+                del B_on
+
+                del probing_direction
+
+                del region_count
+
+                del leeway_factor
+
+                del coord_backup
+                del future_dims
+
+                del debug
 
             # Need to make sure all rays have left volume
             # Conservative estimate of diagonal across volume
             # Then can backproject to surface of volume
 
-            trace_depth = ScalarDomain.coordinates[upper, ['x', 'y', 'z'].index(ScalarDomain.probing_direction)] - ScalarDomain.coordinates[lower, ['x', 'y', 'z'].index(ScalarDomain.probing_direction)]
             depth_remaining = probing_depth - depth_traced
 
+            trace_depth = ScalarDomain.lengths[['x', 'y', 'z'].index(ScalarDomain.probing_direction)]
             if trace_depth > depth_remaining:
                 trace_depth = depth_remaining
 
             del depth_remaining
 
-        depth_traced += trace_depth
+        print(" --> tracing to depth of", trace_depth, "mm's")
 
         t = jnp.linspace(0.0, jnp.sqrt(8.0) * trace_depth / c, 2)
         norm_factor = jnp.max(t)
@@ -380,31 +528,37 @@ def solve(s0_import, ScalarDomain, dim, probing_depth, *, return_E = False, para
         # think we should change this???
 
         # passed args must be hashable to be made static for jax.jit, tuple is hashable, array & dict are not
-        args = (parallelise, ScalarDomain.inv_brems, ScalarDomain.phaseshift, ScalarDomain.B_on, ScalarDomain.ne, ScalarDomain.B, ScalarDomain.Te, ScalarDomain.Z, ScalarDomain.coordinates, omega, VerdetConst, ScalarDomain.lengths, ScalarDomain.dims)
+        args = (parallelise, ScalarDomain.inv_brems, ScalarDomain.phaseshift, ScalarDomain.B_on, ScalarDomain.ne, ScalarDomain.B, ScalarDomain.Te, ScalarDomain.Z, ScalarDomain.x, ScalarDomain.y, ScalarDomain.z, omega, VerdetConst, ScalarDomain.lengths, ScalarDomain.dims)
 
         if not parallelise:
             from numpy import array
-            s0 = array(jnp.ravel(s0_import))
-            #s0 = s0.flatten() #odeint insists
+            if i == 1:
+                s0 = array(jnp.ravel(s0_import))
+                #s0 = s0.flatten() #odeint insists
+            else:
+                # need a backpropogation algorithm that works for this too
+                s0 = array(jnp.ravel(sol))
+                del sol
 
             start = time()
             # wrapper allows dummy variables t & y to be used by solve_ivp(), self is required by dsdt
             sol = solve_ivp(lambda t, y: dsdt(t, y, *args), [0, t[-1]], s0, t_eval = t)
         else:
+            # transposed as jax.vmap() expects form of [batch_idx, items] not [items, batch_idx]
             available_devices = jax.devices()
 
             running_device = jax.lib.xla_bridge.get_backend().platform # - deprecated, using still as needed for HPC
             #running_device = jax.extend.backend.get_backend().platform
             print("\nRunning device:", running_device, end='')
 
-            # transposed as jax.vmap() expects form of [batch_idx, items] not [items, batch_idx]
-            s0_transformed = s0_import.T
-            del s0_import
+            if i == 1:
+                s0_transformed = s0_import.T
+                del s0_import
+            else:
+                s0_transformed = back_propogate(sol.ys[:, -1, :].T, trace_depth, ScalarDomain.probing_direction).T
+                del sol
 
             if running_device == 'cpu':
-                #from multiprocessing import cpu_count
-                #core_count = cpu_count()
-
                 core_count = int(os.environ['XLA_FLAGS'].replace("--xla_force_host_platform_device_count=", ''))
                 print(", with:", core_count, "cores.")
 
@@ -434,8 +588,9 @@ def solve(s0_import, ScalarDomain, dim, probing_depth, *, return_E = False, para
 
                 s0 = jax.device_put(s0_transformed, gpu_devices[0])
             elif running_device == 'tpu':
-                s0 = s0_transformed
                 pass
+
+                s0 = s0_transformed
             else:
                 assert "No suitable device detected!"
 
@@ -478,8 +633,9 @@ def solve(s0_import, ScalarDomain, dim, probing_depth, *, return_E = False, para
                     saveat = saveat,
                     stepsize_controller = stepsize_controller,
                     # set max steps to no. of cells x100
-                    # cannot be passed as dim --> causes boolean conversion error, has to be passed directly
-                    max_steps = dim[0] * dim[1] * dim[2] * 100 #10000 - default for solve_ivp?????
+                    # cannot be passed as dims --> causes boolean conversion error, has to be passed directly
+                    # need to pass this correctly so that it remains consistent with class when batching
+                    max_steps = 10000#dims[0] * dims[1] * dims[2] * 100 #10000 - default for solve_ivp?????
                 )
 
             # hardcode to normalise to 1 due to diffrax bug
@@ -496,27 +652,22 @@ def solve(s0_import, ScalarDomain, dim, probing_depth, *, return_E = False, para
 
                 print("\njax compilation of solver took:", time() - start_comp, "seconds", end='')
 
-            #from functools import partial
-
             # pass s0[:, i] for each ray via a jax.vmap for parallelisation
             start = time()
             sol = jax.block_until_ready(
                 # in_axes version ensures that vmap doesn't map args parameters, just s0
                 #jax.vmap(lambda rays, args: ODE_solve, in_axes = (0, None))(s0, args)
+
                 # default vmap_method argument is sequential, this is deprecated though and will cause a warning (if debugging) past jax 0.6.0
                 # look into different options for this parameter at a later date
-                #jax.vmap(partial(lambda s: ODE_solve(s, args), vmap_method = "sequential"))(s0)
-                #jax.vmap(partial(ODE_solve, in_axes = (0, None), vmap_method = "sequential"))(s0, args)
+
                 jax.vmap(ODE_solve, in_axes = (0, None))(s0, args)
             )
 
-            #sol = jax.block_until_ready(jax.vmap(ODE_solve, in_axes = (0, None))(s0, args))
-
         duration = time() - start
-        # make this round np not jnp?
         print("\nCompleted ray trace in", jnp.round(duration, 3), "seconds.")
 
-    #del ne_nc
+        depth_traced += trace_depth
 
     if memory_debug:
         if parallelise:
@@ -606,11 +757,12 @@ def solve(s0_import, ScalarDomain, dim, probing_depth, *, return_E = False, para
         rf = sol.ys[:, -1, :].T
 
         print("\n\nParallelised output has resulting 3D matrix of form: [batch_count, 2, 9]:", sol.ys.shape)
-        print("\t2 to account for the start and end results")
-        print("\t9 containing the 3 position and velocity components, amplitude, phase and polarisation")
-        print("\tIf batch_count is lower than expected, this is likely due to jax's forced integer batch sharding when parallelising over cpu cores.")
+        print(" - 2 to account for the start and end results")
+        print(" - 9 containing the 3 position and velocity components, amplitude, phase and polarisation")
+        print(" - If batch_count is lower than expected, this is likely due to jax's forced integer batch sharding requirement over cpu cores.")
         print("\nWe slice the end result and transpose into the form:", rf.shape, "to work with later code.")
         #else:
         #    print("Ray tracer failed. This could be a case of diffrax exceeding max steps again due to apparent 'strictness' compared to solve_ivp, check error log.")
 
+    # need to confirm there is no mismatch between total depth_traced and the target probing_depth
     return *ray_to_Jonesvector(rf, probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E), duration

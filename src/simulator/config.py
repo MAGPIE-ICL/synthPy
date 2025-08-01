@@ -74,8 +74,8 @@ def jax_init(force_device = None, core_limit = None, extra_info = False):
     import sys
     import os
 
-    from utils import colour
-    print(colour.BOLD)
+    #from utils import colour
+    print("\033[1m")
 
     print("\nDisabling python multi-threading...")
 
@@ -111,7 +111,8 @@ def jax_init(force_device = None, core_limit = None, extra_info = False):
     os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.9"
 
     # triggers a jax breakpoint for debugging on error - works with filter_jit not jax.jit
-    #os.environ["EQX_ON_ERROR"] = "breakpoint"
+    # if this is causing erroneous errors see equinox issue #1047: https://github.com/patrick-kidger/equinox/issues/1047
+    os.environ["EQX_ON_ERROR"] = "breakpoint"
 
     if force_device == "cpu":
         os.environ['JAX_PLATFORM_NAME'] = 'cpu'
@@ -134,7 +135,7 @@ def jax_init(force_device = None, core_limit = None, extra_info = False):
 
     #jax.config.update('jax_compiler_enable_remat_pass', False)
 
-    print(colour.END)
+    print("\033[0m")
 
     if extra_info:
         jax.print_environment_info()

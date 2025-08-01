@@ -4,6 +4,8 @@ import matplotlib as mpl
 #import jax
 import jax.numpy as jnp
 
+import fresnel_integral
+
 from propagator import ray_to_Jonesvector
 
 #jax.tree_util.tree_leaves(x, is_leaf = lambda x: x is None)
@@ -152,8 +154,8 @@ def sym_lens(r, f):
 
     return lens(r, f, f)
 
-def distance(r, d):
-    """4x4 matrix  matrix for travelling a distance d
+def travel(r, d):
+    """4x4 matrix  matrix for travelling a travel d
     See: https://en.wikipedia.org/wiki/Ray_transfer_matrix_analysis
     """
 
@@ -269,7 +271,7 @@ class Diagnostic:
     """
 
     # this is in mm's not metres - self.rf is converted to mm's (not sure if everything else is covered though)
-    def __init__(self, wavelength, rf, Jf = None, *, focal_plane = 0, L = 400, R = 25, Lx = 18, Ly = 13.5):
+    def __init__(self, wavelength, rf, Jf = None, *, focal_plane = 0, L = 400, R = 25, Lx = 18, Ly = 13.5, x = None, y = None, x_l = None, y_l = None, amp = None, phase = None):
         """
         Initialise ray diagnostic.
 
@@ -283,6 +285,9 @@ class Diagnostic:
         """     
 
         self.wavelength, self.focal_plane, self.L, self.R, self.Lx, self.Ly = wavelength, focal_plane, L, R, Lx, Ly
+
+        self.x, self.y, self.x_l, self.y_l = x, y, x_l, y_l
+        self.amp, self.phase = amp, phase
 
         # these HAVE to stay... for some reason - not entirely sure why you can't just reference self.Beam.r_ directly (or now just rf)
         # if you can make it without the memory duplication work please do, else DON'T REMOVE!
@@ -324,7 +329,7 @@ class Diagnostic:
             pix_x (int, optional): number of x pixels in detector plane. Defaults to 3448.
             pix_y (int, optional): number of y pixels in detector plane. Defaults to 2574.
         """
-    
+
         x = self.rf[0, :]
         y = self.rf[2, :]
 
@@ -381,21 +386,21 @@ class Shadowgraphy(Diagnostic):
 
     def single_lens_solve(self):
         ## single lens - M = Variable (around ~2) (based on Detector position. Real experimental setup)
-        r1 = distance(self.r0, 3 * self.L / 4 - self.focal_plane) #displace rays to lens. Accounts for object with depth
+        r1 = travel(self.r0, 3 * self.L / 4 - self.focal_plane) #displace rays to lens. Accounts for object with depth
         r2 = circular_aperture(r1, self.R)      # cut off
         r3 = sym_lens(r2, self.L / 2)             # lens 1
-        r4 = distance(r3, 3*self.L / 2)           # detector
+        r4 = travel(r3, 3*self.L / 2)           # detector
         self.rf = r4
 
     def two_lens_solve(self):
         ## 2 lens telescope, M = 1
-        r1 = distance(self.r0, self.L - self.focal_plane) #displace rays to lens. Accounts for object with depth
+        r1 = travel(self.r0, self.L - self.focal_plane) #displace rays to lens. Accounts for object with depth
         r2 = circular_aperture(r1, self.R)    # cut off
         r3 = sym_lens(r2, self.L / 2)           # lens 1
-        r4 = distance(r3, self.L * 2)           # displace rays to lens 2.
+        r4 = travel(r3, self.L * 2)           # displace rays to lens 2.
         r5 = circular_aperture(r4, self.R)    # cut off
         r6 = sym_lens(r5, self.L / 2)           # lens 2
-        r7 = distance(r6, self.L)             # displace rays to detector
+        r7 = travel(r6, self.L)             # displace rays to detector
         self.rf = r7
     
 class Schlieren(Diagnostic):
@@ -403,28 +408,28 @@ class Schlieren(Diagnostic):
     Example dark field schlieren diagnostic. Inherits from Rays, has custom solve method.
     Implements a two lens telescope with M = 1. Both lenses have a f = L focal length, where L is a length scale specified when the class is initialized.
     Each optic has a radius R, which is used to reject rays outside the numerical aperture of the optical system.
-    There is a circular stop placed at the focal point after the first lens which rejects rays which hit the focal planes at distance less than R [mm] from the optical axis.
+    There is a circular stop placed at the focal point after the first lens which rejects rays which hit the focal planes at travel less than R [mm] from the optical axis.
     """
 
     def DF_solve(self, R = 1):
         ## 2 lens telescope, M = 1
-        r1 = distance(self.r0, self.L - self.focal_plane) #displace rays to lens. Accounts for object with depth
+        r1 = travel(self.r0, self.L - self.focal_plane) #displace rays to lens. Accounts for object with depth
         r2 = circular_aperture(r1, self.R) # cut off
     
         r3 = sym_lens(r2, self.L) #lens 1
 
-        r4 = distance(r3, self.L) #displace rays to stop
+        r4 = travel(r3, self.L) #displace rays to stop
 
         # this and positioning of lenses means schlieren ends up with less usable rays than other methods
         r5 = circular_stop(r4, R = R) # stop - blocker at focal point after the first lens of size R (1 mm?)
 
-        r6 = distance(r5, self.L) #displace rays to lens 2
+        r6 = travel(r5, self.L) #displace rays to lens 2
 
         r7 = circular_aperture(r6, self.R) # cut off
 
         r8 = sym_lens(r7, self.L) #lens 2
 
-        r9 = distance(r8, self.L) #displace rays to detector
+        r9 = travel(r8, self.L) #displace rays to detector
 
         self.rf = r9
     
@@ -432,23 +437,23 @@ class Schlieren(Diagnostic):
     Example light field schlieren diagnostic. Inherits from Rays, has custom solve method.
     Implements a two lens telescope with M = 1. Both lenses have a f = L/2 focal length, where L is a length scale specified when the class is initialized.
     Each optic has a radius R, which is used to reject rays outside the numerical aperture of the optical system.
-    There is a circular stop placed at the focal point afte rthe first lens which accepts only rays which hit the focal planes at distance less than R [mm] from the optical axis.
+    There is a circular stop placed at the focal point afte rthe first lens which accepts only rays which hit the focal planes at travel less than R [mm] from the optical axis.
     """
 
     def LF_solve(self, R = 1):
         ## 2 lens telescope, M = 1
-        r1 = distance(self.r0, self.L - self.focal_plane) #displace rays to lens. Accounts for object with depth
+        r1 = travel(self.r0, self.L - self.focal_plane) #displace rays to lens. Accounts for object with depth
         r2 = circular_aperture(r1, self.R) # cut off
         r3 = sym_lens(r2, self.L) #lens 1
 
-        r4 = distance(r3, self.L) #displace rays to stop
+        r4 = travel(r3, self.L) #displace rays to stop
         r5 = circular_aperture(r4, R = R) # stop
 
-        r6 = distance(r5, self.L) #displace rays to lens 2
+        r6 = travel(r5, self.L) #displace rays to lens 2
         r7 = circular_aperture(r6, self.R) # cut off
         r8 = sym_lens(r7, self.L) #lens 2
 
-        r9 = distance(r8, self.L) #displace rays to detector
+        r9 = travel(r8, self.L) #displace rays to detector
         self.rf = r9
         
 class Refractometry(Diagnostic):
@@ -464,19 +469,20 @@ class Refractometry(Diagnostic):
         ##
 
         ## Imaging the spatial axis - M = 2
-        r1 = distance(self.r0, 3 * self.L / 4 - self.focal_plane) #displace rays to lens 1. Accounts for object with depth
+        r1 = travel(self.r0, 3 * self.L / 4 - self.focal_plane) #displace rays to lens 1. Accounts for object with depth
         r2 = circular_aperture(r1, self.R)      # cut off
         r3 = sym_lens(r2, self.L/2)             # lens 1 - spherical
-        r4 = distance(r3, 3*self.L/2)           # displace rays to lens 2 - hybrid
+        r4 = travel(r3, 3*self.L/2)           # displace rays to lens 2 - hybrid
         r5 = rect_aperture(r4, 15, 30)          # rectangular lens cut-off
         r6 = circular_aperture(r5, self.R)      # cut off
         r7 = lens(r6, self.L/3, self.L/2)       # lens 2 - hybrid lens
-        r8 = distance(r7, self.L)               # displace rays to detector
+        r8 = travel(r7, self.L)               # displace rays to detector
         self.rf = r8
 
+    '''
     def coherent_solve(self):
         ## Imaging the spatial axis - M = 2 - Coherent Implementation of the Refractometer
-        r1 = distance(self.r0, 3 * self.L / 4 - self.focal_plane)
+        r1 = travel(self.r0, 3 * self.L / 4 - self.focal_plane)
         # propagate E field
         self.propagate_E(r1, self.r0)
 
@@ -484,18 +490,65 @@ class Refractometry(Diagnostic):
         r3 = sym_lens(r2, self.L / 2)          # lens 1 - spherical
         self.propagate_E(r3, r2)
 
-        r4 = distance(r3, 3 * self.L / 2)
+        r4 = travel(r3, 3 * self.L / 2)
         self.propagate_E(r4, r3)                 # displace rays to lens 2 - hybrid
 
         r5, self.Jf = circular_aperture(r4, self.R, E = self.Jf)      # cut off
         r6 = lens(r5, self.L / 3, self.L / 2)       # lens 2 - hybrid lens
         self.propagate_E(r6, r5)
 
-        self.rf = distance(r6, self.L)               # displace rays to detector
+        self.rf = travel(r6, self.L)               # displace rays to detector
+        self.propagate_E(self.rf, r6)
+    '''
+
+    def coherent_solve(self):
+        ## Imaging the spatial axis - M = 2 - Coherent Implementation of the Refractometer
+        r1 = travel(self.r0, 3 * self.L / 4 - self.focal_plane)
+
+        r2, self.Jf = circular_aperture(self.r0, self.R, E = self.Jf)      # cut off
+        # propagate E field
+        self.propagate_E(r2, r1)
+
+        r3 = sym_lens(r2, self.L / 2)          # lens 1 - spherical
+        self.propagate_E(r3, r2)
+
+        r4 = travel(r3, 3 * self.L / 2)
+        self.propagate_E(r4, r3)                 # displace rays to lens 2 - hybrid
+
+        r5, self.Jf = circular_aperture(r4, self.R, E = self.Jf)      # cut off
+        r6 = lens(r5, self.L / 3, self.L / 2)       # lens 2 - hybrid lens
+        self.propagate_E(r6, r5)
+
+        self.rf = travel(r6, self.L)               # displace rays to detector
         self.propagate_E(self.rf, r6)
 
     def refractogram(self, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
         self.histogram_legacy(bin_scale = bin_scale, pix_x = pix_x, pix_y = pix_y, clear_mem = clear_mem)
+
+    def fresnel_solve(self, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
+        # repeated across many functions, have made a wrapper for it instead of repeats to preserve backwards compatability
+        # was this replaced by jnp.histogram2d function?
+        # this function is far slower for a general histogram than the new function - yet is used for refractogram and interferogram so kept to be wrapped for those
+        x_bins = jnp.linspace(-self.Lx // 2, self.Lx // 2, pix_x // bin_scale)
+        y_bins = jnp.linspace(-self.Ly // 2, self.Ly // 2, pix_y // bin_scale)
+
+        amplitude_x = jnp.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype = complex)
+        amplitude_y = jnp.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype = complex)
+
+        x_indices = jnp.digitize(self.rf[0, :], x_bins) - 1
+        y_indices = jnp.digitize(self.rf[2, :], y_bins) - 1
+
+        self.Jf = fresnel_integral.propagate(self.wavelength, self.x, self.y, self.x_l, self.y_l, self.r0, self.amp, self.phase, 3 * self.L / 4 - self.focal_plane)
+
+        for i in range(self.rf.shape[1]):
+            if 0 <= x_indices[i] < amplitude_x.shape[1] and 0 <= y_indices[i] < amplitude_x.shape[0]:
+                # jax arrays are immutable - fix later
+                amplitude_x = amplitude_x.at[y_indices[i], x_indices[i]].set(amplitude_x[y_indices[i], x_indices[i]] + self.Jf[0, i])
+                amplitude_y = amplitude_y.at[y_indices[i], x_indices[i]].set(amplitude_y[y_indices[i], x_indices[i]] + self.Jf[1, i])
+
+        amplitude = jnp.sqrt(jnp.real(amplitude_x) ** 2 + jnp.real(amplitude_y) ** 2)
+        # amplitude_normalised = (amplitude - amplitude.min()) / (amplitude.max() - amplitude.min()) # this line needs work and is currently causing problems
+        self.H = amplitude
 
 class Interferometry(Diagnostic):
     """
@@ -535,20 +588,20 @@ class Interferometry(Diagnostic):
         # assuming reference is recombined with the probe beam at the exit of the domain (should be changed)
         self.interfere_ref_beam(n_fringes, deg)
         ## 2 lens telescope, M = 1
-        r1 = distance(rr0, self.L + domain_length) #displace rays to lens. Accounts for object with depth
+        r1 = travel(rr0, self.L + domain_length) #displace rays to lens. Accounts for object with depth
         # propagate E field
         self.propagate_E(r1, rr0)
         r2, self.Jf = circular_aperture(r1, self.R, E = self.Jf)    # cut off
         r3 = sym_lens(r2, self.L / 2)           # lens 1
         self.propagate_E(r3, r2)
 
-        r4 = distance(r3, self.L * 2)           # displace rays to lens 2.
+        r4 = travel(r3, self.L * 2)           # displace rays to lens 2.
         self.propagate_E(r4, r3)
         r5, self.Jf = circular_aperture(r4, self.R, E = self.Jf)    # cut off
         r6 = sym_lens(r5, self.L / 2)                             # lens 2
         self.propagate_E(r6, r5)
         
-        r7 = distance(r6, self.L)             # displace rays to detector
+        r7 = travel(r6, self.L)             # displace rays to detector
         self.propagate_E(r7, r6)
         rf = r7
 
@@ -561,7 +614,7 @@ class Interferometry(Diagnostic):
         # assuming reference is recombined with the probe beam at the exit of the domain (should be changed)
         self.interfere_ref_beam(10, 20)
         ## 2 lens telescope, M = 1
-        r1 = distance(self.r0, self.L - self.focal_plane) #displace rays to lens. Accounts for object with depth
+        r1 = travel(self.r0, self.L - self.focal_plane) #displace rays to lens. Accounts for object with depth
 
         # propagate E field
         self.propagate_E(r1, self.r0)
@@ -570,7 +623,7 @@ class Interferometry(Diagnostic):
         r3 = sym_lens(r2, self.L/2)           # lens 1
         self.propagate_E(r3, r2)
 
-        r4 = distance(r3, self.L*2)           # displace rays to lens 2.
+        r4 = travel(r3, self.L*2)           # displace rays to lens 2.
         self.propagate_E(r4, r3)
 
         r5, self.Jf = circular_aperture(r4, self.R, E = self.Jf)    # cut off
@@ -578,7 +631,7 @@ class Interferometry(Diagnostic):
         r6 = sym_lens(r5, self.L/2)                             # lens 2
         self.propagate_E(r6, r5)
         
-        r7 = distance(r6, self.L)             # displace rays to detector
+        r7 = travel(r6, self.L)             # displace rays to detector
         self.propagate_E(r7, r6)
 
         self.rf = r7
