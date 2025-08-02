@@ -167,12 +167,9 @@ class Propagator:
         args = (self, parallelise, x, y, z, dndx, dndy, dndz)
         sol = jax.vmap(lambda s: ODE_solve(s, args))(s0.T)
 
-        finish = time()
-        self.duration = finish - start
+        print("Time to ray trace:", time() - start)
 
-        self.Beam.rf, _ = ray_to_Jonesvector(sol.ys[:, -1, :].T, self.extent, probing_direction = self.Beam.probing_direction)
-
-        return self.Beam.rf
+        return ray_to_Jonesvector(sol.ys[:, -1, :].T, self.extent, probing_direction = self.Beam.probing_direction)
 
 # ODEs of photon paths, standalone function to support the solve()
 def dsdt(t, s, Propagator, parallelise, x, y, z, dndx, dndy, dndz):
@@ -181,15 +178,10 @@ def dsdt(t, s, Propagator, parallelise, x, y, z, dndx, dndy, dndz):
 
     sprime = jnp.zeros_like(s)
 
-    # Position and velocity
-    # needs to be before the reshape to avoid indexing errors
     r = s[:3, :]
     v = s[3:6, :]
 
-    # Amplitude, phase and polarisation
     a = s[6, :]
-    #p = s[7,:]
-    #r = s[8,:]
 
     #sprime = sprime.at[3:6, :].set(Propagator.dndr(r))
     sprime = sprime.at[3:6, :].set(Propagator.dndr_test(r, x, y, z, dndx, dndy, dndz))
@@ -197,23 +189,7 @@ def dsdt(t, s, Propagator, parallelise, x, y, z, dndx, dndy, dndz):
 
     return sprime.flatten()
 
-# Need to backproject to ne volume, then find angles
 def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction):
-    """
-    Takes the output from the 9D solver and returns 6D rays for ray-transfer matrix techniques.
-    Effectively finds how far the ray is from the end of the volume, returns it to the end of the volume.
-
-    Gives position (and angles) in other axes at point where ray is in end plane of its extent in the probing axis
-
-    Args:
-        ode_sol (6xN float): N rays in (x,y,z,vx,vy,vz) format, m and m/s and amplitude, phase and polarisation
-        ne_extent (float): edge length of shape (cuboid) in probing direction, m
-        probing_direction (str): x, y or z.
-
-    Returns:
-        [type]: [description]
-    """
-
     Np = ode_sol.shape[1] # number of photons
 
     ray_p = np.zeros((4, Np))
@@ -269,6 +245,4 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction):
     ray_J[0] = amp*(np.cos(phase)+1.0j*np.sin(phase))*(np.cos(pol)*E_x_init-np.sin(pol)*E_y_init)
     ray_J[1] = amp*(np.cos(phase)+1.0j*np.sin(phase))*(np.sin(pol)*E_x_init+np.cos(pol)*E_y_init)
 
-    # ray_p [x,phi,y,theta], ray_J [E_x,E_y]
-
-    return ray_p, ray_J
+    return ray_p

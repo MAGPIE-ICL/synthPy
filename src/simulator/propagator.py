@@ -170,15 +170,7 @@ def ray_to_Jonesvector(rays, ne_extent, *, probing_direction = 'z', keep_current
 
     del Np
 
-    #return_E_test = True
-    #if return_E_test:
-    #    return ray_p, rays[6], rays[7]
-
-    # ray_p [x, phi, y, theta], ray_J [E_x, E_y]
-    if return_E:
-        return ray_p, ray_J
-
-    return ray_p, None
+    return ray_p
 
 def dsdt(t, s, x, y, z, ne, omega, lengths, dims):
     # forces s to be a matrix even if has the indexes of a 1d array such that dsdt() can be generalised
@@ -248,10 +240,6 @@ def solve(s0, ScalarDomain, lwl, probing_depth, return_E = False, parallelise = 
     args = (x, y, z, ScalarDomain.ne, omega, ScalarDomain.lengths, ScalarDomain.dims)
     sol = jax.vmap(lambda s: ODE_solve(s, args))(s0.T)
 
-    finish = time()
-    duration = finish - start
+    print("Time to ray trace:", time() - start)
 
-    rf = sol.ys[:, -1, :].T
-    rf, _ = ray_to_Jonesvector(rf, probing_depth, probing_direction = ScalarDomain.probing_direction)
-
-    return rf
+    return ray_to_Jonesvector(sol.ys[:, -1, :].T, probing_depth, probing_direction = ScalarDomain.probing_direction)
