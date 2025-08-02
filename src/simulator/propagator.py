@@ -620,7 +620,7 @@ def solve(s0_import, ScalarDomain, dims, probing_depth, *, return_E = False, par
                 # At what time points you want to save the solution
                 saveat = SaveAt(ts = jnp.linspace(t0, t1, Nt))
                 # Diffrax uses adaptive time stepping to gain accuracy within certain tolerances
-                stepsize_controller = PIDController(rtol = rtol, atol = atol)
+                stepsize_controller = PIDController(rtol, atol)
 
                 return lambda s0, args : diffeqsolve(
                     term,
