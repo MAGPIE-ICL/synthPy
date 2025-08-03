@@ -6,7 +6,7 @@ import jax.numpy as jnp
 
 import fresnel_integral
 
-from propagator import ray_to_Jonesvector
+from propagator_MWE import ray_to_Jonesvector
 
 #jax.tree_util.tree_leaves(x, is_leaf = lambda x: x is None)
 
