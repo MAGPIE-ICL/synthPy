@@ -77,6 +77,7 @@ class Propagator:
     def dndr_test(self, r, x, y, z, dndx, dndy, dndz):
         grad = jnp.zeros_like(r)
 
+        '''
         grad = grad.at[0, :].set(
             self.trilinearInterpolator(
                 x, y, z,
@@ -108,6 +109,34 @@ class Propagator:
                 r.T,
                 fill_value = 0.0
             )
+        )
+        '''
+
+        val1 = self.trilinearInterpolator(
+            x, y, z,
+            self.ScalarDomain.lengths,
+            self.ScalarDomain.dims,
+            dndz,
+            r.T,
+            fill_value = 0.0
+        )
+
+        val2 = self.trilinearInterpolator(
+            x, y, z,
+            self.ScalarDomain.lengths,
+            self.ScalarDomain.dims,
+            dndy,
+            r.T,
+            fill_value = 0.0
+        )
+
+        val3 = self.trilinearInterpolator(
+            x, y, z,
+            self.ScalarDomain.lengths,
+            self.ScalarDomain.dims,
+            dndz,
+            r.T,
+            fill_value = 0.0
         )
 
         return grad
@@ -184,8 +213,8 @@ def dsdt(t, s, Propagator, parallelise, x, y, z, dndx, dndy, dndz):
 
     a = s[6, :]
 
-    sprime = sprime.at[3:6, :].set(Propagator.dndr(r))
-    #sprime = sprime.at[3:6, :].set(Propagator.dndr_test(r, x, y, z, dndx, dndy, dndz))
+    #sprime = sprime.at[3:6, :].set(Propagator.dndr(r))
+    sprime = sprime.at[3:6, :].set(Propagator.dndr_test(r, x, y, z, dndx, dndy, dndz))
     sprime = sprime.at[:3, :].set(v)
 
     return sprime.flatten()
