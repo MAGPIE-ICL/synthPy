@@ -167,7 +167,8 @@ class Propagator:
         args = (self, parallelise, x, y, z, dndx, dndy, dndz)
         sol = jax.vmap(lambda s: ODE_solve(s, args))(s0.T)
 
-        print("Time to ray trace:", time() - start)
+        self.duration = time() - start
+        print("Time to ray trace:", self.duration)
 
         return ray_to_Jonesvector(sol.ys[:, -1, :].T, self.extent, probing_direction = self.Beam.probing_direction)
 
