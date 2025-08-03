@@ -183,8 +183,8 @@ def dsdt(t, s, Propagator, parallelise, x, y, z, dndx, dndy, dndz):
 
     a = s[6, :]
 
-    #sprime = sprime.at[3:6, :].set(Propagator.dndr(r))
-    sprime = sprime.at[3:6, :].set(Propagator.dndr_test(r, x, y, z, dndx, dndy, dndz))
+    sprime = sprime.at[3:6, :].set(Propagator.dndr(r))
+    #sprime = sprime.at[3:6, :].set(Propagator.dndr_test(r, x, y, z, dndx, dndy, dndz))
     sprime = sprime.at[:3, :].set(v)
 
     return sprime.flatten()
@@ -193,56 +193,17 @@ def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction):
     Np = ode_sol.shape[1] # number of photons
 
     ray_p = np.zeros((4, Np))
-    ray_J = np.zeros((2, Np), dtype=complex)
 
     x, y, z, vx, vy, vz = ode_sol[0], ode_sol[1], ode_sol[2], ode_sol[3], ode_sol[4], ode_sol[5]
 
-    # Resolve distances and angles
-    # YZ plane
-    if(probing_direction == 'x'):
-        t_bp = (x - ne_extent) / vx
+    t_bp = (z - ne_extent) / vz
 
-        # Positions on plane
-        ray_p[0] = y - vy * t_bp
-        ray_p[2] = z - vz * t_bp
+    # Positions on plane
+    ray_p[0] = x - vx * t_bp
+    ray_p[2] = y - vy * t_bp
 
-        # Angles to plane
-        ray_p[1] = np.arctan(vy / vx)
-        ray_p[3] = np.arctan(vz / vx)
-    # XZ plane
-    elif(probing_direction == 'y'):
-        t_bp = (y - ne_extent) / vy
-
-        # Positions on plane
-        ray_p[0] = x - vx * t_bp
-        ray_p[2] = z - vz * t_bp
-
-        # Angles to plane
-        ray_p[1] = np.arctan(vx / vy)
-        ray_p[3] = np.arctan(vz / vy)
-    # XY plane
-    elif(probing_direction == 'z'):
-        t_bp = (z - ne_extent) / vz
-
-        # Positions on plane
-        ray_p[0] = x - vx * t_bp
-        ray_p[2] = y - vy * t_bp
-
-        # Angles to plane
-        ray_p[1] = np.arctan(vx / vz)
-        ray_p[3] = np.arctan(vy / vz)
-    else:
-        print("\nIncorrect probing direction. Use: x, y or z.")
-
-    # Resolve Jones vectors
-    amp,phase,pol = ode_sol[6], ode_sol[7], ode_sol[8]
-
-    # Assume initially polarised along y
-    E_x_init = np.zeros(Np)
-    E_y_init = np.ones(Np)
-
-    # Perform rotation for polarisation, multiplication for amplitude, and complex rotation for phase
-    ray_J[0] = amp*(np.cos(phase)+1.0j*np.sin(phase))*(np.cos(pol)*E_x_init-np.sin(pol)*E_y_init)
-    ray_J[1] = amp*(np.cos(phase)+1.0j*np.sin(phase))*(np.sin(pol)*E_x_init+np.cos(pol)*E_y_init)
+    # Angles to plane
+    ray_p[1] = np.arctan(vx / vz)
+    ray_p[3] = np.arctan(vy / vz)
 
     return ray_p
