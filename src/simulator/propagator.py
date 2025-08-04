@@ -233,18 +233,15 @@ def dndr(r, ne, omega, x, y, z, lengths, dims):
     grad = jnp.zeros_like(r.T)
 
     dndx = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), x, axis = 0)
-    #grad = grad.at[0, :].set(trilinearInterpolator(x, y, z, lengths, dims, dndx, r, fill_value = 0.0))
-    grad = grad.at[0, :].set(RegularGridInterpolator((x, y, z), dndx, r, fill_value = 0.0))
+    grad = grad.at[0, :].set(trilinearInterpolator(x, y, z, lengths, dims, dndx, r, fill_value = 0.0))
     del dndx
 
     dndy = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), y, axis = 1)
-    #grad = grad.at[1, :].set(trilinearInterpolator(x, y, z, lengths, dims, dndy, r, fill_value = 0.0))
-    grad = grad.at[0, :].set(RegularGridInterpolator((x, y, z), dndy, r, fill_value = 0.0))
+    grad = grad.at[1, :].set(trilinearInterpolator(x, y, z, lengths, dims, dndy, r, fill_value = 0.0))
     del dndy
 
     dndz = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), z, axis = 2)
-    #grad = grad.at[2, :].set(trilinearInterpolator(x, y, z, lengths, dims, dndz, r, fill_value = 0.0))
-    grad = grad.at[0, :].set(RegularGridInterpolator((x, y, z), dndz, r, fill_value = 0.0))
+    grad = grad.at[2, :].set(trilinearInterpolator(x, y, z, lengths, dims, dndz, r, fill_value = 0.0))
     del dndz
 
     return grad
