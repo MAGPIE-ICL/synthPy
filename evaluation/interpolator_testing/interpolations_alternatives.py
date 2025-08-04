@@ -138,6 +138,28 @@ from jax._src.tree_util import register_pytree_node
 from jax._src.numpy.util import check_arraylike, promote_dtypes_inexact
 
 def RegularGridInterpolator(points, values, xi, method="linear", bounds_error=False, fill_value=np.nan):
+    """
+    Interpolate coordinates on a regular rectangular grid.
+
+    JAX implementation of a custom trilinear interpolator to decrease memory overhead in our use case
+
+    Args:
+        coordinates: length-N sequence of arrays specifying the grid coordinates.
+        values: N-dimensional array specifying the grid values.
+        fill_value: value returned for coordinates outside the grid, defaults to NaN.
+
+    Returns:
+        results: interpolated value(s) instead of object to test.
+
+    Examples:
+        >>> coordinates = (jnp.array([1, 2, 3]), jnp.array([4, 5, 6]))
+        >>> values = jnp.array([[10, 20, 30], [40, 50, 60], [70, 80, 90]])
+        >>> query_points = jnp.array([[1.5, 4.5], [2.2, 5.8]])
+        >>> interpolated_values = trilinearInterpolator(coordinates, values, query_points)
+
+        Array([30., 64.], dtype=float32)
+    """
+
     if method != "linear":
         raise NotImplementedError("`method` has no effect, defaults to `linear` with no other options available")
 
