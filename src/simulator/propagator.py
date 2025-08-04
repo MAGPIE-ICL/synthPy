@@ -348,7 +348,7 @@ def back_propogate(rays, ne_extent, probing_direction):
 
     return rays
 
-def solve(s0_import, ScalarDomain, dims, probing_depth, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False, lwl = 1064e-9, keep_domain = False):
+def solve(s0_import, ScalarDomain, probing_depth, *, return_E = False, parallelise = True, jitted = True, save_steps = 2, memory_debug = False, lwl = 1064e-9, keep_domain = False):
     # Find Faraday rotation constant http://farside.ph.utexas.edu/teaching/em/lectures/node101.html
     VerdetConst = 0.0
     if (ScalarDomain.B_on):
@@ -536,7 +536,8 @@ def solve(s0_import, ScalarDomain, dims, probing_depth, *, return_E = False, par
             from diffrax import ODETerm, Tsit5, SaveAt, PIDController, diffeqsolve
             #import optax - diffrax uses as a dependency, don't need to import directly
 
-            def diffrax_solve(dydt, t0, t1, Nt, *, rtol = 1e-7, atol = 1e-9):
+            # using lengths and/or dims to set parameters of diffeqsolve(...) results in BooleanConversionError due to tracing variable resolution
+            def diffrax_solve(dydt, t0, t1, Nt, lengths, dims, *, rtol = 1e-7, atol = 1e-9):
                 """
                 Here we wrap the diffrax diffeqsolve function such that we can easily parallelise it
                 """
@@ -544,13 +545,16 @@ def solve(s0_import, ScalarDomain, dims, probing_depth, *, return_E = False, par
                 # We convert our python function to a diffrax ODETerm
                 # should use the function passed into the wrapper - not the local definition
                 term = ODETerm(dydt)
+
                 # We chose a solver (time-stepping) method from within diffrax library
                 solver = Tsit5() # (RK45 - closest I could find to solve_ivp's default method)
 
                 # At what time points you want to save the solution
                 saveat = SaveAt(ts = jnp.linspace(t0, t1, Nt))
+    
                 # Diffrax uses adaptive time stepping to gain accuracy within certain tolerances
-                stepsize_controller = PIDController(rtol = 1, atol = 1e-5)
+                #dtmax = 0.5 * ((lengths[0] * lengths[1] * lengths[2]) / (dims[0] * dims[1] * dims[2])) ** (1 / 3) / (c * norm_factor)
+                stepsize_controller = PIDController(rtol = 1, atol = 1e-5)#, dtmax = dtmax)
 
                 return lambda s0, args : diffeqsolve(
                     term,
@@ -559,7 +563,7 @@ def solve(s0_import, ScalarDomain, dims, probing_depth, *, return_E = False, par
                     args = args,
                     t0 = t0,
                     t1 = t1,
-                    dt0 = (t1 - t0) * norm_factor / Nt,
+                    dt0 = (t1 - t0) * norm_factor / Nt, # can set = 0 if dtmax is set apparently?
                     saveat = saveat,
                     stepsize_controller = stepsize_controller,
                     # set max steps to no. of cells x100
@@ -569,7 +573,7 @@ def solve(s0_import, ScalarDomain, dims, probing_depth, *, return_E = False, par
                 )
 
             # hardcode to normalise to 1 due to diffrax bug
-            ODE_solve = diffrax_solve(dsdt_ODE, t[0], t[-1] / norm_factor, save_steps)
+            ODE_solve = diffrax_solve(dsdt_ODE, t[0], t[-1] / norm_factor, save_steps, ScalarDomain.lengths, ScalarDomain.dims)
 
             if jitted:
                 start_comp = time()

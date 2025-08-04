@@ -1,6 +1,8 @@
 import numpy as np
 import jax.numpy as jnp
 
+import matplotlib.pyplot as plt
+
 from sys import getsizeof as getsizeof_default
 
 def random_array(length, seed = False):
@@ -14,6 +16,12 @@ def random_array_n(length, seed = False):
         np.random.seed(0)
 
     return np.random.randn(length)
+
+def random_inv_pow_array(power, length, seed = False):
+    if seed:
+        np.random.seed(0)
+
+    return np.random.power(power, length)
 
 def count_nans(matrix, axes = [0, 2]):
     for i in axes:
@@ -204,3 +212,36 @@ def RegularGridInterpolator(points, values, xi, method = "linear", bounds_error 
         result = where(out_of_bounds.reshape(bc_shp), fill_value, result)
 
     return result.reshape(xi_shape[:-1] + values.shape[ndim:])
+
+def baseRayPlot(x, y, *, scaling = 1, bin_scale = 1, pix_x = 3448, pix_y = 2574, Lx = 18, Ly = 13.5):
+    print("\nrf size expected: (", len(x), ", ", len(y), ")", sep='')
+
+    # means that jnp.isnan(a) returns True when a is not Nan
+    # ensures that x & y are the same length, if output of either is Nan then will not try to render ray in histogram
+    mask = ~jnp.isnan(x) & ~jnp.isnan(y)
+
+    x = x[mask]
+    y = y[mask]
+
+    print("rf after clearing nan's: (", len(x), ", ", len(y), ")", sep='')
+
+    H, xedges, yedges = jnp.histogram2d(x, y, bins=[pix_x // bin_scale, pix_y // bin_scale], range=[[-Lx / 2, Lx / 2],[-Ly / 2, Ly / 2]])
+    H = H.T
+
+    plt.imshow(H, cmap = 'hot', interpolation = 'nearest', clim = (0.5, 1))
+
+def heat_plot(x, y, *, bin_scale = 1, pix_x = 3448, pix_y = 2574, Lx = 18, Ly = 13.5):
+    #fig, axis = plt.subplots(1, figsize = (20,5))
+
+    H,_,_,im1 = plt.hist2d(x, y, bins = (pix_x, pix_y), cmap = "turbo")
+
+    #plt.imshow(H, cmap = 'turbo', interpolation = 'nearest', clim = (0, 10))
+    #im1.set_clim(0, 10)
+
+    plt.colorbar(im1)
+    plt.grid(False)
+
+    #axis.set_xlabel("x (mm)")
+    #axis.set_ylabel("z (mm)")
+    #axis.set_xlim([-9, 9])
+    #axis.set_ylim([-6.75, 6.75])
