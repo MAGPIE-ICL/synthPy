@@ -70,7 +70,7 @@ class flags:
         for i, (k, v) in enumerate(self.value_holders):
             self.value_holders[k].value = self.value_holders[k].default
 
-def jax_init(force_device = None, core_limit = None, extra_info = False, disable_python_multithreading = True, enable_x64 = True, debugging = False):
+def jax_init(force_device = None, core_limit = None, extra_info = False, disable_python_multithreading = True, enable_x64 = False, debugging = False):
     import sys
     import os
 
@@ -127,6 +127,7 @@ def jax_init(force_device = None, core_limit = None, extra_info = False, disable
     # enables float data types to use 64-bit instead of 32 for greater precision
     # currently disabled by default as greater precision will vastly increase run times
     if enable_x64:
+        print("\nWARNING: x64 bit currently disabled by default as greater precision will vastly increase run times")
         jax.config.update('jax_enable_x64', True)
 
     # HPC doesn't recognise this config option

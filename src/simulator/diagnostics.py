@@ -1,13 +1,14 @@
-#import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-#import jax
+
+#import numpy as np
 import jax.numpy as jnp
 
 import fresnel_integral
 
 from propagator import ray_to_Jonesvector
 
+#import jax
 #jax.tree_util.tree_leaves(x, is_leaf = lambda x: x is None)
 
 """

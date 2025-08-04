@@ -190,6 +190,7 @@ class ScalarDomain(eqx.Module):
             estimate_limit = predicted_domain_allocation * allocation_count * self.leeway_factor
             print("Est. memory limit: {} --> inc. +{}% variance margin.".format(mem_conversion(estimate_limit), jnp.int64((self.leeway_factor - 1) * 100)))
 
+            # when jnp.float32 is not used, will cause overflow error if 64 bit floats are not enabled
             if jnp.float32(estimate_limit) > jnp.float32(free_mem):
                 print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
                 print("--> Auto-batching domain based on memory available and domain size estimate...")
@@ -306,6 +307,7 @@ class ScalarDomain(eqx.Module):
         else:
             assert auto_batching == True, colour.BOLD + "\nne_type must be passed to domain creation in order to utilise auto-batching." + colour.END
 
+            # can't initialise yourself as equinox.Module inherited class is not mutable and self.ne is set during creation -- FIX!
             print("\nWARNING: Electron density profile to generate not passed. You will need to initialise this yourself with a call to this library.")
             print("If you run low on memory, you can enforce a manual domain cleanup with a call to ScalarDomain.cleanup()")
 
