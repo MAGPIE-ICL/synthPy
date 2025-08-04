@@ -14,4 +14,5 @@ echo 'packages loaded successfully'
 
 echo 'starting job'
 
-python -u examples/jobs/run_scripts/solver_comparisons.py
+#mkdir -p /rds/general/user/sm5625/home/solver_comparisons;
+python -u examples/jobs/run_scripts/solver_comparisons.py #&> "solver_comparisons/solver_comparisons-$(date +"%Y-%m-%d_%I:%M_%p").output"

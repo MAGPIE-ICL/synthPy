@@ -14,6 +14,9 @@ from vtk.util import numpy_support as vtk_np
 
 sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/simulator')
 
+import config
+config.jax_init()
+
 # cwd is set to synthPy acc. to hpc
 
 import beam as beam_initialiser
@@ -65,12 +68,13 @@ beam_type = 'circular'
 
 parameters = np.array([
     [128, 256, 512, 1024],
-    [1, 100, 1e6, 1e7]
+    [10, 1e4, 1e6, 1e7]
 ], dtype = np.int64)
 
 count = 0
 for i in parameters[0, :]:
-    print("\n\n\n", count += 1, "th trial:\n")#
+    count += 1
+    print("\n\n\n", count, "th trial:\n")#
 
     x = np.linspace(-extent_x, extent_x, i)
     y = np.linspace(-extent_y, extent_y, i)
@@ -91,21 +95,12 @@ for i in parameters[0, :]:
 
         beam = beam_initialiser.Beam(j, beam_size, divergence, ne_extent, probing_direction = probing_direction, wavelength = lwl, beam_type = beam_type)
 
-        snapshot = tracemalloc.take_snapshot()
-        display_top(snapshot)
-
-        tracer = p.Propagator(domain, beam.s0, probing_direction = probing_direction, inv_brems = False, phaseshift = False)
-
-        snapshot = tracemalloc.take_snapshot()
-        display_top(snapshot)
+        tracer = p.Propagator(domain, probing_direction = probing_direction, inv_brems = False, phaseshift = False)
 
         tracer.calc_dndr(lwl)
 
-        snapshot = tracemalloc.take_snapshot()
-        display_top(snapshot)
-
         try:
-            final_rays = tracer.solve(parallelise = True, jitted = True)
+            final_rays = tracer.solve(beam.s0, jitted = True)
 
             print("\nCompleted ray trace in", np.round(tracer.duration, 3), "seconds.")
 
