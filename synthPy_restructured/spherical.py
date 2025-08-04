@@ -13,7 +13,7 @@ from SpK_reader import open_emi_files
 def distance(x,y,z):
     return np.sqrt(x**2 + y**2 + z**2)
 
-def spherical_2(domain, radii, ne, rho):
+def spherical(domain, radii, ne, rho):
     radii = (0,) + radii
     domain.spherical = True
     domain.num_layers = len(ne)

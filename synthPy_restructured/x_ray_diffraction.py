@@ -89,6 +89,11 @@ def propagate(Propagator, jones_vector, amplitudes, phases, z, pad_factor = 2):
     # phases_interp = LND((x_positions, y_positions), phases, fill_value = 0.0)
     # amplitudes_interp = LND((x_positions, y_positions), amplitudes, fill_value = 0.0)
 
+    # XX, YY = np.meshgrid(Propagator.ScalarDomain.x, Propagator.ScalarDomain.y)
+    # phase_grid = phases_interp((XX, YY))
+    # amplitude_grid = amplitudes_interp((XX, YY))
+    
+    # U_0 = amplitude_grid * np.exp(-1j  * phase_grid)
     x_bins = Propagator.ScalarDomain.x
     y_bins = Propagator.ScalarDomain.y
 
@@ -100,16 +105,9 @@ def propagate(Propagator, jones_vector, amplitudes, phases, z, pad_factor = 2):
     for i in range(0, len(x_positions)):
         if x_indices[i] < field_grid.shape[0] and y_indices[i] < field_grid.shape[1]:
             field_grid[y_indices[i], x_indices[i]] += amplitudes[i] * np.exp(-1j * phases[i])
-        
+    U_0 = field_grid   
 
-
-
-    XX, YY = np.meshgrid(Propagator.ScalarDomain.x, Propagator.ScalarDomain.y)
-    # phase_grid = phases_interp((XX, YY))
-    # amplitude_grid = amplitudes_interp((XX, YY))
     # U_0 = np.exp(-1j * k * (phase_slice - 1j * attenuation_slice))
-    # U_0 = amplitude_grid * np.exp(-1j  * phase_grid)
-    U_0 = field_grid
     U_0_prepared = prepare_field_for_propagation(U_0, pad_factor = pad_factor)
     
     # Pass the dynamically calculated FWHM to the propagation function

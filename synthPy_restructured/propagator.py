@@ -6,7 +6,7 @@ import jax.numpy as jnp
 import jax
 import sys
 import os
-import spherical
+import spherical_v2
 
 sys.path.append('../../utils')
 jax.config.update("jax_enable_x64", True)
@@ -147,7 +147,7 @@ class Propagator:
             self.kappa_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.kappa(), bounds_error = False, fill_value = 0.0)
         
         #Opacity, Temperature, and Mass Density
-        if(self.x_ray):
+        if(self.x_ray & (self.ScalarDomain.spherical is not True)):
             grp_centres, grps, rho, Te, opa_data = open_emi_files("../../opa_multi_planck_CH_LTE_210506_Hydra_ColdOpa.spk")
             opa_max=self.ScalarDomain.x_n/(self.ScalarDomain.x_length)
             opa_data_capped=np.minimum(opa_max, opa_data)
@@ -190,7 +190,7 @@ class Propagator:
     def atten_x_ray(self, x):
         if(self.x_ray):
             if self.ScalarDomain.spherical is True:
-                coeff = spherical.spherical_atten(self, x)
+                coeff = spherical_v2.spherical_atten(self, x)
                 return coeff
             else:   
                 # rho = self.rho_interp(x.T)
