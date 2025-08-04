@@ -190,7 +190,7 @@ class ScalarDomain(eqx.Module):
             estimate_limit = predicted_domain_allocation * allocation_count * self.leeway_factor
             print("Est. memory limit: {} --> inc. +{}% variance margin.".format(mem_conversion(estimate_limit), jnp.int64((self.leeway_factor - 1) * 100)))
 
-            if estimate_limit > free_mem:
+            if jnp.float32(estimate_limit) > jnp.float32(free_mem):
                 print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
                 print("--> Auto-batching domain based on memory available and domain size estimate...")
 

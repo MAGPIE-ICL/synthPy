@@ -124,7 +124,7 @@ def jax_init(force_device = None, core_limit = None, extra_info = False, python_
     import jax
 
     # defaults float data types to 64-bit instead of 32 for greater precision
-    jax.config.update('jax_enable_x64', True)
+    #jax.config.update('jax_enable_x64', True)
     # HPC doesn't recognise this config option
     #jax.config.update('jax_captured_constants_report_frames', -1)
     #jax.config.update('jax_captured_constants_warn_bytes', 128 * 1024 ** 2)
