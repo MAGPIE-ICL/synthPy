@@ -17,4 +17,8 @@ evaluation/interferometry_testing/.ipynb_checkpoints
 
 examples/jobs/run_scripts/.ipynb_checkpoints
 
+# can't just do .../error_reading as that ignores the whole directory not just the files within - ! can't override that
+evaluation/error_reading/*
+!evaluation/error_reading/error_parser.py
+
 **/__pycache__/
