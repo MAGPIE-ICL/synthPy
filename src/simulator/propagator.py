@@ -690,7 +690,7 @@ def solve(s0_import, ScalarDomain, probing_depth, *, return_E = False, paralleli
         #rf = sol.ys[:, -1, :].reshape(9, Np)# / scalar
         rf = sol.ys[:, -1, :].T
 
-        print("\n\nParallelised output has resulting 3D matrix of form: [batch_count, 2, 9]:", sol.ys.shape)
+        print("\nParallelised output has resulting 3D matrix of form: [batch_count, 2, 9]:", sol.ys.shape)
         print(" - 2 to account for the start and end results")
         print(" - 9 containing the 3 position and velocity components, amplitude, phase and polarisation")
         print(" - If batch_count is lower than expected, this is likely due to jax's forced integer batch sharding requirement over cpu cores.")

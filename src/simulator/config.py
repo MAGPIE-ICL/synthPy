@@ -78,7 +78,7 @@ def jax_init(force_device = None, core_limit = None, extra_info = False, disable
     print(colour.BOLD)
 
     if disable_python_multithreading:
-        print("\nDisabling python multi-threading...")
+        print("Disabling python multi-threading...\n")
 
         thread_count = str(1)
         os.environ["OMP_NUM_THREADS"]        = thread_count
@@ -89,7 +89,7 @@ def jax_init(force_device = None, core_limit = None, extra_info = False, disable
 
     from multiprocessing import cpu_count
 
-    print("\nInitialising jax...")
+    print("Initialising jax...")
 
     ### THIS NEEDS TO BE SET BEFORE JAX IS INITIALISED IN ANY WAY, INCLUDING IMPORTING
     # - XLA_FLAGS are read WHEN jax is IMPORTED
@@ -145,9 +145,10 @@ def jax_init(force_device = None, core_limit = None, extra_info = False, disable
 
     if extra_info:
         jax.print_environment_info()
+        print("\n")
 
     # look further into what this actually means...
-    print("\nDefault jax backend:", jax.default_backend())
+    print("Default jax backend:", jax.default_backend())
 
     available_devices = jax.devices()
     print(f"Available devices: {available_devices}")

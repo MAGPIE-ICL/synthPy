@@ -22,17 +22,17 @@ class ScalarDomain(eqx.Module):
 
     ne_type: str
 
-    leeway_factor: jnp.float64
+    leeway_factor: jnp.float32
 
-    x_length: jnp.int64
-    y_length: jnp.int64
-    z_length: jnp.int64
+    x_length: jnp.int32
+    y_length: jnp.int32
+    z_length: jnp.int32
 
     lengths: jax.Array
 
-    x_n: jnp.int64
-    y_n: jnp.int64
-    z_n: jnp.int64
+    x_n: jnp.int32
+    y_n: jnp.int32
+    z_n: jnp.int32
 
     dims: jax.Array
 
@@ -52,7 +52,7 @@ class ScalarDomain(eqx.Module):
     Te: jax.Array
     Z: jax.Array
 
-    region_count: jnp.int64
+    region_count: jnp.int32
 
     coord_backup: jax.Array
     future_dims: jax.Array
@@ -99,7 +99,7 @@ class ScalarDomain(eqx.Module):
 
         self.debug = debug
 
-        valid_types = (int, float, jnp.int64)
+        valid_types = (int, float, jnp.int32)
 
         ##
         ## NOT FORCING THESE CONVERSIONS MAY CAUSE ISSUES WITH EQUINOX CLASS LATER DOWN THE LINE DEPENDING ON USER INPUT
@@ -188,7 +188,7 @@ class ScalarDomain(eqx.Module):
                 allocation_count += 1
 
             estimate_limit = predicted_domain_allocation * allocation_count * self.leeway_factor
-            print("Est. memory limit: {} --> inc. +{}% variance margin.".format(mem_conversion(estimate_limit), jnp.int64((self.leeway_factor - 1) * 100)))
+            print("Est. memory limit: {} --> inc. +{}% variance margin.".format(mem_conversion(estimate_limit), jnp.int32((self.leeway_factor - 1) * 100)))
 
             # when jnp.float32 is not used, will cause overflow error if 64 bit floats are not enabled
             if jnp.float32(estimate_limit) > jnp.float32(free_mem):
@@ -281,7 +281,7 @@ class ScalarDomain(eqx.Module):
         print("\nCoordinates have shape of ({}, {}, {})".format(len(self.x), len(self.y), len(self.z)), end = " --> ")
 
         if self.x.shape == self.y.shape and self.y.shape == self.z.shape and self.z.shape == self.x.shape:
-            self.coordinates = jnp.stack([self.x, self.y, self.z], axis = 1)
+            self.coordinates = jnp.stack([self.x, self.y, self.z], axis = 1, dtype = jnp.float32)
 
             print("no padding required.")
         else:
@@ -337,13 +337,11 @@ class ScalarDomain(eqx.Module):
                 arr = arr.at[i].set(jnp.round(arr[i], round_to))
             '''
 
-            print("\n --> x, y, z (s,e): [{}, {}], [{}, {}], [{}, {}]".format(
-                round_to_n(self.x[0], aim),
-                round_to_n(self.x[-1], aim),
-                round_to_n(self.y[0], aim),
-                round_to_n(self.y[-1], aim),
-                round_to_n(self.z[0], aim),
-                round_to_n(self.z[-1], aim)))
+            print(f"\n --> x, y, z (s,e):",
+                " [", round_to_n(self.x[0], aim), ", ", round_to_n(self.x[-1], aim), "],",
+                " [", round_to_n(self.y[0], aim), ", ", round_to_n(self.y[-1], aim), "],",
+                " [", round_to_n(self.z[0], aim), ", ", round_to_n(self.z[-1], aim), "]",
+            sep = "")
             print(" --> their len's: {}, {}, {}".format(len(self.x), len(self.y), len(self.z)))
 
             if self.region_count != 1 and auto_batching:
@@ -442,17 +440,15 @@ class ScalarDomain(eqx.Module):
         self.YY = self.YY.at[:, :].set(jnp.pi * self.YY)
         self.YY = self.YY.at[:, :].set(2 * self.YY)
         self.YY = self.YY.at[:, :].set(jnp.cos(self.YY))
-        self.YY = self.YY.at[:, :].set(1 + self.YY) # any difference if float or not? shouldn't be.
+        self.YY = self.YY.at[:, :].set(1 + self.YY)
 
-        # jnp.float64(), both here and on final assignment
-        # should be float32 surely?
-        # is it needed at all?
+        # any difference if float32 (or even 64 if changed later) or not? shouldn't be.
         self.ne = self.XX * self.YY
         self.cleanup()
 
         self.ne = self.ne.at[:, :].set(ne_0 * self.ne)
 
-        #self.ne = jnp.float64(ne_0 * 10 ** (self.XX / s) * (1 + jnp.cos(2 * jnp.pi * self.YY / Ly)))
+        #self.ne = jnp.float32(ne_0 * 10 ** (self.XX / s) * (1 + jnp.cos(2 * jnp.pi * self.YY / Ly)))
 
     def external_ne(self, ne):
         """
