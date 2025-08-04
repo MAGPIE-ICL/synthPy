@@ -70,14 +70,14 @@ class flags:
         for i, (k, v) in enumerate(self.value_holders):
             self.value_holders[k].value = self.value_holders[k].default
 
-def jax_init(force_device = None, core_limit = None, extra_info = False, python_multithreading = True):
+def jax_init(force_device = None, core_limit = None, extra_info = False, disable_python_multithreading = True, enable_x64 = True, debugging = False):
     import sys
     import os
 
-    #from utils import colour
-    print("\033[1m")
+    from printing import colour
+    print(colour.BOLD)
 
-    if not python_multithreading:
+    if disable_python_multithreading:
         print("\nDisabling python multi-threading...")
 
         thread_count = str(1)
@@ -110,7 +110,8 @@ def jax_init(force_device = None, core_limit = None, extra_info = False, python_
 
     # triggers a jax breakpoint for debugging on error - works with filter_jit not jax.jit
     # if this is causing erroneous errors see equinox issue #1047: https://github.com/patrick-kidger/equinox/issues/1047
-    #os.environ["EQX_ON_ERROR"] = "breakpoint"
+    if debugging:
+        os.environ["EQX_ON_ERROR"] = "breakpoint"
 
     if force_device == "cpu":
         os.environ['JAX_PLATFORM_NAME'] = 'cpu'
@@ -123,8 +124,11 @@ def jax_init(force_device = None, core_limit = None, extra_info = False, python_
 
     import jax
 
-    # defaults float data types to 64-bit instead of 32 for greater precision
-    #jax.config.update('jax_enable_x64', True)
+    # enables float data types to use 64-bit instead of 32 for greater precision
+    # currently disabled by default as greater precision will vastly increase run times
+    if enable_x64:
+        jax.config.update('jax_enable_x64', True)
+
     # HPC doesn't recognise this config option
     #jax.config.update('jax_captured_constants_report_frames', -1)
     #jax.config.update('jax_captured_constants_warn_bytes', 128 * 1024 ** 2)
@@ -136,7 +140,7 @@ def jax_init(force_device = None, core_limit = None, extra_info = False, python_
 
     #jax.config.update('jax_compiler_enable_remat_pass', False)
 
-    print("\033[0m")
+    print(colour.END)
 
     if extra_info:
         jax.print_environment_info()

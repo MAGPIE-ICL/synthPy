@@ -14,39 +14,12 @@ from scipy.constants import e
 from utils import getsizeof
 #from utils import trilinearInterpolator
 from utils import mem_conversion
-from utils import colour
+from printing import colour
 from utils import add_integer_postfix
 
 # is overhead better using jnp.clip or a vectorised(?) if statement?
 # if we can sort out my original solution to this - clip would not be necessary at all
 # can we speed this up even further?
-
-'''
-@jax.jit
-def trilinearInterpolator(x, y, z, lengths, dims, values, query_points, *, fill_value = jnp.nan):
-    idr = jnp.clip(
-        jnp.floor(
-            ((query_points / jnp.asarray(lengths)) + 0.5) * (jnp.asarray(dims) - 1)
-        ).astype(jnp.int32),
-        0, jnp.asarray(dims) - 2
-    )
-
-    wx = (query_points[:, 0] - x[idr[:, 0]]) / (x[idr[:, 0] + 1] - x[idr[:, 0]])
-    wy = (query_points[:, 1] - y[idr[:, 1]]) / (y[idr[:, 1] + 1] - y[idr[:, 1]])
-    wz = (query_points[:, 2] - z[idr[:, 2]]) / (z[idr[:, 2] + 1] - z[idr[:, 2]])
-
-    #return jax.vmap(trilinear)(jax.vmap(get_cube, in_axes=(0, None))(idr, values), wx, wy, wz)
-    return (
-        values[idr[:, 0], idr[:, 1], idr[:, 2]] * (1 - wx) * (1 - wy) * (1 - wz) +
-        values[idr[:, 0], idr[:, 1], idr[:, 2] + 1] * (1 - wx) * (1 - wy) * wz       +
-        values[idr[:, 0], idr[:, 1] + 1, idr[:, 2]] * (1 - wx) * wy       * (1 - wz) +
-        values[idr[:, 0], idr[:, 1] + 1, idr[:, 2] + 1] * (1 - wx) * wy       * wz       +
-        values[idr[:, 0] + 1, idr[:, 1], idr[:, 2]] * wx       * (1 - wy) * (1 - wz) +
-        values[idr[:, 0] + 1, idr[:, 1], idr[:, 2] + 1] * wx       * (1 - wy) * wz       +
-        values[idr[:, 0] + 1, idr[:, 1] + 1, idr[:, 2]] * wx       * wy       * (1 - wz) +
-        values[idr[:, 0] + 1, idr[:, 1] + 1, idr[:, 2] + 1] * wx       * wy       * wz
-    )
-'''
 
 from itertools import product
 
@@ -58,29 +31,7 @@ from jax._src.numpy import (asarray, broadcast_arrays,
 from jax._src.tree_util import register_pytree_node
 from jax._src.numpy.util import check_arraylike, promote_dtypes_inexact
 
-def RegularGridInterpolator(points, values, xi, method="linear", bounds_error=False, fill_value=np.nan):
-    """
-    Interpolate coordinates on a regular rectangular grid.
-
-    JAX implementation of a custom trilinear interpolator to decrease memory overhead in our use case
-
-    Args:
-        coordinates: length-N sequence of arrays specifying the grid coordinates.
-        values: N-dimensional array specifying the grid values.
-        fill_value: value returned for coordinates outside the grid, defaults to NaN.
-
-    Returns:
-        results: interpolated value(s) instead of object to test.
-
-    Examples:
-        >>> coordinates = (jnp.array([1, 2, 3]), jnp.array([4, 5, 6]))
-        >>> values = jnp.array([[10, 20, 30], [40, 50, 60], [70, 80, 90]])
-        >>> query_points = jnp.array([[1.5, 4.5], [2.2, 5.8]])
-        >>> interpolated_values = trilinearInterpolator(coordinates, values, query_points)
-
-        Array([30., 64.], dtype=float32)
-    """
-
+def RegularGridInterpolator(points, values, xi, method = "linear", bounds_error = False, fill_value = 0.0):
     if method != "linear":
         raise NotImplementedError("`method` has no effect, defaults to `linear` with no other options available")
 
@@ -219,7 +170,7 @@ def kappa(ne, Te, Z, omega):
 def n_refrac(ne, omega):
     return jnp.sqrt(1.0 - (omega_pe(ne * 1e-6) / omega) ** 2)
 
-def dndr(r, ne, omega, x, y, z, lengths, dims):
+def dndr(r, ne, omega, x, y, z):
     """
     Returns the gradient at the locations r
 
@@ -233,15 +184,15 @@ def dndr(r, ne, omega, x, y, z, lengths, dims):
     grad = jnp.zeros_like(r.T)
 
     dndx = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), x, axis = 0)
-    grad = grad.at[0, :].set(trilinearInterpolator(x, y, z, lengths, dims, dndx, r, fill_value = 0.0))
+    grad = grad.at[0, :].set(RegularGridInterpolator((x, y, z), dndx, r, fill_value = 0.0))
     del dndx
 
     dndy = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), y, axis = 1)
-    grad = grad.at[1, :].set(trilinearInterpolator(x, y, z, lengths, dims, dndy, r, fill_value = 0.0))
+    grad = grad.at[1, :].set(RegularGridInterpolator((x, y, z), dndy, r, fill_value = 0.0))
     del dndy
 
     dndz = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), z, axis = 2)
-    grad = grad.at[2, :].set(trilinearInterpolator(x, y, z, lengths, dims, dndz, r, fill_value = 0.0))
+    grad = grad.at[2, :].set(RegularGridInterpolator((x, y, z), dndz, r, fill_value = 0.0))
     del dndz
 
     return grad
@@ -286,14 +237,14 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
 
     # must unpack x, y, z tuple here for the sake of dndr, could be earlier but this is easier to pass and more generalised
     # r must be transposed within dndr(...) else we get an AbstractTerm error due to the effect on the return value
-    sprime = sprime.at[3:6, :].set(dndr(r, ne, omega, x, y, z, lengths, dims))
+    sprime = sprime.at[3:6, :].set(dndr(r, ne, omega, x, y, z))
     sprime = sprime.at[:3, :].set(v)
 
     # Attenuation due to inverse bremsstrahlung
     if inv_brems:
-        sprime = sprime.at[6, :].set(trilinearInterpolator(x, y, z, kappa(ne, Te, Z, omega), r) * amp)
+        sprime = sprime.at[6, :].set(RegularGridInterpolator(x, y, z, kappa(ne, Te, Z, omega), r) * amp)
     if phaseshift:
-        sprime = sprime.at[7, :].set(omega * (trilinearInterpolator(x, y, z, n_refrac(ne, omega), r) - 1.0))
+        sprime = sprime.at[7, :].set(omega * (RegularGridInterpolator(x, y, z, n_refrac(ne, omega), r) - 1.0))
     if B_on:
         """
         Returns the VerdetConst ne B.v
@@ -306,14 +257,14 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
             N float: N values of ne B.v
         """
 
-        ne_N = trilinearInterpolator(x, y, z, ne, r)
+        ne_N = RegularGridInterpolator(x, y, z, ne, r)
 
         Bv_N = jnp.sum(
             jnp.array(
                 [
-                    trilinearInterpolator(x, y, z, B[:, :, :, 0], r),
-                    trilinearInterpolator(x, y, z, B[:, :, :, 1], r),
-                    trilinearInterpolator(x, y, z, B[:, :, :, 2], r)
+                    RegularGridInterpolator(x, y, z, B[:, :, :, 0], r),
+                    RegularGridInterpolator(x, y, z, B[:, :, :, 1], r),
+                    RegularGridInterpolator(x, y, z, B[:, :, :, 2], r)
                 ]
             ) * v, axis = 0
         )
@@ -705,7 +656,7 @@ def solve(s0_import, ScalarDomain, dims, probing_depth, *, return_E = False, par
                 # At what time points you want to save the solution
                 saveat = SaveAt(ts = jnp.linspace(t0, t1, Nt))
                 # Diffrax uses adaptive time stepping to gain accuracy within certain tolerances
-                stepsize_controller = PIDController(rtol, atol)
+                stepsize_controller = PIDController(rtol = 1, atol = 1e-5)
 
                 return lambda s0, args : diffeqsolve(
                     term,

@@ -4,7 +4,7 @@ import jax
 import equinox as eqx
 
 from utils import mem_conversion
-from utils import colour
+from printing import colour
 from utils import dalloc
 from utils import domain_estimate
 
