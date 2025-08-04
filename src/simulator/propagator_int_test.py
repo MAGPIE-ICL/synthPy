@@ -5,13 +5,20 @@ import matplotlib.pyplot as plt
 import jax.numpy as jnp
 import jax
 
+import sys
+sys.path.insert(0, '/home/administrator/Work/UROP_ICL_Internship/synthPy/evaluation/interpolator_testing')
+
 #from scipy.interpolate import RegularGridInterpolator
 from scipy.integrate import odeint, solve_ivp
 from time import time
 from jax.scipy.interpolate import RegularGridInterpolator
+#from interpolations_alternatives import RegularGridInterpolator
 from equinox import filter_jit
 
 from scipy.constants import c
+
+#from interpolations_alternatives import trilinearInterpolator as trilinearInterpolatorScipyAlt
+from interpolations_alternatives import RegularGridInterpolator as trilinearInterpolatorScipyAlt
 
 class Propagator:
     def __init__(self, ScalarDomain, Beam, inv_brems = False, phaseshift = False):
@@ -77,7 +84,6 @@ class Propagator:
     def dndr_test(self, r, x, y, z, dndx, dndy, dndz):
         grad = jnp.zeros_like(r)
 
-        '''
         grad = grad.at[0, :].set(
             self.trilinearInterpolator(
                 x, y, z,
@@ -110,33 +116,39 @@ class Propagator:
                 fill_value = 0.0
             )
         )
-        '''
 
-        val1 = self.trilinearInterpolator(
-            x, y, z,
-            self.ScalarDomain.lengths,
-            self.ScalarDomain.dims,
-            dndz,
-            r.T,
-            fill_value = 0.0
+        return grad
+
+    def dndr_scipy_alt(self, r, x, y, z, dndx, dndy, dndz):
+        grad = jnp.zeros_like(r)
+
+        coords = jnp.array([x, y, z])
+
+        grad = grad.at[0, :].set(
+            trilinearInterpolatorScipyAlt(
+                coords,
+                dndx,
+                r.T,
+                fill_value = 0.0
+            )
         )
 
-        val2 = self.trilinearInterpolator(
-            x, y, z,
-            self.ScalarDomain.lengths,
-            self.ScalarDomain.dims,
-            dndy,
-            r.T,
-            fill_value = 0.0
+        grad = grad.at[1, :].set(
+            trilinearInterpolatorScipyAlt(
+                coords,
+                dndy,
+                r.T,
+                fill_value = 0.0
+            )
         )
 
-        val3 = self.trilinearInterpolator(
-            x, y, z,
-            self.ScalarDomain.lengths,
-            self.ScalarDomain.dims,
-            dndz,
-            r.T,
-            fill_value = 0.0
+        grad = grad.at[2, :].set(
+            trilinearInterpolatorScipyAlt(
+                coords,
+                dndz,
+                r.T,
+                fill_value = 0.0
+            )
         )
 
         return grad
@@ -214,7 +226,8 @@ def dsdt(t, s, Propagator, parallelise, x, y, z, dndx, dndy, dndz):
     a = s[6, :]
 
     #sprime = sprime.at[3:6, :].set(Propagator.dndr(r))
-    sprime = sprime.at[3:6, :].set(Propagator.dndr_test(r, x, y, z, dndx, dndy, dndz))
+    #sprime = sprime.at[3:6, :].set(Propagator.dndr_test(r, x, y, z, dndx, dndy, dndz))
+    sprime = sprime.at[3:6, :].set(Propagator.dndr_scipy_alt(r, x, y, z, dndx, dndy, dndz))
     sprime = sprime.at[:3, :].set(v)
 
     return sprime.flatten()
