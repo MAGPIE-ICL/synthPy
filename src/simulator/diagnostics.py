@@ -273,7 +273,7 @@ class Diagnostic:
     """
 
     # this is in mm's not metres - self.rf is converted to mm's (not sure if everything else is covered though)
-    def __init__(self, wavelength, rf, Jf = None, *, focal_plane = 0, L = 400, R = 25, Lx = 18, Ly = 13.5, x = None, y = None, x_l = None, y_l = None, amp = None, phase = None):
+    def __init__(self, wavelength, rf, Jf = None, *, focal_plane = 0, L = 400, R = 25, Lx = 18, Ly = 13.5, x = None, y = None, x_l = None, y_l = None, amp = None, phase = None, l_x = 0, u_x = 0.3, l_y = -5, u_y = 5):
         """
         Initialise ray diagnostic.
 
@@ -290,6 +290,24 @@ class Diagnostic:
 
         self.x, self.y, self.x_l, self.y_l = x, y, x_l, y_l
         self.amp, self.phase = amp, phase
+
+        ##
+        ## Masks the Jonesvector resulting array to avoid plotting any values outside of our set limits
+        ## - important as even if you set limits for the histogram to "zoom in", binning is based on raw data
+        ## --> leading to low resolutions if this is not used
+        ##
+
+        x_theta = rf[1]
+        y_theta = rf[3]
+
+        mask = (x_theta >= l_x) & (x_theta <= u_x) & (y_theta >= l_y) & (x_theta <= u_y)
+
+        del x_theta
+        del y_theta
+
+        rf = rf[mask]
+
+        del mask
 
         # these HAVE to stay... for some reason - not entirely sure why you can't just reference self.Beam.r_ directly (or now just rf)
         # if you can make it without the memory duplication work please do, else DON'T REMOVE!

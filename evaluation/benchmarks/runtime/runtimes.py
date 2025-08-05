@@ -22,8 +22,12 @@ cores = None
 if args.cores is not None:
     cores = args.cores
 
-sys.path.insert(0, '../../../src/simulator')
-sys.path.insert(0, '../../../src/solvers-legacy')
+#sys.path.insert(0, '../../../src/simulator')
+#sys.path.insert(0, '../../../src/solvers-legacy')
+
+# attempts to fix path issues - need to find a resolution to the problem of relative paths on the HPC
+sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/simulator')
+sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/solvers-legacy')
 
 import config
 config.jax_init(core_limit = cores)
