@@ -23,18 +23,24 @@ def random_inv_pow_array(power, length, seed = False):
 
     return np.random.power(power, length)
 
-def count_nans(matrix, axes = [0, 2]):
-    for i in axes:
-        x = r2[0, :]
-        y = r2[2, :]
+def count_nans(matrix, *, axes = [0, 2], ret = False):
+    dim = len(axes)
+    stats = np.zeros(dim, 2)
 
-        print("\nrf size expected: (", len(x), ", ", len(y), ")", sep='')
-        mask = ~jnp.isnan(x) & ~jnp.isnan(y)
+    mask = True
+    for i in range(dim)):
+        arr = matrix[i]
+        mask = mask & ~jnp.isnan(arr)
 
-        x = x[mask]
-        y = y[mask]
+    for i in range(dim):
+        stats[i][0] = len(matrix[i])
+        stats[i][1] = len(matrix[i][mask])
 
-        print("rf after clearing nan's: (", len(x), ", ", len(y), ")", sep='')
+    print("\nrf size expected:", stats[:, 0])
+    print("rf after clearing nan's:", stats[:, 1])
+
+    if ret:
+        return matrix[:, mask]
 
 def getsizeof(object):
     return mem_conversion(getsizeof_default(object))

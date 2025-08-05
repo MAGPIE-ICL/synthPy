@@ -1,5 +1,5 @@
 #!/bin/sh
-#PBS -l walltime=7:59:00
+#PBS -l walltime=23:59:00
 #PBS -l select=1:ncpus=8:mem=16gb:ngpus=1:gpu_type=RTX6000
 #PBS -j oe
 

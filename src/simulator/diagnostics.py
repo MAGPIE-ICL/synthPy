@@ -7,6 +7,7 @@ import jax.numpy as jnp
 import fresnel_integral
 
 from propagator import ray_to_Jonesvector
+from utils import count_nans
 
 #import jax
 #jax.tree_util.tree_leaves(x, is_leaf = lambda x: x is None)
@@ -331,6 +332,7 @@ class Diagnostic:
             pix_y (int, optional): number of y pixels in detector plane. Defaults to 2574.
         """
 
+        '''
         x = self.rf[0, :]
         y = self.rf[2, :]
 
@@ -344,6 +346,9 @@ class Diagnostic:
         y = y[mask]
 
         print("rf after clearing nan's: (", len(x), ", ", len(y), ")", sep='')
+        '''
+
+        x, y = count_nans(rf)
 
         self.H, self.xedges, self.yedges = jnp.histogram2d(x, y, bins=[pix_x // bin_scale, pix_y // bin_scale], range=[[-self.Lx / 2, self.Lx / 2],[-self.Ly / 2, self.Ly / 2]])
         self.H = self.H.T

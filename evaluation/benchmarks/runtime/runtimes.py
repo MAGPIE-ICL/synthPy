@@ -22,13 +22,14 @@ cores = None
 if args.cores is not None:
     cores = args.cores
 
+sys.path.insert(0, '../../../src/simulator')
+sys.path.insert(0, '../../../src/solvers-legacy')
+
 import config
 config.jax_init(core_limit = cores)
 
 import jax.numpy as jnp
 
-sys.path.insert(0, '../../../src/simulator')
-sys.path.insert(0, '../../src/solvers-legacy')
 import importlib
 
 import beam as beam_initialiser
