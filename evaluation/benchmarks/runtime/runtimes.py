@@ -16,7 +16,7 @@ if args.domain is not None:
 if args.rays is not None:
     rays = args.rays
 else:
-    rays = np.array([1e5, 1e6, 1e7, 1e8, 1e9, 1e10])
+    rays = np.array([1e5, 1e6, 1e7, 1e8, 1e9])
 
 cores = None
 if args.cores is not None:
