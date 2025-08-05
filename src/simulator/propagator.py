@@ -616,15 +616,15 @@ def solve(s0_import, ScalarDomain, probing_depth, *, return_E = False, paralleli
         print("Est. size of solution class / single ray (?):", getsizeof(sol))
         print("Est. size of solution (bef. JV):", mem_conversion(getsizeof_default(sol) * Np))
 
-        folder_name = "memory_benchmarks/"
-        rel_path_to_folder = "evaluation/"
+        folder_name = "memory"
+        postfix = "_benchmarks/"
 
-        path = rel_path_to_folder + folder_name
+        path = "evaluation/benchmarks/" + folder_name + "/"
 
         if os.path.isdir(os.getcwd() + "/" + path):
             pass
         else:
-            path = os.getcwd() + "/../" + folder_name
+            path = os.getcwd() + "/../" + folder_name + postfix
 
             if os.path.isdir(path):
                 pass
@@ -636,10 +636,10 @@ def solve(s0_import, ScalarDomain, probing_depth, *, return_E = False, paralleli
 
                     print("\nFailed to create folder above current working directory, attempting in cwd:")
 
-                    path = os.getcwd() + "/" + folder_name
+                    path = os.getcwd() + "/" + folder_name + postfix
 
                     if os.path.isdir(path):
-                        path = folder_name
+                        path = folder_name + postfix
                     else:
                         try:
                             os.mkdir(path)
@@ -664,7 +664,7 @@ def solve(s0_import, ScalarDomain, probing_depth, *, return_E = False, paralleli
             os_system(f"~/go/bin/pprof -top /bin/ls " + path)
             #os_system(f"~/go/bin/pprof --web " + path)
         else:
-            print("No pprof install detected. Please download (using go) to visualise memory usage.")
+            print("No pprof install detected. Please download to visualise memory usage - requires Golang to run.")
 
     del s0
 
