@@ -423,14 +423,14 @@ class ScalarDomain(eqx.Module):
 
         self.ne = ne_0 * (1.0 + s1 * self.XX / self.x_length) * (1 + s2 * jnp.cos(2 * jnp.pi * self.YY / Ly))
     
-    def test_exponential_cos(self, ne_0 = 1e24, Ly = 1e-3, s = 2e-3):
+    def test_exponential_cos(self, ne_0 = 1e24, Ly = 1e-3, s = -2e-3):
         """
-        Exponentially growing sinusoidal perturbation
+        Exponentially growing/decaying sinusoidal perturbation
 
         Args:
             ne_0 ([type], optional): mean electron density. Defaults to 1e24 m^-3.
             Ly (int, optional): spatial scale of sinusoidal perturbation. Defaults to 1e-3 m.
-            s ([type], optional): scale of exponential growth. Defaults to 2e-3 m.
+            s ([type], optional): scale of exponential change. Defaults to -2e-3 m (exponential decay).
         """
 
         self.XX = self.XX.at[:, :].set(self.XX / s)
