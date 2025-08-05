@@ -309,7 +309,7 @@ class ScalarDomain(eqx.Module):
 
             # can't initialise yourself as equinox.Module inherited class is not mutable and self.ne is set during creation -- FIX!
             print("\nWARNING: Electron density profile to generate not passed. You will need to initialise this yourself with a call to this library.")
-            print("If you run low on memory, you can enforce a manual domain cleanup with a call to ScalarDomain.cleanup()")
+            print("\t If you run low on memory, you can enforce a manual domain cleanup with a call to ScalarDomain.cleanup()")
 
             self.XX, self.YY, self.ZZ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)#False) - has to be true for jnp
 
@@ -395,8 +395,8 @@ class ScalarDomain(eqx.Module):
         """
 
         self.ne = jnp.zeros_like(self.XX)
-    
-    def test_slab(self, s = 1, ne_0 = 2e23):
+
+    def test_slab(self, *, s = 1, ne_0 = 2e23):
         """
         A slab with a linear gradient in x:
         n_e =  ne_0 * (1 + s*x/extent)
@@ -410,7 +410,7 @@ class ScalarDomain(eqx.Module):
 
         self.ne = ne_0 * (1.0 + s * self.XX / self.x_length)
 
-    def test_linear_cos(self, s1 = 0.1, s2 = 0.1, ne_0 = 2e23, Ly = 1):
+    def test_linear_cos(self, *, s1 = 0.1, s2 = 0.1, ne_0 = 2e23, Ly = 1):
         """
         Linearly growing sinusoidal perturbation
 
@@ -423,7 +423,7 @@ class ScalarDomain(eqx.Module):
 
         self.ne = ne_0 * (1.0 + s1 * self.XX / self.x_length) * (1 + s2 * jnp.cos(2 * jnp.pi * self.YY / Ly))
     
-    def test_exponential_cos(self, ne_0 = 1e24, Ly = 1e-3, s = -2e-3):
+    def test_exponential_cos(self, *, ne_0 = 1e24, Ly = 1e-3, s = -2e-3):
         """
         Exponentially growing/decaying sinusoidal perturbation
 
@@ -450,7 +450,7 @@ class ScalarDomain(eqx.Module):
 
         #self.ne = jnp.float32(ne_0 * 10 ** (self.XX / s) * (1 + jnp.cos(2 * jnp.pi * self.YY / Ly)))
 
-    def external_ne(self, ne):
+    def external_ne(self, *, ne):
         """
         Load externally generated grid
 
@@ -460,7 +460,7 @@ class ScalarDomain(eqx.Module):
 
         self.ne = ne
 
-    def external_B(self, B):
+    def external_B(self, *, B):
         """
         Load externally generated grid
 
@@ -470,7 +470,7 @@ class ScalarDomain(eqx.Module):
 
         self.B = B
 
-    def external_Te(self, Te, Te_min = 1.0):
+    def external_Te(self, *, Te, Te_min = 1.0):
         """
         Load externally generated grid
 
@@ -480,7 +480,7 @@ class ScalarDomain(eqx.Module):
 
         self.Te = jnp.maximum(Te_min, Te)
 
-    def external_Z(self, Z):
+    def external_Z(self, *, Z):
         """
         Load externally generated grid
 
@@ -490,7 +490,7 @@ class ScalarDomain(eqx.Module):
 
         self.Z = Z
         
-    def test_B(self, Bmax=1.0):
+    def test_B(self, *, Bmax = 1.0):
         """
         A Bz field with a linear gradient in x:
         Bz =  Bmax*x/extent

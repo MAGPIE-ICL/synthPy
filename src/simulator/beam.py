@@ -5,6 +5,8 @@ from utils import random_array
 from utils import random_array_n
 from utils import random_inv_pow_array
 
+from printing import colour
+
 class Beam:
 # Initialise beam
     def __init__(self, Np, beam_size, divergence, ne_extent, *, probing_direction = 'z', wavelength = 1064e-9, beam_type = 'circular', seeded = False):
@@ -29,8 +31,9 @@ class Beam:
         self.beam_type = beam_type
         self.wavelength = wavelength
 
-        #calls actual initialisation of beam automatically, first function just initialises variables
-        Beam.init_beam(self, ne_extent, seeded)
+        # calls actual initialisation of beam automatically, first function just initialises variables
+        # forces ne_extent to negative when passed to init_beam(... ne_extent < 0 ...)
+        Beam.init_beam(self, -ne_extent, seeded) # [x if x < 0 else -x for x in jnp.array(ne_extent)]
 
     def init_beam(self, ne_extent, seeded):
         """
@@ -65,10 +68,6 @@ class Beam:
             # position, uniformly within a circle
             t  = 2 * jnp.pi * random_array(Np, seeded) #polar angle of position
 
-            #u  = random_array(Np)+random_array(Np) # radial coordinate of position
-            #u[u > 1] = 2-u[u > 1]
-            u = random_array(Np, seeded) # radial coordinate of position
-
             # inversely weights probability with radius so that positions are uniformly distributed
             u = random_inv_pow_array(2, Np, seeded) # radial coordinate of position
 
@@ -83,7 +82,7 @@ class Beam:
                 s0 = s0.at[5, :].set(c * jnp.sin(χ) * jnp.sin(ϕ))
 
                 # Initial position
-                s0 = s0.at[0, :].set(-ne_extent)
+                s0 = s0.at[0, :].set(ne_extent)
                 s0 = s0.at[1, :].set(beam_size * u * jnp.cos(t))
                 s0 = s0.at[2, :].set(beam_size * u * jnp.sin(t))
             elif(probing_direction == 'z'):
@@ -95,7 +94,7 @@ class Beam:
                 # Initial position
                 s0 = s0.at[0, :].set(beam_size * u * jnp.cos(t))
                 s0 = s0.at[1, :].set(beam_size * u * jnp.sin(t))
-                s0 = s0.at[2, :].set(-ne_extent)
+                s0 = s0.at[2, :].set(ne_extent)
             else: # Default to y
                 #print("Default to y")
                 # Initial velocity
@@ -105,7 +104,7 @@ class Beam:
 
                 # Initial position
                 s0 = s0.at[0, :].set(beam_size * u * jnp.cos(t))
-                s0 = s0.at[1, :].set(-ne_extent)
+                s0 = s0.at[1, :].set(ne_extent)
                 s0 = s0.at[2, :].set(beam_size * u * jnp.sin(t))
         elif(beam_type == 'square'):
             # position, uniformly within a square
@@ -123,7 +122,7 @@ class Beam:
                 s0 = s0.at[5, :].set(c * jnp.sin(χ) * jnp.sin(ϕ))
 
                 # Initial position
-                s0 = s0.at[0, :].set(-ne_extent)
+                s0 = s0.at[0, :].set(ne_extent)
                 s0 = s0.at[1, :].set(beam_size * u)
                 s0 = s0.at[2, :].set(beam_size * t)
             elif(probing_direction == 'z'):
@@ -135,7 +134,7 @@ class Beam:
                 # Initial position
                 s0 = s0.at[0, :].set(beam_size * u)
                 s0 = s0.at[1, :].set(beam_size * t)
-                s0 = s0.at[2, :].set(-ne_extent)
+                s0 = s0.at[2, :].set(ne_extent)
             else: # Default to y
                 #print("Default to y")
                 # Initial velocity
@@ -145,9 +144,12 @@ class Beam:
 
                 # Initial position
                 s0 = s0.at[0, :].set(beam_size * u)
-                s0 = s0.at[1, :].set(-ne_extent)
+                s0 = s0.at[1, :].set(ne_extent)
                 s0 = s0.at[2, :].set(beam_size * t)
         elif(beam_type == 'rectangular'):
+            size_dim = len(beam_size)
+            assert size_dim == 2, colour.BOLD + "\nERROR: " + colour.END + "Must pass a list of length 2 to initialise a rectangular beam," + size_dim + "item was passed."
+
             # position, uniformly within a square
             t  = 2 * random_array(Np, seeded) - 1.0
             u  = 2 * random_array(Np, seeded) - 1.0
@@ -166,7 +168,7 @@ class Beam:
                 s0 = s0.at[5, :].set(c * jnp.sin(χ) * jnp.sin(ϕ))
 
                 # Initial position
-                s0 = s0.at[0, :].set(-ne_extent)
+                s0 = s0.at[0, :].set(ne_extent)
                 s0 = s0.at[1, :].set(beam_size_1 * u)
                 s0 = s0.at[2, :].set(beam_size_2 * t)
             elif(probing_direction == 'z'):
@@ -178,7 +180,7 @@ class Beam:
                 # Initial position
                 s0 = s0.at[0, :].set(beam_size_1 * u)
                 s0 = s0.at[1, :].set(beam_size_2 * t)
-                s0 = s0.at[2, :].set(-ne_extent)
+                s0 = s0.at[2, :].set(ne_extent)
             else: # Default to y
                 print("Default to y")
                 # Initial velocity
@@ -188,7 +190,7 @@ class Beam:
 
                 # Initial position
                 s0 = s0.at[0, :].set(beam_size_1 * u)
-                s0 = s0.at[1, :].set(-ne_extent)
+                s0 = s0.at[1, :].set(ne_extent)
                 s0 = s0.at[2, :].set(beam_size_2 * t)
             
             del beam_size_1
@@ -206,7 +208,7 @@ class Beam:
             # Initial position
             s0 = s0.at[0, :].set(beam_size * t)
             s0 = s0.at[1, :].set(0.0)
-            s0 = s0.at[2, :].set(-ne_extent)
+            s0 = s0.at[2, :].set(ne_extent)
         elif(beam_type == 'even'): # evenly distributed circular ray using concentric discs
             # number of concentric discs and points
             num_of_circles = (-1 + jnp.sqrt(1 + 8 * (Np // 6))) / 2 
@@ -247,7 +249,7 @@ class Beam:
                 s0 = s0.at[5, :].set(c * jnp.sin(χ) * jnp.sin(ϕ))
 
                 # Initial position
-                s0 = s0.at[0, :].set(-ne_extent)
+                s0 = s0.at[0, :].set(ne_extent)
                 s0 = s0.at[1, :].set(beam_size_1 * u)
                 s0 = s0.at[2, :].set(beam_size_2 * t)
             elif(probing_direction == 'y'):
@@ -258,7 +260,7 @@ class Beam:
 
                 # Initial position
                 s0 = s0.at[0, :].set(beam_size_1 * u)
-                s0 = s0.at[1, :].set(-ne_extent)
+                s0 = s0.at[1, :].set(ne_extent)
                 s0 = s0.at[2, :].set(beam_size_2 * t)
             elif(probing_direction == 'z'):
                 # Initial velocity
@@ -269,7 +271,7 @@ class Beam:
                 # Initial position
                 s0 = s0.at[0, :].set(beam_size_1 * u)
                 s0 = s0.at[1, :].set(beam_size_2 * t)
-                s0 = s0.at[2, :].set(-ne_extent)
+                s0 = s0.at[2, :].set(ne_extent)
             else: # Default to y
                 print("Default to y")
                 # Initial velocity
@@ -279,7 +281,7 @@ class Beam:
 
                 # Initial position
                 s0 = s0.at[0, :].set(beam_size_1 * u)
-                s0 = s0.at[1, :].set(-ne_extent)
+                s0 = s0.at[1, :].set(ne_extent)
                 s0 = s0.at[2, :].set(beam_size_2 * t)
             
             del beam_size_1
