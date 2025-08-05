@@ -106,12 +106,11 @@ def jax_init(force_device = None, core_limit = None, extra_info = False, disable
             core_count = core_limit
 
     os.environ['XLA_FLAGS'] = "--xla_force_host_platform_device_count=" + str(core_count)
-    #os.environ['JAX_ENABLE_X64'] = "True"
 
-    # triggers a jax breakpoint for debugging on error - works with filter_jit not jax.jit
-    # if this is causing erroneous errors see equinox issue #1047: https://github.com/patrick-kidger/equinox/issues/1047
-    if debugging:
-        os.environ["EQX_ON_ERROR"] = "breakpoint"
+    # https://docs.jax.dev/en/latest/gpu_memory_allocation.html
+    # can't set via jax.config.update as jax requires this to be initialised on first use
+
+    #jax.config.update('jax_compiler_enable_remat_pass', False) # look into for future reference to debug mem use.
 
     if force_device == "cpu":
         os.environ['JAX_PLATFORM_NAME'] = 'cpu'
@@ -122,6 +121,11 @@ def jax_init(force_device = None, core_limit = None, extra_info = False, disable
         os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"
         #os.environ["TF_CUDA_MALLOC_ASYNC_SUPPORTED_PREALLOC"] = "0.95"
 
+    # triggers a jax breakpoint for debugging on error - works with filter_jit not jax.jit
+    # if this is causing erroneous errors see equinox issue #1047: https://github.com/patrick-kidger/equinox/issues/1047
+    if debugging:
+        os.environ["EQX_ON_ERROR"] = "breakpoint"
+
     import jax
 
     # enables float data types to use 64-bit instead of 32 for greater precision
@@ -130,16 +134,12 @@ def jax_init(force_device = None, core_limit = None, extra_info = False, disable
         print("\nWARNING: x64 bit currently disabled by default as greater precision will vastly increase run times")
         jax.config.update('jax_enable_x64', True)
 
-    # HPC doesn't recognise this config option
-    #jax.config.update('jax_captured_constants_report_frames', -1)
-    #jax.config.update('jax_captured_constants_warn_bytes', 128 * 1024 ** 2)
-    #jax.config.update('jax_traceback_filtering', 'off')
-    # https://docs.jax.dev/en/latest/gpu_memory_allocation.html
-    #jax.config.update('xla_python_client_preallocate', False)
-    #jax.config.update('xla_python_client_allocator', '\"platform\"')
-    # can't set via jax.config.update for some reason
-
-    #jax.config.update('jax_compiler_enable_remat_pass', False)
+    jax.config.update('jax_traceback_filtering', 'off')
+    # HPC doesn't recognise these config options due to old jax version (added in jax-0.6.0)
+    # - you need to speak to RCS to get an updated version (either forcing them to or to know how to do it yourself)
+    # - I (Sam MacKay) have this built on cx(1/3)? if you need help
+    jax.config.update('jax_captured_constants_report_frames', -1)
+    jax.config.update('jax_captured_constants_warn_bytes', 128 * 1024 ** 2)
 
     print(colour.END)
 
