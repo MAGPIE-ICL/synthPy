@@ -390,8 +390,8 @@ class ScalarDomain:
 
         sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t)
 
-        finish = time()
-        print("Ray trace completed in:\t",finish-start,"s")
+        self.duration = time() - start
+        print("Ray trace completed in:\t", self.duration, "s")
 
         Np = s0.size//9
         self.sf = sol.y[:,-1].reshape(9,Np)
