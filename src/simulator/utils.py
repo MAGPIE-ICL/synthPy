@@ -34,6 +34,8 @@ def count_nans(matrix, axes = [0, 2]):
         x = x[mask]
         y = y[mask]
 
+        print("rf after clearing nan's: (", len(x), ", ", len(y), ")", sep='')
+
 def getsizeof(object):
     return mem_conversion(getsizeof_default(object))
 

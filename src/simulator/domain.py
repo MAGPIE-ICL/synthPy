@@ -312,6 +312,7 @@ class ScalarDomain(eqx.Module):
             print("\t If you run low on memory, you can enforce a manual domain cleanup with a call to ScalarDomain.cleanup()")
 
             self.XX, self.YY, self.ZZ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)#False) - has to be true for jnp
+            self.ne = jnp.zeros(self.dims[0], self.dims[1], self.dims[2])
 
         if self.debug:
             from utils import round_to_n
@@ -351,6 +352,15 @@ class ScalarDomain(eqx.Module):
                 print(" --> it's len: {}".format(len(self.coord_backup)))
 
                 print("\n --> future dims: {}".format(self.future_dims))
+
+        '''
+        if B_on:
+            self.B = jnp.array
+        else:
+            self.B = None
+
+        etc...
+        '''
 
     def generate_electron_density_profile(self):
         print("\nGenerating test", end = " ")
@@ -394,7 +404,7 @@ class ScalarDomain(eqx.Module):
         Null test, an empty cube
         """
 
-        self.ne = jnp.zeros_like(self.XX)
+        self.ne = self.ne.at[:, :, :].set(jnp.zeros_like(self.XX))
 
     def test_slab(self, *, s = 1, ne_0 = 2e23):
         """
@@ -408,7 +418,7 @@ class ScalarDomain(eqx.Module):
             ne_0 ([type], optional): mean density. Defaults to 2e23 m^-3.
         """
 
-        self.ne = ne_0 * (1.0 + s * self.XX / self.x_length)
+        self.ne = self.ne.at[:, :, :].set(ne_0 * (1.0 + s * self.XX / self.x_length))
 
     def test_linear_cos(self, *, s1 = 0.1, s2 = 0.1, ne_0 = 2e23, Ly = 1):
         """
@@ -421,7 +431,7 @@ class ScalarDomain(eqx.Module):
             Ly (int, optional): spatial scale of sinusoidal perturbation. Defaults to 1.
         """
 
-        self.ne = ne_0 * (1.0 + s1 * self.XX / self.x_length) * (1 + s2 * jnp.cos(2 * jnp.pi * self.YY / Ly))
+        self.ne = self.ne.at[:, :, :].set(ne_0 * (1.0 + s1 * self.XX / self.x_length) * (1 + s2 * jnp.cos(2 * jnp.pi * self.YY / Ly)))
     
     def test_exponential_cos(self, *, ne_0 = 1e24, Ly = 1e-3, s = -2e-3):
         """
@@ -446,7 +456,7 @@ class ScalarDomain(eqx.Module):
         self.ne = self.XX * self.YY
         self.cleanup()
 
-        self.ne = self.ne.at[:, :].set(ne_0 * self.ne)
+        self.ne = self.ne.at[:, :, :].set(ne_0 * self.ne)
 
         #self.ne = jnp.float32(ne_0 * 10 ** (self.XX / s) * (1 + jnp.cos(2 * jnp.pi * self.YY / Ly)))
 
@@ -458,7 +468,7 @@ class ScalarDomain(eqx.Module):
             ne ([type]): MxMxM grid of density in m^-3
         """
 
-        self.ne = ne
+        self.ne = self.ne.at[:, :, :].set(ne)
 
     def external_B(self, *, B):
         """
@@ -468,7 +478,7 @@ class ScalarDomain(eqx.Module):
             B ([type]): MxMxMx3 grid of B field in T
         """
 
-        self.B = B
+        self.B = self.B.at[:, :, :].set(B)
 
     def external_Te(self, *, Te, Te_min = 1.0):
         """
@@ -478,7 +488,7 @@ class ScalarDomain(eqx.Module):
             Te ([type]): MxMxM grid of electron temperature in eV
         """
 
-        self.Te = jnp.maximum(Te_min, Te)
+        self.Te = self.Te.at[:, :, :].set(jnp.maximum(Te_min, Te))
 
     def external_Z(self, *, Z):
         """
@@ -488,7 +498,7 @@ class ScalarDomain(eqx.Module):
             Z ([type]): MxMxM grid of ionisation
         """
 
-        self.Z = Z
+        self.Z = self.Z.at[:, :, :].set(Z)
         
     def test_B(self, *, Bmax = 1.0):
         """
@@ -499,8 +509,8 @@ class ScalarDomain(eqx.Module):
             Bmax ([type], optional): maximum B field, default 1.0 T
         """
 
-        self.B = jnp.zeros(jnp.append(jnp.array(self.XX.shape), 3))
-        self.B[:, :, :, 2] = Bmax * self.XX / self.x_length
+        self.B = self.B.at[:, :, :, :].set(jnp.zeros(jnp.append(jnp.array(self.XX.shape), 3)))
+        self.B = self.B.at[:, :, :, 2].set(Bmax * self.XX / self.x_length)
 
     def export_scalar_field(self, property: str = 'ne', fname: str = None):
         """
