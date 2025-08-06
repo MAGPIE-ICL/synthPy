@@ -168,8 +168,7 @@ def jax_init(force_device = None, core_limit = None, extra_info = False, disable
     if debugging:
         jax.config.update('jax_traceback_filtering', 'off')
         # HPC doesn't recognise these config options due to old jax version (added in jax-0.6.0)
-        # - you need to speak to RCS to get an updated version (either forcing them to or to know how to do it yourself)
-        # - I (Sam MacKay) have this built on cx(1/3)? if you need help
+        # - you need to speak to RCS to get an updated version (either forcing them to do it or to find out how to do it yourself)
         jax.config.update('jax_captured_constants_report_frames', -1)
         jax.config.update('jax_captured_constants_warn_bytes', 128 * 1024 ** 2)
 
