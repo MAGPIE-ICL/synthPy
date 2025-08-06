@@ -28,7 +28,7 @@ def count_nans(matrix, *, axes = [0, 2], ret = False):
     stats = np.zeros(dim, 2)
 
     mask = True
-    for i in range(dim)):
+    for i in range(dim):
         arr = matrix[i]
         mask = mask & ~jnp.isnan(arr)
 
