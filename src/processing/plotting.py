@@ -5,6 +5,25 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 import processing.diagnostics as diag
 
+import jax.numpy as jnp
+    
+def lens_cutoff(rf, *, L = 400, R = 25):
+    """
+    Masks the Jonesvector resulting array to avoid plotting any values outside of some set limit
+        - important as even if you set limits for the histogram to "zoom in", binning is based on raw data
+        --> leading to low resolutions if this is not used!
+
+    Args:
+        rf (jax.Array): Jonesvector output from solver
+        L (int): Length till next lens
+        R (int): Radius of lens
+
+    Return:
+        rf (jax.Array): Masked Jonesvector
+    """
+
+    return jnp.asarray(rf)[:, jnp.pow(jnp.pow(L * jnp.tan(rf[1]) + rf[0], 2) + jnp.pow(L * jnp.tan(rf[3]) + rf[2], 2), 0.5) <= R]
+
 def graph_domain(domain, *, save = False):
     fig, ax = plt.subplots(figsize = (9.5, 9.5))
     fig.subplots_adjust(.15, .15, .95, .95, hspace = 0.5)
@@ -79,10 +98,12 @@ def general_ray_plots(rf, lwl, *, l_x, u_x, l_y, u_y):
     ax1.set_xlabel("x (mm)")
     ax1.set_ylabel("y (mm)")
 
+    rf = lens_cutoff(rf)
+
     x_theta = rf[1] * 1e3
     y_theta = rf[3] * 1e3
 
-    mask = (x_theta >= l_x) & (x_theta <= u_x) & (y_theta >= l_y) & (x_theta <= u_y)
+    #mask = (x_theta >= l_x) & (x_theta <= u_x) & (y_theta >= l_y) & (x_theta <= u_y)
 
     _, _, _, im2 = ax2.hist2d(x_theta[mask], y_theta[mask], bins=(nbins, nbins), cmap=plt.cm.jet);
     plt.colorbar(im2, ax = ax2)

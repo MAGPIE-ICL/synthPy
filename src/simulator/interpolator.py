@@ -1,3 +1,5 @@
+import jax.numpy as jnp
+
 from itertools import product
 
 from jax._src import dtypes
@@ -25,14 +27,14 @@ def RegularGridInterpolator(points, values, xi, method = "linear", bounds_error 
 
     if fill_value is not None:
         check_arraylike("RegularGridInterpolator", fill_value)
-        fill_value = asarray(fill_value)
+        fill_value = jnp.asarray(fill_value)
         if not dtypes.can_cast(fill_value.dtype, values.dtype, casting='same_kind'):
             ve = "fill_value must be either 'None' or of a type compatible with values"
             raise ValueError(ve)
 
     # TODO: assert sanity of `points` similar to SciPy but in a JIT-able way
     check_arraylike("RegularGridInterpolator", *points)
-    grid = tuple(asarray(p) for p in points)
+    grid = tuple(jnp.asarray(p) for p in points)
 
     ndim = len(grid)
 
@@ -50,7 +52,7 @@ def RegularGridInterpolator(points, values, xi, method = "linear", bounds_error 
             xi = xi.at[..., j].set(item)
     else:
         check_arraylike("_ndim_coords_from_arrays", xi)
-        xi = asarray(xi)  # SciPy: asanyarray(xi)
+        xi = jnp.asarray(xi)  # SciPy: asanyarray(xi)
         if xi.ndim == 1:
             if ndim is None:
                 xi = xi.reshape(-1, 1)
@@ -88,9 +90,9 @@ def RegularGridInterpolator(points, values, xi, method = "linear", bounds_error 
     # find relevant values
     # each i and i+1 represents a edge
     edges = product(*[[i, i + 1] for i in indices])
-    result = asarray(0.)
+    result = jnp.asarray(0.)
     for edge_indices in edges:
-        weight = asarray(1.)
+        weight = jnp.asarray(1.)
         for ei, i, yi in zip(edge_indices, indices, norm_distances):
             weight *= where(ei == i, 1 - yi, yi)
         result += values[edge_indices] * weight[vslice]
