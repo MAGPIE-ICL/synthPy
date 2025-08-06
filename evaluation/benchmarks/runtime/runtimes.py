@@ -49,7 +49,7 @@ import legacy.rtm_solver as rtm
 importlib.reload(fs)
 importlib.reload(rtm)
 
-from utils.printing import colour
+from shared.printing import colour
 
 extent_x = 5e-3
 extent_y = 5e-3

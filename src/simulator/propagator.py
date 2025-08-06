@@ -179,7 +179,7 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
     # - as then data would be in the wrong place
     return sprime.flatten()
 
-def process_results(sol, probing_depth, probing_direction, return_E, duration, steps_per_region):
+def process_results(solutions, depth_traced, trace_depth, probing_direction, return_E, duration, save_points_per_region):
     """
     #for i in enumerate(sol.result):
     #    print(i)
@@ -198,20 +198,30 @@ def process_results(sol, probing_depth, probing_direction, return_E, duration, s
     #if sol.result == RESULTS.successful:
     #rf = sol.ys[:, -1, :].reshape(9, Np)# / scalar
 
-    if steps_per_region == 2 or steps_per_region == 1:
-        rf = sol.ys[:, -1, :].T
+    if save_points_per_region == 2 or save_points_per_region == 1:
+        rf = solutions[0].ys[:, -1, :].T
 
-        return *ray_to_Jonesvector(rf, probing_depth, probing_direction = probing_direction, return_E = return_E), duration
-    elif steps_per_region > 2:
+        return *ray_to_Jonesvector(rf, depth_traced + trace_depth, probing_direction = probing_direction, return_E = return_E), duration
+    elif save_points_per_region > 2:
         slice_rf_list = []
         slice_Jf_list = []
 
-        for i in range(steps_per_region):
-            rf_slice, Jf_slice = ray_to_Jonesvector(sol.ys[:, i, :].T, probing_depth, probing_direction = probing_direction, return_E = return_E)
+        for i in range(len(solutions)):
+            #save_point_depth = depth_traced
+            for j in range(save_points_per_region):
+                '''
+                if j == save_points_per_region - 1:
+                    save_point_depth = depth_traced + trace_depth
+                else:
+                    save_point_depth += trace_depth // save_points_per_region
+                '''
 
-            slice_rf_list.append(rf_slice)
-            if Jf_slice is not None:
-                slice_Jf_list.append(Jf_slice)
+                if j != save_points_per_region - 1:
+                    rf_slice, Jf_slice = ray_to_Jonesvector(sol[i].ys[:, j, :].T, depth_traced + trace_depth * sol[i].ts[j], probing_direction = probing_direction, return_E = return_E)
+
+                    slice_rf_list.append(rf_slice)
+                    if Jf_slice is not None:
+                        slice_Jf_list.append(Jf_slice)
 
         rf = jnp.stack(slice_rf_list, axis = -1)
         del slice_rf_list
@@ -226,7 +236,7 @@ def process_results(sol, probing_depth, probing_direction, return_E, duration, s
     else:
         assert "\nWhat."
 
-def solve(s0_import, ScalarDomain, probing_depth, *, return_E = False, parallelise = True, jitted = True, steps_per_region = 2, memory_debug = False, lwl = 1064e-9, keep_domain = False, return_raw_results = False):
+def solve(s0_import, ScalarDomain, probing_depth, *, return_E = False, parallelise = True, jitted = True, save_points_per_region = 2, memory_debug = False, lwl = 1064e-9, keep_domain = False, return_raw_results = False):
     # Find Faraday rotation constant http://farside.ph.utexas.edu/teaching/em/lectures/node101.html
     VerdetConst = 0.0
     if (ScalarDomain.B_on):
@@ -242,6 +252,8 @@ def solve(s0_import, ScalarDomain, probing_depth, *, return_E = False, paralleli
     # make logic too loop it and pick up from previous solution
 
     depth_traced = 0.0
+    solutions = []
+
     for i in range(1, ScalarDomain.region_count + 1):
         if ScalarDomain.region_count == 1:
             print("\nNo need to generate any sections of the domain, batching not utilised.")
@@ -327,9 +339,11 @@ def solve(s0_import, ScalarDomain, probing_depth, *, return_E = False, paralleli
 
             del depth_remaining
 
+        target_depth = trace_depth + depth_traced
+
         # it isn't tracing up till this depth, it is tracing this amount further
         # at end positions are r(vector) + trace_depth (ish) NOT trace_depth(vector)
-        print(" --> tracing a depth of", trace_depth, "mm's")
+        print(" --> tracing a depth of", trace_depth, "mm's to the target depth of", target_depth, "mm's")
 
         t = jnp.linspace(0.0, jnp.sqrt(8.0) * trace_depth / c, 2)
         norm_factor = jnp.max(t)
@@ -365,7 +379,8 @@ def solve(s0_import, ScalarDomain, probing_depth, *, return_E = False, paralleli
                 s0_transformed = s0_import.T
                 del s0_import
             else:
-                s0_transformed = back_propogate(sol.ys[:, -1, :].T, trace_depth, ScalarDomain.probing_direction).T
+                # change target_depth back to trace_depth and check the difference
+                s0_transformed = back_propogate(sol.ys[:, -1, :].T, target_depth, ScalarDomain.probing_direction).T
                 del sol
 
             if running_device == 'cpu':
@@ -453,7 +468,7 @@ def solve(s0_import, ScalarDomain, probing_depth, *, return_E = False, paralleli
                 )
 
             # hardcode to normalise to 1 due to diffrax bug
-            ODE_solve = diffrax_solve(dsdt_ODE, t[0], t[-1] / norm_factor, steps_per_region, ScalarDomain.lengths, ScalarDomain.dims)
+            ODE_solve = diffrax_solve(dsdt_ODE, t[0], t[-1] / norm_factor, save_points_per_region, ScalarDomain.lengths, ScalarDomain.dims)
 
             if jitted:
                 start_comp = time()
@@ -480,6 +495,8 @@ def solve(s0_import, ScalarDomain, probing_depth, *, return_E = False, paralleli
 
         duration = time() - start
         print("\nCompleted ray trace in", jnp.round(duration, 3), "seconds.")
+
+        solutions.append(sol)
 
         depth_traced += trace_depth
 
@@ -538,26 +555,26 @@ def solve(s0_import, ScalarDomain, probing_depth, *, return_E = False, paralleli
         print("\n", end = '')
         if os.path.isfile(os.path.expanduser("~") + "/go/bin/pprof"):
             #import sys
-            from os import system as os_system
+            from os import system
 
-            #os_system(f"~/go/bin/pprof -top {sys.executable} memory_{N}.prof")
-            os_system(f"~/go/bin/pprof -top /bin/ls " + path)
-            #os_system(f"~/go/bin/pprof --web " + path)
+            #system(f"~/go/bin/pprof -top {sys.executable} memory_{N}.prof")
+            system(f"~/go/bin/pprof -top /bin/ls " + path)
+            #system(f"~/go/bin/pprof --web " + path)
         else:
             print("No pprof install detected. Please download to visualise memory usage - requires Golang to run.")
 
     del s0
 
     if return_raw_results:
-        return sol
+        return solutions
     else:
         if not parallelise:
-            return *ray_to_Jonesvector(sol.y[:,-1].reshape(9, Np), probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E), duration
+            return *ray_to_Jonesvector(solutions.y[:,-1].reshape(9, Np), probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E), duration
         else:
             # need to confirm there is no mismatch between total depth_traced and the target probing_depth
-            rf, Jf, duration = process_results(sol, probing_depth, ScalarDomain.probing_direction, return_E, duration, steps_per_region)
+            rf, Jf, duration = process_results(solutions, depth_traced, trace_depth, ScalarDomain.probing_direction, return_E, duration, save_points_per_region)
 
-            print("\nParallelised output has resulting 3D matrix of form: [batch_count, steps_per_region, 9]:", sol.ys.shape)
+            print("\nParallelised output has resulting 3D matrix of form: [batch_count, save_points_per_region, 9]:", sol.ys.shape)
             print(" - 2 to account for the start and end results (typical, can be greater if set)")
             print(" - 9 containing the 3 position and velocity components, amplitude, phase and polarisation")
             print(" - If batch_count is lower than expected, this is likely due to jax's forced integer batch sharding requirement over cpu cores.")
