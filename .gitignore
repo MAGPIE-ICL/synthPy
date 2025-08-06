@@ -13,7 +13,7 @@ src/utils/__pycache__
 
 examples/notebooks/.ipynb_checkpoints
 
-evaluation/memory_benchmarks/memory-*
+evaluation/benchmarks/memory/memory-*
 
 evaluation/interferometry_testing/.ipynb_checkpoints
 

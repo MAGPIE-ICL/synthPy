@@ -3,7 +3,6 @@
 # if we want to include also interferometry this is the right place
 # REQUIRES CHANGING NAMES AND EXAMPLES
 
-import sympy as sym
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl

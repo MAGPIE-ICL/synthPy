@@ -293,8 +293,6 @@ class Diagnostic:
         self.x, self.y, self.x_l, self.y_l = x, y, x_l, y_l
         self.amp, self.phase = amp, phase
 
-        self.Np = rf.shape[-1]
-
         # these HAVE to stay... for some reason - not entirely sure why you can't just reference self.Beam.r_ directly (or now just rf)
         # if you can make it without the memory duplication work please do, else DON'T REMOVE!
 
@@ -303,6 +301,14 @@ class Diagnostic:
         # just re-assert type here to fix
 
         if rf is not None:
+            # forces self.rf to the last slice if rf returns multiple samples
+            # also preserves the whole pass if required
+            if len(rf.shape) == 3:
+                #self.rf_full = rf
+                rf = rf[:, :, -1]
+
+            self.Np = rf.shape[-1]
+
             # masks matrix such that rf only passes entries representing rays that will be captured by the lens system
             self.rf = jnp.asarray(self.lens_cutoff(rf, self.L, self.R))
 
@@ -334,7 +340,7 @@ class Diagnostic:
 
         self.Jf = self.Jf.at[:, :].set(self.Jf[:, :] * jnp.exp(1.0j * k * jnp.sqrt(dx ** 2 + dy ** 2)))
 
-    def histogram(self, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
+    def histogram(self, *, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False, plain_plot = False):
         """
         Bin data into a histogram. Defaults are for a KAF-8300.
         Outputs are H, the histogram, and xedges and yedges, the bin edges.
@@ -345,7 +351,10 @@ class Diagnostic:
             pix_y (int, optional): number of y pixels in detector plane. Defaults to 2574.
         """
 
-        x, y = count_nans(self.rf, ret = True)
+        if plain_plot:
+            x, y = count_nans(self.r0, ret = True)
+        else:
+            x, y = count_nans(self.rf, ret = True)
 
         self.H, self.xedges, self.yedges = jnp.histogram2d(x, y, bins=[pix_x // bin_scale, pix_y // bin_scale], range=[[-self.Lx / 2, self.Lx / 2],[-self.Ly / 2, self.Ly / 2]])
         self.H = self.H.T
@@ -396,6 +405,9 @@ class Diagnostic:
         """
 
         return jnp.asarray(rf)[:, jnp.pow(jnp.pow(L * jnp.tan(rf[1]) + rf[0], 2) + jnp.pow(L * jnp.tan(rf[3]) + rf[2], 2), 0.5) <= R]
+
+    def plot_rays(self, *, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False, plain_plot = False):
+        self.histogram(bin_scale = bin_scale, pix_x = pix_x, pix_y = pix_y, clear_mem = clear_mem, plain_plot = plain_plot, plain_plot = True)
 
 class Shadowgraphy(Diagnostic):
     """

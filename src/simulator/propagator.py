@@ -500,7 +500,7 @@ def solve(s0_import, ScalarDomain, probing_depth, *, return_E = False, paralleli
     del s0
 
     if not parallelise:
-        rf = sol.y[:,-1].reshape(9, Np)
+        return *ray_to_Jonesvector(sol.y[:,-1].reshape(9, Np), probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E), duration
     else:
         """
         #for i in enumerate(sol.result):
@@ -519,15 +519,42 @@ def solve(s0_import, ScalarDomain, probing_depth, *, return_E = False, paralleli
 
         #if sol.result == RESULTS.successful:
         #rf = sol.ys[:, -1, :].reshape(9, Np)# / scalar
-        rf = sol.ys[:, -1, :].T
 
-        print("\nParallelised output has resulting 3D matrix of form: [batch_count, 2, 9]:", sol.ys.shape)
-        print(" - 2 to account for the start and end results")
+        # need to confirm there is no mismatch between total depth_traced and the target probing_depth
+        if save_steps == 2 or save_steps == 1:
+            rf = sol.ys[:, -1, :].T
+
+            result = *ray_to_Jonesvector(rf, probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E), duration
+        elif save_steps > 2:
+            slice_rf_list = []
+            slice_Jf_list = []
+
+            for i in range(save_steps):
+                rf_slice, Jf_slice = ray_to_Jonesvector(sol.ys[:, i, :].T, probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E)
+
+                slice_rf_list.append(rf_slice)
+                if Jf_slice is not None:
+                    slice_Jf_list.append(Jf_slice)
+
+            rf = jnp.stack(slice_rf_list, axis = -1)
+            del slice_rf_list
+
+            if len(slice_Jf_list) > 0:
+                Jf = jnp.stack(slice_Jf_list, axis = -1)
+                del slice_Jf_list
+            else:
+                Jf = None
+
+            result = rf, Jf, duration
+        else:
+            assert "\nWhat."
+
+        print("\nParallelised output has resulting 3D matrix of form: [batch_count, save_steps, 9]:", sol.ys.shape)
+        print(" - 2 to account for the start and end results (typical, can be greater if set)")
         print(" - 9 containing the 3 position and velocity components, amplitude, phase and polarisation")
         print(" - If batch_count is lower than expected, this is likely due to jax's forced integer batch sharding requirement over cpu cores.")
         print("\nWe slice the end result and transpose into the form:", rf.shape, "to work with later code.")
         #else:
         #    print("Ray tracer failed. This could be a case of diffrax exceeding max steps again due to apparent 'strictness' compared to solve_ivp, check error log.")
 
-    # need to confirm there is no mismatch between total depth_traced and the target probing_depth
-    return *ray_to_Jonesvector(rf, probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E), duration
+        return result

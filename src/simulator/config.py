@@ -99,15 +99,17 @@ def jax_init(force_device = None, core_limit = None, extra_info = False, disable
     # os.path.abspath(sys.argv[0])                  # haven't tested...
 
     top_level_path = resolve_path(str(os.path.dirname(os.path.realpath(__file__))) + "/../")
-    print("Setting top level path for imports:" + top_level_path)
+    print("Setting top level path for imports: " + top_level_path)
+
     # makes sure top level directory path is present in system so that relative imports work
     sys.path.insert(0, top_level_path)
 
     from shared.printing import colour
     print(colour.BOLD)
 
+    # has to be disabled by default to prevent possible interference with jax parallelisation (caused issues on the cluster)
     if disable_python_multithreading:
-        print("Disabling python multi-threading...\n")
+        print("Disabling python multi-threading...")
 
         thread_count = str(1)
         os.environ["OMP_NUM_THREADS"]        = thread_count
