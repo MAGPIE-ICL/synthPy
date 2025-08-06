@@ -43,8 +43,8 @@ importlib.reload(beam_initialiser)
 importlib.reload(p)
 importlib.reload(diag)
 
-import solvers-legacy.full_solver as fs
-import solvers-legacy.rtm_solver as rtm
+import legacy.full_solver as fs
+import legacy.rtm_solver as rtm
 
 importlib.reload(fs)
 importlib.reload(rtm)
