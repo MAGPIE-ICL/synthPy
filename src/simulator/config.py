@@ -70,6 +70,23 @@ class flags:
         for i, (k, v) in enumerate(self.value_holders):
             self.value_holders[k].value = self.value_holders[k].default
 
+def resolve_path(path: str) -> str:
+    # Split the path into parts
+    parts = path.strip().split('/')
+    stack = []
+
+    for part in parts:
+        if part == '' or part == '.':
+            continue  # Skip empty or current dir
+        elif part == '..':
+            if stack:
+                stack.pop()  # Go back one directory
+        else:
+            stack.append(part)
+
+    # Handle root path (if path starts with '/')
+    return '/' + '/'.join(stack) if path.startswith('/') else '/'.join(stack)
+
 def jax_init(force_device = None, core_limit = None, extra_info = False, disable_python_multithreading = True, enable_x64 = False, debugging = False):
     import sys
     import os
@@ -81,7 +98,7 @@ def jax_init(force_device = None, core_limit = None, extra_info = False, disable
     # sys.path[0]                                   # haven't tested...
     # os.path.abspath(sys.argv[0])                  # haven't tested...
 
-    top_level_path = str(os.path.dirname(os.path.realpath(__file__))) + "/../"
+    top_level_path = resolve_path(str(os.path.dirname(os.path.realpath(__file__))) + "/../")
     print("Setting top level path for imports:" + top_level_path)
     # makes sure top level directory path is present in system so that relative imports work
     sys.path.insert(0, top_level_path)
@@ -90,7 +107,7 @@ def jax_init(force_device = None, core_limit = None, extra_info = False, disable
     print(colour.BOLD)
 
     if disable_python_multithreading:
-        print("\nDisabling python multi-threading...\n")
+        print("Disabling python multi-threading...\n")
 
         thread_count = str(1)
         os.environ["OMP_NUM_THREADS"]        = thread_count
