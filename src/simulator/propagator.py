@@ -216,8 +216,10 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, ret
                     save_point_depth += trace_depth // save_points_per_region
                 '''
 
-                if j != save_points_per_region - 1:
-                    rf_slice, Jf_slice = ray_to_Jonesvector(sol[i].ys[:, j, :].T, depth_traced + trace_depth * sol[i].ts[j], probing_direction = probing_direction, return_E = return_E)
+                if j < save_points_per_region - 1 or (j == save_points_per_region - 1 and i == len(solutions) - 1):
+                    # sol.ts having shape of (Np, save_points_per_region) per region is very inefficent given there are N - 1 duplications
+                    # - issue with diffrax though I can't fix this
+                    rf_slice, Jf_slice = ray_to_Jonesvector(solutions[i].ys[:, j, :].T, depth_traced + trace_depth * solutions[i].ts[0, j], probing_direction = probing_direction, return_E = return_E)
 
                     slice_rf_list.append(rf_slice)
                     if Jf_slice is not None:

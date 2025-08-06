@@ -63,7 +63,7 @@ dims = 128
 lwl = 1064e-9
 
 divergence = 5e-5
-beam_size = ne_extent * 0.9
+beam_size = extent_z * 0.9
 beam_type = "square"
 
 times = np.array(2, len(rays))

@@ -70,7 +70,7 @@ def graph_domain(domain, *, save = False):
         from datetime import datetime
         fig.savefig('./analytical 2D electron density distribution - ' + datetime.now().strftime("%Y%m%d-%H%M%S") + '.png', bbox_inches = 'tight', dpi = 600)
 
-def general_ray_plots(rf, lwl, *, l_x, u_x, l_y, u_y):
+def general_ray_plots(rf, lwl = 1032e-9, *, l_x = 0, u_x = 0.3, l_y = -5, u_y = 5):
     fig1, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
     nbins = 201
 
