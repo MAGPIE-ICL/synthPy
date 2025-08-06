@@ -3,7 +3,7 @@ import jax.numpy as jnp
 from itertools import product
 
 from jax._src import dtypes
-from jax._src.numpy import (asarray, broadcast_arrays, empty, searchsorted, where, zeros)
+#from jax._src.numpy import (asarray, broadcast_arrays, empty, searchsorted, where, zeros)
 from jax._src.tree_util import register_pytree_node
 from jax._src.numpy.util import check_arraylike, promote_dtypes_inexact
 
@@ -43,11 +43,11 @@ def RegularGridInterpolator(points, values, xi, method = "linear", bounds_error 
         # handle argument tuple
         xi = xi[0]
     if isinstance(xi, tuple):
-        p = broadcast_arrays(*xi)
+        p = jnp.broadcast_arrays(*xi)
         for p_other in p[1:]:
             if p_other.shape != p[0].shape:
                 raise ValueError("coordinate arrays do not have the same shape")
-        xi = empty(p[0].shape + (len(xi),), dtype=float)
+        xi = jnp.empty(p[0].shape + (len(xi),), dtype=float)
         for j, item in enumerate(p):
             xi = xi.at[..., j].set(item)
     else:
@@ -72,12 +72,12 @@ def RegularGridInterpolator(points, values, xi, method = "linear", bounds_error 
     # compute distance to lower edge in unity units
     norm_distances = []
     # check for out of bounds xi
-    out_of_bounds = zeros((xi.T.shape[1],), dtype=bool)
+    out_of_bounds = jnp.zeros((xi.T.shape[1],), dtype=bool)
     # iterate through dimensions
     for x, g in zip(xi.T, grid):
-        i = searchsorted(g, x) - 1
-        i = where(i < 0, 0, i)
-        i = where(i > g.size - 2, g.size - 2, i)
+        i = jnp.searchsorted(g, x) - 1
+        i = jnp.where(i < 0, 0, i)
+        i = jnp.where(i > g.size - 2, g.size - 2, i)
         indices.append(i)
         norm_distances.append((x - g[i]) / (g[i + 1] - g[i]))
         if not bounds_error:
@@ -94,11 +94,11 @@ def RegularGridInterpolator(points, values, xi, method = "linear", bounds_error 
     for edge_indices in edges:
         weight = jnp.asarray(1.)
         for ei, i, yi in zip(edge_indices, indices, norm_distances):
-            weight *= where(ei == i, 1 - yi, yi)
+            weight *= jnp.where(ei == i, 1 - yi, yi)
         result += values[edge_indices] * weight[vslice]
 
     if not bounds_error and fill_value is not None:
         bc_shp = result.shape[:1] + (1,) * (result.ndim - 1)
-        result = where(out_of_bounds.reshape(bc_shp), fill_value, result)
+        result = jnp.where(out_of_bounds.reshape(bc_shp), fill_value, result)
 
     return result.reshape(xi_shape[:-1] + values.shape[ndim:])

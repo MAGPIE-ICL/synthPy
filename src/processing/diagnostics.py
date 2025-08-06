@@ -308,8 +308,11 @@ class Diagnostic:
 
             self.Np_inc = self.rf.shape[-1]
 
-            print("\n{} rays received, {} incident on the first lens.".format(str(self.Np), str(self.Np_inc)))
-            print(" --> {} % of rays wasted!".format(str(round_to_n((1 - self.Np_inc / self.Np) * 100, 3))))
+            if self.Np == self.Np_inc:
+                print("\nAll rays incident on lens!")
+            else:
+                print("\n{} rays received, {} incident on the first lens.".format(str(self.Np), str(self.Np_inc)))
+                print(" --> {} % of rays wasted!".format(str(round_to_n((1 - self.Np_inc / self.Np) * 100, 3))))
         else:
             assert "rf should not be of Noneype! diffrax clearly failed."
 
