@@ -36,10 +36,12 @@ import jax.numpy as jnp
 import importlib
 
 import simulator.beam as beam_initialiser
+import simulator.domain as d
 import simulator.propagator as p
 import processing.diagnostics as diag
 
 importlib.reload(beam_initialiser)
+importlib.reload(d)
 importlib.reload(p)
 importlib.reload(diag)
 

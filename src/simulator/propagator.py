@@ -569,7 +569,7 @@ def solve(s0_import, ScalarDomain, probing_depth, *, return_E = False, paralleli
     del s0
 
     if return_raw_results:
-        return solutions
+        return solutions, None, duration
     else:
         if not parallelise:
             return *ray_to_Jonesvector(solutions.y[:,-1].reshape(9, Np), probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E), duration
@@ -577,7 +577,7 @@ def solve(s0_import, ScalarDomain, probing_depth, *, return_E = False, paralleli
             # need to confirm there is no mismatch between total depth_traced and the target probing_depth
             rf, Jf, duration = process_results(solutions, depth_traced, trace_depth, ScalarDomain.probing_direction, return_E, duration, save_points_per_region)
 
-            print("\nParallelised output has resulting 3D matrix of form: [batch_count, save_points_per_region, 9]:", sol.ys.shape)
+            print("\nParallelised output has resulting 3D matrix of form: [batch_count, (save_points_per_region - 1) * ScalarDomain.region_count, 9]:", sol.ys.shape)
             print(" - 2 to account for the start and end results (typical, can be greater if set)")
             print(" - 9 containing the 3 position and velocity components, amplitude, phase and polarisation")
             print(" - If batch_count is lower than expected, this is likely due to jax's forced integer batch sharding requirement over cpu cores.")
