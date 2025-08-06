@@ -70,9 +70,14 @@ def graph_domain(domain, *, save = False):
         from datetime import datetime
         fig.savefig('./analytical 2D electron density distribution - ' + datetime.now().strftime("%Y%m%d-%H%M%S") + '.png', bbox_inches = 'tight', dpi = 600)
 
-def general_ray_plots(rf, lwl = 1032e-9, *, l_x = 0, u_x = 0.3, l_y = -5, u_y = 5):
+from processing.diagnostics import lens_cutoff
+
+def general_ray_plots(rf, lwl = 1032e-9, *, l_x = 0, u_x = 0.3, l_y = -5, u_y = 5, extra_info = True):
     fig1, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
     nbins = 201
+
+    # lens_cutoff may not make a difference to the angle plot (after already masked seperately) - but it does to this
+    rf = lens_cutoff(rf)
 
     _, _, _, im1 = ax1.hist2d(rf[0] * 1e3, rf[2] * 1e3, bins=(nbins, nbins), cmap=plt.cm.jet);
     plt.colorbar(im1, ax = ax1)
@@ -109,12 +114,12 @@ def general_ray_plots(rf, lwl = 1032e-9, *, l_x = 0, u_x = 0.3, l_y = -5, u_y = 
 
     shadowgrapher = diag.Shadowgraphy(lwl, rf)
     shadowgrapher.single_lens_solve()
-    shadowgrapher.histogram(bin_scale = 1, clear_mem = False)
+    shadowgrapher.histogram(bin_scale = 1, clear_mem = False, extra_info = extra_info)
 
     axis[0].imshow(shadowgrapher.H, cmap = 'hot', interpolation = 'nearest', clim = (0.5, 1))
 
     refractometer = diag.Refractometry(lwl, rf)
     refractometer.incoherent_solve()
-    refractometer.histogram(bin_scale = 1, clear_mem = False)
+    refractometer.histogram(bin_scale = 1, clear_mem = False, extra_info = extra_info)
 
     axis[1].imshow(refractometer.H, cmap = 'hot', interpolation = 'nearest', clim = (0.5, 1))

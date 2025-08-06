@@ -66,7 +66,7 @@ divergence = 5e-5
 beam_size = extent_z * 0.9
 beam_type = "square"
 
-times = np.array(2, len(rays))
+times = np.array((2, len(rays)))
 
 for i, Np in enumerate(rays):
     domain = d.ScalarDomain(lengths, dims, ne_type = "test_exponential_cos", probing_direction = probing_direction)

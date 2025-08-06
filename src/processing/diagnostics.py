@@ -268,6 +268,23 @@ def ray(x, θ, y, ϕ):
 def d2r(d):
     # helper function, degrees to radians
     return d * jnp.pi / 180
+    
+def lens_cutoff(rf, *, L = 400, R = 25):
+        """
+        Masks the Jonesvector resulting array to avoid plotting any values outside of some set limit
+         - important as even if you set limits for the histogram to "zoom in", binning is based on raw data
+         --> leading to low resolutions if this is not used!
+
+        Args:
+            rf (jax.Array): Jonesvector output from solver
+            L (int): Length till next lens
+            R (int): Radius of lens
+
+        Return:
+            rf (jax.Array): Masked Jonesvector
+        """
+
+        return jnp.asarray(rf)[:, jnp.pow(jnp.pow(L * jnp.tan(rf[1]) + rf[0], 2) + jnp.pow(L * jnp.tan(rf[3]) + rf[2], 2), 0.5) <= R]
 
 class Diagnostic:
     """
@@ -305,15 +322,14 @@ class Diagnostic:
             # also preserves the whole pass if required
             if len(rf.shape) == 3:
                 #self.rf_full = rf
-                rf = rf[:, :, -1]
+                rf = rf[-1, :, :]
 
             self.Np = rf.shape[-1]
 
             # masks matrix such that rf only passes entries representing rays that will be captured by the lens system
-            self.rf = jnp.asarray(self.lens_cutoff(rf, self.L, self.R))
+            self.rf = jnp.asarray(lens_cutoff(rf, L = self.L, R = self.R))
 
             self.Np_inc = self.rf.shape[-1]
-
             if self.Np == self.Np_inc:
                 print("\nAll rays incident on lens!")
             else:
@@ -340,7 +356,7 @@ class Diagnostic:
 
         self.Jf = self.Jf.at[:, :].set(self.Jf[:, :] * jnp.exp(1.0j * k * jnp.sqrt(dx ** 2 + dy ** 2)))
 
-    def histogram(self, *, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False, plain_plot = False):
+    def histogram(self, *, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False, plain_plot = False, extra_info = True):
         """
         Bin data into a histogram. Defaults are for a KAF-8300.
         Outputs are H, the histogram, and xedges and yedges, the bin edges.
@@ -388,23 +404,6 @@ class Diagnostic:
         amplitude = jnp.sqrt(jnp.real(amplitude_x) ** 2 + jnp.real(amplitude_y) ** 2)
         # amplitude_normalised = (amplitude - amplitude.min()) / (amplitude.max() - amplitude.min()) # this line needs work and is currently causing problems
         self.H = amplitude
-    
-    def lens_cutoff(self, rf, L, R):
-        """
-        Masks the Jonesvector resulting array to avoid plotting any values outside of some set limit
-         - important as even if you set limits for the histogram to "zoom in", binning is based on raw data
-         --> leading to low resolutions if this is not used!
-
-        Args:
-            rf (jax.Array): Jonesvector output from solver
-            L (int): Length till next lens
-            R (int): Radius of lens
-
-        Return:
-            rf (jax.Array): Masked Jonesvector
-        """
-
-        return jnp.asarray(rf)[:, jnp.pow(jnp.pow(L * jnp.tan(rf[1]) + rf[0], 2) + jnp.pow(L * jnp.tan(rf[3]) + rf[2], 2), 0.5) <= R]
 
     def plot_rays(self, *, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
         self.histogram(bin_scale = bin_scale, pix_x = pix_x, pix_y = pix_y, clear_mem = clear_mem, plain_plot = True)

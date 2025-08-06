@@ -201,6 +201,7 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, ret
     if save_points_per_region == 2 or save_points_per_region == 1:
         rf = solutions[0].ys[:, -1, :].T
 
+        # depth_traced + trace_depth or just trace_depth
         return *ray_to_Jonesvector(rf, depth_traced + trace_depth, probing_direction = probing_direction, return_E = return_E), duration
     elif save_points_per_region > 2:
         slice_rf_list = []
@@ -219,17 +220,17 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, ret
                 if j < save_points_per_region - 1 or (j == save_points_per_region - 1 and i == len(solutions) - 1):
                     # sol.ts having shape of (Np, save_points_per_region) per region is very inefficent given there are N - 1 duplications
                     # - issue with diffrax though I can't fix this
-                    rf_slice, Jf_slice = ray_to_Jonesvector(solutions[i].ys[:, j, :].T, depth_traced + trace_depth * solutions[i].ts[0, j], probing_direction = probing_direction, return_E = return_E)
+                    rf_slice, Jf_slice = ray_to_Jonesvector(solutions[i].ys[:, j, :].T, depth_traced + trace_depth * solutions[i].ts[0, j], probing_direction = probing_direction, return_E = return_E, keep_current_plane = True)
 
                     slice_rf_list.append(rf_slice)
                     if Jf_slice is not None:
                         slice_Jf_list.append(Jf_slice)
 
-        rf = jnp.stack(slice_rf_list, axis = -1)
+        rf = jnp.stack(slice_rf_list, axis = 0)
         del slice_rf_list
 
         if len(slice_Jf_list) > 0:
-            Jf = jnp.stack(slice_Jf_list, axis = -1)
+            Jf = jnp.stack(slice_Jf_list, axis = 0)
             del slice_Jf_list
         else:
             Jf = None
@@ -580,7 +581,14 @@ def solve(s0_import, ScalarDomain, probing_depth, *, return_E = False, paralleli
             print(" - 2 to account for the start and end results (typical, can be greater if set)")
             print(" - 9 containing the 3 position and velocity components, amplitude, phase and polarisation")
             print(" - If batch_count is lower than expected, this is likely due to jax's forced integer batch sharding requirement over cpu cores.")
-            print("\nWe slice the end result and transpose into the form:", rf.shape, "to work with later code.")
+            
+            print("\nWe slice the", end = " ")
+            if len(rf.shape) == 3:
+                print("results", end = " ")
+            else:
+                print("end result", end = " ")
+            print("and transpose into the form:", rf.shape, "to work with later code.")
+
             #else:
             #    print("Ray tracer failed. This could be a case of diffrax exceeding max steps again due to apparent 'strictness' compared to solve_ivp, check error log.")
 
