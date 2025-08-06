@@ -4,10 +4,12 @@ import matplotlib as mpl
 #import numpy as np
 import jax.numpy as jnp
 
-import fresnel_integral
+import simulator.fresnel_integral
 
-from propagator import ray_to_Jonesvector
-from utils import count_nans
+from shared.propagation import ray_to_Jonesvector
+
+from shared.utils import count_nans
+from shared.utils import round_to_n
 
 #import jax
 #jax.tree_util.tree_leaves(x, is_leaf = lambda x: x is None)
@@ -28,7 +30,7 @@ rr0[4,:]-= 0.5 #rand generates [0,1], so we recentre [-0.5,0.5]
 rr0[5,:]-= 0.5
 
 #x, θ, y, ϕ
-scales=jnp.diag(jnp.array([10, 0, 10, 0, 1, 1j])) #set angles to 0, collimated beam. x, y in [-5,5]. Circularly polarised beam, E_x = iE_y
+scales=jnp.diag(jnp.asarray([10, 0, 10, 0, 1, 1j])) #set angles to 0, collimated beam. x, y in [-5,5]. Circularly polarised beam, E_x = iE_y
 rr0=jnp.matmul(scales, rr0)
 r0=circular_aperture(5, rr0) #cut out a circle
 
@@ -72,7 +74,7 @@ a=α(x, n_e0=ne0, w=w, Dx=Dx, x0=x0)
 n=ne(x, n_e0=ne0, w=w, Dx=Dx, x0=x0)
 ne0s=ne_ramp(y, ne_0=ne0, scale=s)
 
-nn=jnp.array([ne(x, n_e0=n0, w=w, Dx=Dx, x0=x0) for n0 in ne0s])
+nn=jnp.asarray([ne(x, n_e0=n0, w=w, Dx=Dx, x0=x0) for n0 in ne0s])
 nn=jnp.rot90(nn)
 
 ###PLOT SHOCKS###
@@ -138,9 +140,9 @@ def lens(r, f1, f2):
     See: https://en.wikipedia.org/wiki/Ray_transfer_matrix_analysis
     """
 
-    l1 = jnp.array([[1, 0],
+    l1 = jnp.asarray([[1, 0],
             [-1 / f1, 1]])
-    l2 = jnp.array([[1, 0],
+    l2 = jnp.asarray([[1, 0],
             [-1 / f2, 1]])
 
     L = jnp.zeros((4, 4))
@@ -161,8 +163,8 @@ def travel(r, d):
     See: https://en.wikipedia.org/wiki/Ray_transfer_matrix_analysis
     """
 
-    d = jnp.array([[1, d],
-                  [0, 1]])
+    d = jnp.asarray([[1, d],
+                     [0, 1]])
 
     L = jnp.zeros((4, 4))
 
@@ -291,23 +293,7 @@ class Diagnostic:
         self.x, self.y, self.x_l, self.y_l = x, y, x_l, y_l
         self.amp, self.phase = amp, phase
 
-        ##
-        ## Masks the Jonesvector resulting array to avoid plotting any values outside of our set limits
-        ## - important as even if you set limits for the histogram to "zoom in", binning is based on raw data
-        ## --> leading to low resolutions if this is not used
-        ##
-
-        x_theta = rf[1]
-        y_theta = rf[3]
-
-        mask = (x_theta >= l_x) & (x_theta <= u_x) & (y_theta >= l_y) & (x_theta <= u_y)
-
-        del x_theta
-        del y_theta
-
-        rf = rf[mask]
-
-        del mask
+        self.Np = rf.shape[-1]
 
         # these HAVE to stay... for some reason - not entirely sure why you can't just reference self.Beam.r_ directly (or now just rf)
         # if you can make it without the memory duplication work please do, else DON'T REMOVE!
@@ -317,12 +303,18 @@ class Diagnostic:
         # just re-assert type here to fix
 
         if rf is not None:
-            self.rf = jnp.array(rf)
+            # masks matrix such that rf only passes entries representing rays that will be captured by the lens system
+            self.rf = jnp.asarray(self.lens_cutoff(rf, self.L, self.R))
+
+            self.Np_inc = self.rf.shape[-1]
+
+            print("\n{} rays received, {} incident on the first lens.".format(str(self.Np), str(self.Np_inc)))
+            print(" --> {} % of rays wasted!".format(str(round_to_n((1 - self.Np_inc / self.Np) * 100, 3))))
         else:
             assert "rf should not be of Noneype! diffrax clearly failed."
 
         if Jf is not None:
-            self.Jf = jnp.array(Jf)
+            self.Jf = jnp.asarray(Jf)
         else:
             self.Jf = Jf
 
@@ -350,23 +342,7 @@ class Diagnostic:
             pix_y (int, optional): number of y pixels in detector plane. Defaults to 2574.
         """
 
-        '''
-        x = self.rf[0, :]
-        y = self.rf[2, :]
-
-        print("\nrf size expected: (", len(x), ", ", len(y), ")", sep='')
-
-        # means that jnp.isnan(a) returns True when a is not Nan
-        # ensures that x & y are the same length, if output of either is Nan then will not try to render ray in histogram
-        mask = ~jnp.isnan(x) & ~jnp.isnan(y)
-
-        x = x[mask]
-        y = y[mask]
-
-        print("rf after clearing nan's: (", len(x), ", ", len(y), ")", sep='')
-        '''
-
-        x, y = count_nans(rf)
+        x, y = count_nans(self.rf, ret = True)
 
         self.H, self.xedges, self.yedges = jnp.histogram2d(x, y, bins=[pix_x // bin_scale, pix_y // bin_scale], range=[[-self.Lx / 2, self.Lx / 2],[-self.Ly / 2, self.Ly / 2]])
         self.H = self.H.T
@@ -400,6 +376,23 @@ class Diagnostic:
         amplitude = jnp.sqrt(jnp.real(amplitude_x) ** 2 + jnp.real(amplitude_y) ** 2)
         # amplitude_normalised = (amplitude - amplitude.min()) / (amplitude.max() - amplitude.min()) # this line needs work and is currently causing problems
         self.H = amplitude
+    
+    def lens_cutoff(self, rf, L, R):
+        """
+        Masks the Jonesvector resulting array to avoid plotting any values outside of some set limit
+         - important as even if you set limits for the histogram to "zoom in", binning is based on raw data
+         --> leading to low resolutions if this is not used!
+
+        Args:
+            rf (jax.Array): Jonesvector output from solver
+            L (int): Length till next lens
+            R (int): Radius of lens
+
+        Return:
+            rf (jax.Array): Masked Jonesvector
+        """
+
+        return jnp.asarray(rf)[:, jnp.pow(jnp.pow(L * jnp.tan(rf[1]) + rf[0], 2) + jnp.pow(L * jnp.tan(rf[3]) + rf[2], 2), 0.5) <= R]
 
 class Shadowgraphy(Diagnostic):
     """

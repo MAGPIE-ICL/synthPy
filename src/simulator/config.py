@@ -74,11 +74,23 @@ def jax_init(force_device = None, core_limit = None, extra_info = False, disable
     import sys
     import os
 
-    from printing import colour
+    ### DO NOT REMOVE UNLESS YOU ARE VERY CERTAIN OF CORRECT PACKAGING
+
+    # os.getcwd()                                   # - don't want cwd, want the dir of this file
+    # os.path.dirname(os.path.realpath(__file__))   # cannot be called interactively - ? - seems's fine though
+    # sys.path[0]                                   # haven't tested...
+    # os.path.abspath(sys.argv[0])                  # haven't tested...
+
+    top_level_path = str(os.path.dirname(os.path.realpath(__file__))) + "/../"
+    print("Setting top level path for imports:" + top_level_path)
+    # makes sure top level directory path is present in system so that relative imports work
+    sys.path.insert(0, top_level_path)
+
+    from shared.printing import colour
     print(colour.BOLD)
 
     if disable_python_multithreading:
-        print("Disabling python multi-threading...\n")
+        print("\nDisabling python multi-threading...\n")
 
         thread_count = str(1)
         os.environ["OMP_NUM_THREADS"]        = thread_count

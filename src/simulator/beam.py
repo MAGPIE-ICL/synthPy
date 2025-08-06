@@ -1,11 +1,11 @@
 #import numpy as np
 import jax.numpy as jnp
 
-from utils import random_array
-from utils import random_array_n
-from utils import random_inv_pow_array
+from shared.utils import random_array
+from shared.utils import random_array_n
+from shared.utils import random_inv_pow_array
 
-from printing import colour
+from shared.printing import colour
 
 class Beam:
 # Initialise beam
@@ -31,11 +31,16 @@ class Beam:
         self.beam_type = beam_type
         self.wavelength = wavelength
 
+        if seeded:
+            self.seed = 42
+        else:
+            self.seed = None
+
         # calls actual initialisation of beam automatically, first function just initialises variables
         # forces ne_extent to negative when passed to init_beam(... ne_extent < 0 ...)
-        Beam.init_beam(self, -ne_extent, seeded) # [x if x < 0 else -x for x in jnp.array(ne_extent)]
+        Beam.init_beam(self, -ne_extent, self.seed) # [x if x < 0 else -x for x in jnp.array(ne_extent)]
 
-    def init_beam(self, ne_extent, seeded):
+    def init_beam(self, ne_extent, seed):
         """
         function designed to be called by the propagtor class during propagator init to complete the construction of the beam using parameters about the scalar domain
         [summary]
@@ -66,14 +71,14 @@ class Beam:
         s0 = jnp.zeros((9, Np))
         if(beam_type == 'circular'):
             # position, uniformly within a circle
-            t  = 2 * jnp.pi * random_array(Np, seeded) #polar angle of position
+            t  = 2 * jnp.pi * random_array(Np, seed) #polar angle of position
 
             # inversely weights probability with radius so that positions are uniformly distributed
-            u = random_inv_pow_array(2, Np, seeded) # radial coordinate of position
+            u = random_inv_pow_array(2, Np, seed) # radial coordinate of position
 
             # angle
             ϕ = jnp.pi * random_array(Np) #azimuthal angle of velocity
-            χ = divergence * random_array_n(Np, seeded) #polar angle of velocity
+            χ = divergence * random_array_n(Np, seed) #polar angle of velocity
 
             if(probing_direction == 'x'):
                 # Initial velocity
@@ -108,12 +113,12 @@ class Beam:
                 s0 = s0.at[2, :].set(beam_size * u * jnp.sin(t))
         elif(beam_type == 'square'):
             # position, uniformly within a square
-            t  = 2 * random_array(Np, seeded) - 1.0
-            u  = 2 * random_array(Np, seeded) - 1.0
+            t  = 2 * random_array(Np, seed) - 1.0
+            u  = 2 * random_array(Np, seed) - 1.0
 
             # angle
-            ϕ = jnp.pi * random_array(Np, seeded) #azimuthal angle of velocity
-            χ = divergence * random_array_n(Np, seeded) #polar angle of velocity
+            ϕ = jnp.pi * random_array(Np, seed) #azimuthal angle of velocity
+            χ = divergence * random_array_n(Np, seed) #polar angle of velocity
 
             if(probing_direction == 'x'):
                 # Initial velocity
@@ -151,12 +156,12 @@ class Beam:
             assert size_dim == 2, colour.BOLD + "\nERROR: " + colour.END + "Must pass a list of length 2 to initialise a rectangular beam," + size_dim + "item was passed."
 
             # position, uniformly within a square
-            t  = 2 * random_array(Np, seeded) - 1.0
-            u  = 2 * random_array(Np, seeded) - 1.0
+            t  = 2 * random_array(Np, seed) - 1.0
+            u  = 2 * random_array(Np, seed) - 1.0
 
             # angle
-            ϕ = jnp.pi * random_array(Np, seeded) #azimuthal angle of velocity
-            χ = divergence * random_array_n(Np, seeded) #polar angle of velocity
+            ϕ = jnp.pi * random_array(Np, seed) #azimuthal angle of velocity
+            χ = divergence * random_array_n(Np, seed) #polar angle of velocity
 
             beam_size_1 = beam_size[0] #m
             beam_size_2 = beam_size[1] #m
@@ -197,9 +202,9 @@ class Beam:
             del beam_size_2
         elif(beam_type == 'linear'):
             # position, uniformly along a line - probing direction is defaulted z, solved in x,z plane
-            t  = 2 * random_array(Np, seeded) - 1.0
+            t  = 2 * random_array(Np, seed) - 1.0
             # angle
-            χ = divergence * random_array_n(Np, seeded) #polar angle of velocity
+            χ = divergence * random_array_n(Np, seed) #polar angle of velocity
 
             # Initial velocity
             s0 = s0.at[3, :].set(c * jnp.sin(χ))
@@ -215,8 +220,8 @@ class Beam:
             Np = 3 * (num_of_circles + 1) * num_of_circles + 1 
 
             # angle
-            ϕ = jnp.pi * random_array(Np, seeded) #azimuthal angle of velocity
-            χ = divergence * random_array_n(Np, seeded) #polar angle of velocity
+            ϕ = jnp.pi * random_array(Np, seed) #azimuthal angle of velocity
+            χ = divergence * random_array_n(Np, seed) #polar angle of velocity
 
             # position, uniformly within a circle
             t = [0]
@@ -232,12 +237,12 @@ class Beam:
             # tracker_indices = jnp.random.choice(Np, N_trackers, replace=False)
 
             # position, uniformly within a square
-            t  = 2 * random_array(Np, seeded) - 1.0
-            u  = 2 * random_array(Np, seeded) - 1.0
+            t  = 2 * random_array(Np, seed) - 1.0
+            u  = 2 * random_array(Np, seed) - 1.0
 
             # angle
-            ϕ = jnp.pi * random_array(Np, seeded) #azimuthal angle of velocity
-            χ = divergence * random_array_n(Np, seeded) #polar angle of velocity
+            ϕ = jnp.pi * random_array(Np, seed) #azimuthal angle of velocity
+            χ = divergence * random_array_n(Np, seed) #polar angle of velocity
 
             beam_size_1 = beam_size[0] #m
             beam_size_2 = beam_size[1] #m

@@ -26,31 +26,30 @@ if args.cores is not None:
 #sys.path.insert(0, '../../../src/solvers-legacy')
 
 # attempts to fix path issues - need to find a resolution to the problem of relative paths on the HPC
-sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/simulator')
-sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/solvers-legacy')
+sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/')
 
-import config
+import simulator.config as config
 config.jax_init(core_limit = cores)
 
 import jax.numpy as jnp
 
 import importlib
 
-import beam as beam_initialiser
-import propagator as p
-import diagnostics as diag
+import simulator.beam as beam_initialiser
+import simulator.propagator as p
+import processing.diagnostics as diag
 
 importlib.reload(beam_initialiser)
 importlib.reload(p)
 importlib.reload(diag)
 
-import full_solver as fs
-import rtm_solver as rtm
+import solvers-legacy.full_solver as fs
+import solvers-legacy.rtm_solver as rtm
 
 importlib.reload(fs)
 importlib.reload(rtm)
 
-from printing import colour
+from utils.printing import colour
 
 extent_x = 5e-3
 extent_y = 5e-3

@@ -1,12 +1,12 @@
-import numpy as np
 import jax.numpy as jnp
 import jax
+
 import equinox as eqx
 
-from utils import mem_conversion
-from printing import colour
-from utils import dalloc
-from utils import domain_estimate
+from shared.utils import mem_conversion
+from shared.printing import colour
+from shared.utils import dalloc
+from shared.utils import domain_estimate
 
 class ScalarDomain(eqx.Module):
     """
@@ -315,7 +315,7 @@ class ScalarDomain(eqx.Module):
             self.ne = jnp.zeros(self.dims[0], self.dims[1], self.dims[2])
 
         if self.debug:
-            from utils import round_to_n
+            from shared.utils import round_to_n
 
             print(colour.BOLD + "\nScalarDomain object attribute info:" + colour.END)
             print(" --> lengths: {}, {}, {}".format(self.x_length, self.y_length, self.z_length))
