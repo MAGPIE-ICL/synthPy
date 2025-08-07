@@ -87,6 +87,11 @@ def resolve_path(path: str) -> str:
     # Handle root path (if path starts with '/')
     return '/' + '/'.join(stack) if path.startswith('/') else '/'.join(stack)
 
+##
+## HPC runs on older jax version than local (infact local requires newer version of jax than (as of writing) is released)
+## jax_updated [bool] filters for this, set it to False if on the HPC
+##
+
 def jax_init(force_device = None, core_limit = None, extra_info = False, disable_python_multithreading = True, enable_x64 = False, debugging = True, jax_updated = True):
     import sys
     import os
@@ -155,7 +160,8 @@ def jax_init(force_device = None, core_limit = None, extra_info = False, disable
     # triggers a jax breakpoint for debugging on error - works with filter_jit not jax.jit
     # if this is causing erroneous errors see equinox issue #1047: https://github.com/patrick-kidger/equinox/issues/1047
     if debugging:
-        os.environ["EQX_ON_ERROR"] = "breakpoint"
+        if jax_updated:
+            os.environ["EQX_ON_ERROR"] = "breakpoint"
 
     import jax
 

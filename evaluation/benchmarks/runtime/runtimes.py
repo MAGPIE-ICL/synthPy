@@ -22,9 +22,6 @@ cores = None
 if args.cores is not None:
     cores = args.cores
 
-#sys.path.insert(0, '../../../src/simulator')
-#sys.path.insert(0, '../../../src/solvers-legacy')
-
 # attempts to fix path issues - need to find a resolution to the problem of relative paths on the HPC
 sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/')
 
@@ -100,8 +97,8 @@ for i in range(len(rays)):
     times[1][i] = slab.duration
 
     print(colour.BOLD + "\n\nDuration of " + str(times[1][i]) + " sec for domain of size " + str(dims) + " ^3 and " + str(rays[i]) + " rays with legacy solver." + colour.END)
-    print(colour.BOLD + "\n\nDuration of " + str(times[0][i]) + " sec for domain of size " + str(dims) + " ^3 and " + str(rays[i]) + " rays with updated solver." + colour.END)
+    print(colour.BOLD + "\n\nDuration of " + str(times[0][i]) + " sec for domain of size " + str(dims) + " ^3 and " + str(rays[i]) + " rays with updated solver.\n" + colour.END)
 
 for i in range(len(rays)):
     print(colour.BOLD + "\n\nDuration of " + str(times[0][i]) + " sec for domain of size " + str(dims) + " ^3 and " + str(rays[i]) + " rays with updated solver." + colour.END)
-    print(colour.BOLD + "\n\nDuration of " + str(times[1][i]) + " sec for domain of size " + str(dims) + " ^3 and " + str(rays[i]) + " rays with legacy solver." + colour.END)
+    print(colour.BOLD + "\n\nDuration of " + str(times[1][i]) + " sec for domain of size " + str(dims) + " ^3 and " + str(rays[i]) + " rays with legacy solver.\n" + colour.END)
