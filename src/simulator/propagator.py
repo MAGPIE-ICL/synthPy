@@ -140,9 +140,10 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
 
     # Attenuation due to inverse bremsstrahlung
     if inv_brems:
-        sprime = sprime.at[6, :].set(trilinearInterpolator(x, y, z, kappa(ne, Te, Z, omega), r) * amp)
+        sprime = sprime.at[6, :].set(trilinearInterpolator((x, y, z), kappa(ne, Te, Z, omega), r) * amp)
     if phaseshift:
-        sprime = sprime.at[7, :].set(omega * (trilinearInterpolator(x, y, z, n_refrac(ne, omega), r) - 1.0))
+        sprime = sprime.at[7, :].set(omega * (trilinearInterpolator((x, y, z), n_refrac(ne, omega), r) - 1.0))
+
     if B_on:
         """
         Returns the VerdetConst ne B.v
@@ -155,14 +156,14 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
             N float: N values of ne B.v
         """
 
-        ne_N = trilinearInterpolator(x, y, z, ne, r)
+        ne_N = trilinearInterpolator((x, y, z), ne, r)
 
         Bv_N = jnp.sum(
             jnp.array(
                 [
-                    trilinearInterpolator(x, y, z, B[:, :, :, 0], r),
-                    trilinearInterpolator(x, y, z, B[:, :, :, 1], r),
-                    trilinearInterpolator(x, y, z, B[:, :, :, 2], r)
+                    trilinearInterpolator((x, y, z), B[:, :, :, 0], r),
+                    trilinearInterpolator((x, y, z), B[:, :, :, 1], r),
+                    trilinearInterpolator((x, y, z), B[:, :, :, 2], r)
                 ]
             ) * v, axis = 0
         )

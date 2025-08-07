@@ -268,23 +268,6 @@ def ray(x, θ, y, ϕ):
 def d2r(d):
     # helper function, degrees to radians
     return d * jnp.pi / 180
-    
-def lens_cutoff(rf, *, L = 400, R = 25):
-        """
-        Masks the Jonesvector resulting array to avoid plotting any values outside of some set limit
-         - important as even if you set limits for the histogram to "zoom in", binning is based on raw data
-         --> leading to low resolutions if this is not used!
-
-        Args:
-            rf (jax.Array): Jonesvector output from solver
-            L (int): Length till next lens
-            R (int): Radius of lens
-
-        Return:
-            rf (jax.Array): Masked Jonesvector
-        """
-
-        return jnp.asarray(rf)[:, jnp.pow(jnp.pow(L * jnp.tan(rf[1]) + rf[0], 2) + jnp.pow(L * jnp.tan(rf[3]) + rf[2], 2), 0.5) <= R]
 
 class Diagnostic:
     """
@@ -326,8 +309,9 @@ class Diagnostic:
 
             self.Np = rf.shape[-1]
 
-            # masks matrix such that rf only passes entries representing rays that will be captured by the lens system
-            self.rf = jnp.asarray(lens_cutoff(rf, L = self.L, R = self.R))
+            # masks rf (& Jf) to only hold entries corr. to rays that will be captured by the lense setup
+            # also forces matrices to type jax.Array via jnp.asarray()
+            self.rf, Jf = self.lens_cutoff(rf, Jf)
 
             self.Np_inc = self.rf.shape[-1]
             if self.Np == self.Np_inc:
@@ -395,11 +379,11 @@ class Diagnostic:
         x_indices = jnp.digitize(self.rf[0, :], x_bins) - 1
         y_indices = jnp.digitize(self.rf[2, :], y_bins) - 1
 
-        for i in range(self.rf.shape[1]):
-            if 0 <= x_indices[i] < amplitude_x.shape[1] and 0 <= y_indices[i] < amplitude_x.shape[0]:
-                # jax arrays are immutable - fix later
-                amplitude_x = amplitude_x.at[y_indices[i], x_indices[i]].set(amplitude_x[y_indices[i], x_indices[i]] + self.Jf[0, i])
-                amplitude_y = amplitude_y.at[y_indices[i], x_indices[i]].set(amplitude_y[y_indices[i], x_indices[i]] + self.Jf[1, i])
+        mask = (0 <= x_indices) & (x_indices < amplitude_x.shape[1]) & (0 <= y_indices) & (y_indices < amplitude_x.shape[0])
+
+        # jax arrays are immutable - fix later
+        amplitude_x = amplitude_x.at[y_indices[mask], x_indices[mask]].set(amplitude_x[y_indices[mask], x_indices[mask]] + self.Jf[0, mask])
+        amplitude_y = amplitude_y.at[y_indices[mask], x_indices[mask]].set(amplitude_y[y_indices[mask], x_indices[mask]] + self.Jf[1, mask])
 
         amplitude = jnp.sqrt(jnp.real(amplitude_x) ** 2 + jnp.real(amplitude_y) ** 2)
         # amplitude_normalised = (amplitude - amplitude.min()) / (amplitude.max() - amplitude.min()) # this line needs work and is currently causing problems
@@ -407,6 +391,34 @@ class Diagnostic:
 
     def plot_rays(self, *, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
         self.histogram(bin_scale = bin_scale, pix_x = pix_x, pix_y = pix_y, clear_mem = clear_mem, plain_plot = True)
+
+    def lens_cutoff(self, rf, Jf = None, *, L = None, R = None):
+            """
+            Masks the Jonesvector resulting array to avoid plotting any values outside of some set limit
+            - important as even if you set limits for the histogram to "zoom in", binning is based on raw data
+            --> leading to low resolutions if this is not used!
+
+            Args:
+                rf (jax.Array): Jonesvector output from solver
+                L (int): Length till next lens
+                R (int): Radius of lens
+
+            Return:
+                rf (jax.Array): Masked Jonesvector
+            """
+
+            if L is None:
+                L = self.L
+            if R is None:
+                R = self.R
+
+            mask = jnp.pow(jnp.pow(L * jnp.tan(rf[1]) + rf[0], 2) + jnp.pow(L * jnp.tan(rf[3]) + rf[2], 2), 0.5) <= R
+
+            rf = jnp.asarray(rf)[:, mask]
+            if Jf is not None:
+                Jf = jnp.asarray(Jf)[:, mask]
+
+            return rf, Jf
 
 class Shadowgraphy(Diagnostic):
     """
@@ -557,9 +569,6 @@ class Refractometry(Diagnostic):
         self.histogram_legacy(bin_scale = bin_scale, pix_x = pix_x, pix_y = pix_y, clear_mem = clear_mem)
 
     def fresnel_solve(self, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
-        # repeated across many functions, have made a wrapper for it instead of repeats to preserve backwards compatability
-        # was this replaced by jnp.histogram2d function?
-        # this function is far slower for a general histogram than the new function - yet is used for refractogram and interferogram so kept to be wrapped for those
         x_bins = jnp.linspace(-self.Lx // 2, self.Lx // 2, pix_x // bin_scale)
         y_bins = jnp.linspace(-self.Ly // 2, self.Ly // 2, pix_y // bin_scale)
 
@@ -606,9 +615,10 @@ class Interferometry(Diagnostic):
         y_weight = jnp.arctan(rad) #take x_weight is 1
         x_weight = jnp.sqrt(1 - y_weight**2)
 
-        ref_beam = jnp.exp(2 * n_fringes / 3 * 1.0j * (x_weight * self.rf[0,:] + y_weight * self.rf[2,:]))
+        ref_beam = jnp.exp(2 * n_fringes / 3 * 1.0j * (x_weight * self.rf[0, :] + y_weight * self.rf[2, :]))
 
-        self.Jf = self.Jf.at[1,:].set(self.Jf[1,:] + ref_beam) # assume ref_beam is polarised in y
+        self.Jf = self.Jf.at[1, :].set(self.Jf[1, :] + ref_beam) # assume ref_beam is polarised in y
+        print(self.Jf)
 
     def bkg(self, domain_length, n_fringes, deg, ne_extent):
         rr0, E0 = ray_to_Jonesvector(self.rf, ne_extent, probing_direction = probing_direction, keep_current_plane = True, return_E = True)
