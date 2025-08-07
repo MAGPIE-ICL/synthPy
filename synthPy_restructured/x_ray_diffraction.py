@@ -55,7 +55,7 @@ def fresnel_propagate(U0_prepared, L, wavelength, z, original_shape, pad_factor=
     
     return Uz_padded[start_x:end_x, start_y:end_y]
 
-def propagate(Propagator, jones_vector, amplitudes, phases, z, pad_factor = 2):
+def propagate(Propagator, jones_vector, amplitudes, phases, z, pad_factor = 2, res = 1):
     """
     Prepares and propagates the field, using an energy-dependent PSF.
     """
@@ -94,6 +94,7 @@ def propagate(Propagator, jones_vector, amplitudes, phases, z, pad_factor = 2):
     # amplitude_grid = amplitudes_interp((XX, YY))
     
     # U_0 = amplitude_grid * np.exp(-1j  * phase_grid)
+
     x_bins = Propagator.ScalarDomain.x
     y_bins = Propagator.ScalarDomain.y
 
@@ -104,10 +105,21 @@ def propagate(Propagator, jones_vector, amplitudes, phases, z, pad_factor = 2):
     
     for i in range(0, len(x_positions)):
         if x_indices[i] < field_grid.shape[0] and y_indices[i] < field_grid.shape[1]:
-            field_grid[y_indices[i], x_indices[i]] += amplitudes[i] * np.exp(-1j * phases[i])
-    U_0 = field_grid   
+            field_grid[x_indices[i], y_indices[i]] += amplitudes[i] * np.exp(-1j * phases[i])
+    U_0 = field_grid
+
+    dx = x_bins[1] - x_bins[0]
+    dy = y_bins[1] - y_bins[0]
+    x = np.linspace(x_bins[0] + dx/2, x_bins[-1] - dx/2, len(x_bins)-1)
+    y = np.linspace(y_bins[0] + dy/2, y_bins[-1] - dy/2, len(y_bins)-1)
+    U_0_interp = RGI((x, y), field_grid, bounds_error = False, fill_value = (0.0+0.0j))
+    x1 = np.linspace(-Propagator.ScalarDomain.x_length/2, Propagator.ScalarDomain.x_length/2, Propagator.ScalarDomain.x_n*res)
+    y1 = np.linspace(-Propagator.ScalarDomain.y_length/2, Propagator.ScalarDomain.y_length/2, Propagator.ScalarDomain.y_n*res)
+    XX, YY = np.meshgrid(x1, y1)
+    U_0 = U_0_interp((XX, YY))
 
     # U_0 = np.exp(-1j * k * (phase_slice - 1j * attenuation_slice))
+
     U_0_prepared = prepare_field_for_propagation(U_0, pad_factor = pad_factor)
     
     # Pass the dynamically calculated FWHM to the propagation function

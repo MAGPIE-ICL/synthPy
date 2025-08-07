@@ -56,7 +56,7 @@ class ScalarDomain:
 
         # Logical switches
         self.B_on = B_on
-
+        self.spherical = False
     def test_null(self):
         """
         Null test, an empty cube

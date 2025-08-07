@@ -4,10 +4,9 @@ import os
 from jax.scipy.interpolate import RegularGridInterpolator
 import jax.numpy as jnp
 from scipy.constants import c
-import jax
 import domain as d
+
 sys.path.insert(0, '../../utils')
-print(os.getcwd())
 from SpK_reader import open_emi_files
 
 def distance(x,y,z):
@@ -17,7 +16,6 @@ def spherical(domain, radii, ne, rho):
     radii = (0,) + radii
     domain.spherical = True
     domain.num_layers = len(ne)
-    domain.densities = jnp.array((0,) + rho)
     ne_grid = np.zeros_like(domain.XX)
     initialise  = [np.zeros_like(domain.XX)]
     rho_grid_list = len(rho)*initialise
