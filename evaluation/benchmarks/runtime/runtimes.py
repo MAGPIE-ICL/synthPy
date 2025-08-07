@@ -4,14 +4,14 @@ import sys
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-d", "--domain", type = int)
+parser.add_argument("-d", "--dims", type = int)
 parser.add_argument("-r", "--rays", type = int)
 parser.add_argument("-c", "--cores", type = int)
 args = parser.parse_args()
 
-domain = 128
-if args.domain is not None:
-    domain = args.domain
+dims = 128
+if args.dims is not None:
+    dims = args.dims
 
 if args.rays is not None:
     rays = args.rays
@@ -57,15 +57,13 @@ extent_x = 5e-3
 extent_y = 5e-3
 extent_z = 10e-3
 
-probing_extent = extent_z
-
 lengths = 2 * jnp.array([extent_x, extent_y, extent_z])
-dims = 128
 
-lwl = 1064e-9
-
-divergence = 5e-5
 beam_size = extent_z * 0.9
+divergence = 5e-5
+probing_extent = extent_z
+probing_direction = "z"
+lwl = 1064e-9
 beam_type = "square"
 
 times = np.array((2, len(rays)))
