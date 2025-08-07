@@ -1,7 +1,9 @@
-import jax.numpy as jnp
 import jax
+import jax.numpy as jnp
 
 import equinox as eqx
+
+#from functools import partial
 
 from shared.utils import mem_conversion
 from shared.printing import colour
@@ -59,7 +61,21 @@ class ScalarDomain(eqx.Module):
 
     debug: bool
 
-    def __init__(self, lengths, dims, *, ne_type = None, inv_brems = False, phaseshift = False, B_on = False, probing_direction = 'z', auto_batching = True, iteration = 1, region_count = 1, leeway_factor = None, coord_backup = None, future_dims = None, debug = False):
+    s: jnp.float32
+    s1: jnp.float32
+    s2: jnp.float32
+
+    Ly: jnp.float32
+
+    ne_0: jnp.float32
+
+    Bmax: jnp.float32
+
+    Te_min: jnp.float32
+
+    def __init__(self, lengths, dims, *, ne_type = None, inv_brems = False, phaseshift = False, B_on = False, probing_direction = 'z', auto_batching = True, iteration = 1, region_count = 1, leeway_factor = None, coord_backup = None, future_dims = None, debug = False,
+        s = None, s1 = None, s2 = None, Ly = None, ne_0 = None, ne = None, B = None, Bmax = None, Te = None, Te_min = None, Z = None):
+
         """
         Example:
             N_V = 100
@@ -76,11 +92,43 @@ class ScalarDomain(eqx.Module):
             extent (float): physical size, m
         """
 
-        # initalise to none for equinox incase not initialised properly later on
-        self.ne = None
-        self.B = None
-        self.Te = None
-        self.Z = None
+        # initalise
+        self.s = s
+        del s
+
+        self.s1 = s1
+        del s1
+
+        self.s2 = s2
+        del s2
+
+        self.Ly = Ly
+        del Ly
+
+        self.ne_0 = ne_0
+        del ne_0
+
+        self.ne = ne
+        del ne
+
+        self.B = B
+        del B
+
+        self.Bmax = Bmax
+        del Bmax
+
+        self.Te_min = Te_min
+        del Te_min
+
+        if self.Te_min is not None and Te is not None:
+            self.Te = jnp.maximum(self.Te_min, Te)
+        else:
+            self.Te = Te
+
+        del Te
+
+        self.Z = Z
+        del Z
 
         # Logical switches
         self.inv_brems = inv_brems
@@ -302,17 +350,20 @@ class ScalarDomain(eqx.Module):
             print(" --> y padded with: {} nan's".format(max_dim - self.y_n))
             print(" --> z padded with: {} nan's".format(max_dim - self.z_n))
 
-        if self.ne_type is not None:
-            self.generate_electron_density_profile()
+        if self.ne is None:
+            if self.ne_type is not None:
+                self.generate_electron_density_profile()
+            else:
+                assert auto_batching == True, colour.BOLD + "\nne_type must be passed to domain creation in order to utilise auto-batching." + colour.END
+
+                # can't initialise yourself as equinox.Module inherited class is not mutable and self.ne is set during creation -- FIX!
+                print("\nWARNING: Electron density profile to generate not passed. You will need to initialise this yourself with a call to this library.")
+                print("\t If you run low on memory, you can enforce a manual domain cleanup with a call to ScalarDomain.cleanup()")
+
+                self.XX, self.YY, self.ZZ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)#False) - has to be true for jnp
+                self.ne = jnp.zeros((self.dims[0], self.dims[1], self.dims[2]))
         else:
-            assert auto_batching == True, colour.BOLD + "\nne_type must be passed to domain creation in order to utilise auto-batching." + colour.END
-
-            # can't initialise yourself as equinox.Module inherited class is not mutable and self.ne is set during creation -- FIX!
-            print("\nWARNING: Electron density profile to generate not passed. You will need to initialise this yourself with a call to this library.")
-            print("\t If you run low on memory, you can enforce a manual domain cleanup with a call to ScalarDomain.cleanup()")
-
-            self.XX, self.YY, self.ZZ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)#False) - has to be true for jnp
-            self.ne = jnp.zeros(self.dims[0], self.dims[1], self.dims[2])
+            print("\nUsing imported ne domain. Be careful that your import matches with other passed variables, this is not sanity checked by the init function.")
 
         if self.debug:
             from shared.utils import round_to_n
@@ -362,6 +413,7 @@ class ScalarDomain(eqx.Module):
         etc...
         '''
 
+    #@partial(jax.jit, static_argnames=("self",))  
     def generate_electron_density_profile(self):
         print("\nGenerating test", end = " ")
         if self.ne_type == "test_null":
@@ -394,11 +446,22 @@ class ScalarDomain(eqx.Module):
             self.ZZ = None
 
             self.test_exponential_cos()
+        elif self.ne_type == "test_B":
+            print("testB field...")
+            self.XX, _, _ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)
+
+            self.YY = None
+            self.ZZ = None
+
+            self.test_B()
+        elif self.ne_type == "import":
+            pass
         else:
             assert "\nNo valid profile detected! Ensure passed name is correct or call yourself."
 
         self.cleanup()
 
+    #@partial(jax.jit, static_argnames=("self",))  
     def test_null(self):
         """
         Null test, an empty cube
@@ -406,6 +469,7 @@ class ScalarDomain(eqx.Module):
 
         self.ne = self.ne.at[:, :, :].set(jnp.zeros_like(self.XX))
 
+    #@partial(jax.jit, static_argnames=("self",))  
     def test_slab(self, *, s = 1, ne_0 = 2e23):
         """
         A slab with a linear gradient in x:
@@ -418,8 +482,14 @@ class ScalarDomain(eqx.Module):
             ne_0 ([type], optional): mean density. Defaults to 2e23 m^-3.
         """
 
+        if self.s is not None:
+            s = self.s
+        if self.ne_0 is not None:
+            ne_0 = self.ne_0
+
         self.ne = self.ne.at[:, :, :].set(ne_0 * (1.0 + s * self.XX / self.x_length))
 
+    #@partial(jax.jit, static_argnames=("self",))  
     def test_linear_cos(self, *, s1 = 0.1, s2 = 0.1, ne_0 = 2e23, Ly = 1):
         """
         Linearly growing sinusoidal perturbation
@@ -431,8 +501,18 @@ class ScalarDomain(eqx.Module):
             Ly (int, optional): spatial scale of sinusoidal perturbation. Defaults to 1.
         """
 
+        if self.s1 is not None:
+            s1 = self.s1
+        if self.s2 is not None:
+            s2 = self.s2
+        if self.ne_0 is not None:
+            ne_0 = self.ne_0
+        if self.Ly is not None:
+            Ly = self.Ly
+
         self.ne = self.ne.at[:, :, :].set(ne_0 * (1.0 + s1 * self.XX / self.x_length) * (1 + s2 * jnp.cos(2 * jnp.pi * self.YY / Ly)))
     
+    #@partial(jax.jit, static_argnames=("self",))  
     def test_exponential_cos(self, *, ne_0 = 1e24, Ly = 1e-3, s = -2e-3):
         """
         Exponentially growing/decaying sinusoidal perturbation
@@ -443,14 +523,21 @@ class ScalarDomain(eqx.Module):
             s ([type], optional): scale of exponential change. Defaults to -2e-3 m (exponential decay).
         """
 
-        self.XX = self.XX.at[:, :].set(self.XX / s)
-        self.XX = self.XX.at[:, :].set(10 ** self.XX)
+        if self.ne_0 is not None:
+            ne_0 = self.ne_0
+        if self.Ly is not None:
+            Ly = self.Ly
+        if self.s is not None:
+            s = self.s
 
-        self.YY = self.YY.at[:, :].set(self.YY / Ly)
-        self.YY = self.YY.at[:, :].set(jnp.pi * self.YY)
-        self.YY = self.YY.at[:, :].set(2 * self.YY)
-        self.YY = self.YY.at[:, :].set(jnp.cos(self.YY))
-        self.YY = self.YY.at[:, :].set(1 + self.YY)
+        self.XX = self.XX.at[:, :, :].set(self.XX / s)
+        self.XX = self.XX.at[:, :, :].set(10 ** self.XX)
+
+        self.YY = self.YY.at[:, :, :].set(self.YY / Ly)
+        self.YY = self.YY.at[:, :, :].set(jnp.pi * self.YY)
+        self.YY = self.YY.at[:, :, :].set(2 * self.YY)
+        self.YY = self.YY.at[:, :, :].set(jnp.cos(self.YY))
+        self.YY = self.YY.at[:, :, :].set(1 + self.YY)
 
         # any difference if float32 (or even 64 if changed later) or not? shouldn't be.
         self.ne = self.XX * self.YY
@@ -460,6 +547,8 @@ class ScalarDomain(eqx.Module):
 
         #self.ne = jnp.float32(ne_0 * 10 ** (self.XX / s) * (1 + jnp.cos(2 * jnp.pi * self.YY / Ly)))
 
+    '''
+    #@partial(jax.jit, static_argnames=("self",))  
     def external_ne(self, *, ne):
         """
         Load externally generated grid
@@ -468,8 +557,9 @@ class ScalarDomain(eqx.Module):
             ne ([type]): MxMxM grid of density in m^-3
         """
 
-        self.ne = self.ne.at[:, :, :].set(ne)
+        self.ne = self.ne.at[:, :, :].set(self.ne)
 
+    #@partial(jax.jit, static_argnames=("self",))  
     def external_B(self, *, B):
         """
         Load externally generated grid
@@ -480,6 +570,7 @@ class ScalarDomain(eqx.Module):
 
         self.B = self.B.at[:, :, :].set(B)
 
+    #@partial(jax.jit, static_argnames=("self",))  
     def external_Te(self, *, Te, Te_min = 1.0):
         """
         Load externally generated grid
@@ -490,6 +581,7 @@ class ScalarDomain(eqx.Module):
 
         self.Te = self.Te.at[:, :, :].set(jnp.maximum(Te_min, Te))
 
+    #@partial(jax.jit, static_argnames=("self",))  
     def external_Z(self, *, Z):
         """
         Load externally generated grid
@@ -499,7 +591,9 @@ class ScalarDomain(eqx.Module):
         """
 
         self.Z = self.Z.at[:, :, :].set(Z)
-        
+    '''
+
+    #@partial(jax.jit, static_argnames=("self",))  
     def test_B(self, *, Bmax = 1.0):
         """
         A Bz field with a linear gradient in x:
@@ -508,6 +602,9 @@ class ScalarDomain(eqx.Module):
         Args:
             Bmax ([type], optional): maximum B field, default 1.0 T
         """
+
+        if self.Bmax is not None:
+            Bmax = self.Bmax
 
         self.B = self.B.at[:, :, :, :].set(jnp.zeros(jnp.append(jnp.array(self.XX.shape), 3)))
         self.B = self.B.at[:, :, :, 2].set(Bmax * self.XX / self.x_length)
@@ -588,6 +685,7 @@ class ScalarDomain(eqx.Module):
 
         print(f'Scalar Domain electron density succesfully saved under {fname}.pvti !')
 
+    #@jax.jit
     def cleanup(self):
         if self.XX is not None:
             dalloc(self.XX)
