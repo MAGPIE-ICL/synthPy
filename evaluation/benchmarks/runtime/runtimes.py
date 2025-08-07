@@ -14,9 +14,9 @@ if args.dims is not None:
     dims = args.dims
 
 if args.rays is not None:
-    rays = args.rays
+    rays = np.array(args.rays).astype(np.int32)
 else:
-    rays = np.array([1e5, 1e6, 1e7, 1e8, 1e9])
+    rays = np.array([1e5, 1e6, 1e7, 1e8, 1e9], dtype = np.int32)
 
 cores = None
 if args.cores is not None:
@@ -71,7 +71,7 @@ probing_direction = "z"
 lwl = 1064e-9
 beam_type = "square"
 
-times = np.zeros((2, len(rays)), dtype = np.int32)
+times = np.zeros((2, len(rays)))
 
 for i in range(len(rays)):
     domain = d.ScalarDomain(lengths, dims, ne_type = "test_exponential_cos", probing_direction = probing_direction)

@@ -560,7 +560,7 @@ def init_beam(Np, beam_size, divergence, ne_extent, beam_type, probing_direction
         s0, 9 x N float: N rays with (x, y, z, vx, vy, vz) in m, m/s and amplitude, phase and polarisation (a, p, r) 
     """
 
-    s0 = np.zeros((9,Np))
+    s0 = np.zeros((9, Np))
 
     if (beam_type == 'circular'):
         # position, uniformly within a circle

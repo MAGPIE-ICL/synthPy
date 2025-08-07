@@ -569,26 +569,8 @@ class Refractometry(Diagnostic):
         self.histogram_legacy(bin_scale = bin_scale, pix_x = pix_x, pix_y = pix_y, clear_mem = clear_mem)
 
     def fresnel_solve(self, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
-        x_bins = jnp.linspace(-self.Lx // 2, self.Lx // 2, pix_x // bin_scale)
-        y_bins = jnp.linspace(-self.Ly // 2, self.Ly // 2, pix_y // bin_scale)
-
-        amplitude_x = jnp.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype = complex)
-        amplitude_y = jnp.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype = complex)
-
-        x_indices = jnp.digitize(self.rf[0, :], x_bins) - 1
-        y_indices = jnp.digitize(self.rf[2, :], y_bins) - 1
-
         self.Jf = fresnel_integral.propagate(self.wavelength, self.x, self.y, self.x_l, self.y_l, self.r0, self.amp, self.phase, 3 * self.L / 4 - self.focal_plane)
-
-        for i in range(self.rf.shape[1]):
-            if 0 <= x_indices[i] < amplitude_x.shape[1] and 0 <= y_indices[i] < amplitude_x.shape[0]:
-                # jax arrays are immutable - fix later
-                amplitude_x = amplitude_x.at[y_indices[i], x_indices[i]].set(amplitude_x[y_indices[i], x_indices[i]] + self.Jf[0, i])
-                amplitude_y = amplitude_y.at[y_indices[i], x_indices[i]].set(amplitude_y[y_indices[i], x_indices[i]] + self.Jf[1, i])
-
-        amplitude = jnp.sqrt(jnp.real(amplitude_x) ** 2 + jnp.real(amplitude_y) ** 2)
-        # amplitude_normalised = (amplitude - amplitude.min()) / (amplitude.max() - amplitude.min()) # this line needs work and is currently causing problems
-        self.H = amplitude
+        self.histogram_legacy(bin_scale = bin_scale, pix_x = pix_x, pix_y = pix_y, clear_mem = clear_mem)
 
 class Interferometry(Diagnostic):
     """
