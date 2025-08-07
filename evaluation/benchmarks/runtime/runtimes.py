@@ -83,7 +83,7 @@ for i in range(len(rays)):
     _, _, duration = p.solve(beam_definition.s0, domain, probing_extent)
 
     times[0][i] = duration
-    print(colour.BOLD + "\n\nDuration of" + str(times[0][i]) + "sec for domain of size" + str(dims) + "^3 and" + str(Np) + "rays with updated solver." + colour.END)
+    print(colour.BOLD + "\n\nDuration of" + str(times[0][i]) + "sec for domain of size" + str(dims) + "^3 and" + str(rays[i]) + "rays with updated solver." + colour.END)
 
 for i in range(len(rays)):
     slab = fs.ScalarDomain(ne_x, ne_y, ne_z, ne_extent)
@@ -100,8 +100,8 @@ for i in range(len(rays)):
     slab.solve(s0)
 
     times[1][i] = slab.duration
-    print(colour.BOLD + "\n\nDuration of" + str(times[1][i]) + "sec for domain of size" + str(dims) + "^3 and" + str(Np) + "rays with legacy solver." + colour.END)
+    print(colour.BOLD + "\n\nDuration of" + str(times[1][i]) + "sec for domain of size" + str(dims) + "^3 and" + str(rays[i]) + "rays with legacy solver." + colour.END)
 
 for i in range(len(rays)):
-    print(colour.BOLD + "\nDuration of" + str(times[0][i]) + "sec for domain of size" + str(dims) + "^3 and" + str(Np) + "rays with updated solver." + colour.END)
-    print(colour.BOLD + "Duration of" + str(times[1][i]) + "sec for domain of size" + str(dims) + "^3 and" + str(Np) + "rays with legacy solver." + colour.END)
+    print(colour.BOLD + "\nDuration of" + str(times[0][i]) + "sec for domain of size" + str(dims) + "^3 and" + str(rays[i]) + "rays with updated solver." + colour.END)
+    print(colour.BOLD + "Duration of" + str(times[1][i]) + "sec for domain of size" + str(dims) + "^3 and" + str(rays[i]) + "rays with legacy solver." + colour.END)
