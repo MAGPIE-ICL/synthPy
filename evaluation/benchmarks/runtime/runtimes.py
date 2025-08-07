@@ -66,13 +66,13 @@ probing_direction = "z"
 lwl = 1064e-9
 beam_type = "square"
 
-times = np.array((2, len(rays)))
+times = np.zeros((2, len(rays)))
 
-for i, Np in enumerate(rays):
+for i in range(len(rays)):
     domain = d.ScalarDomain(lengths, dims, ne_type = "test_exponential_cos", probing_direction = probing_direction)
 
     beam_definition = beam_initialiser.Beam(
-        Np, beam_size,
+        rays[i], beam_size,
         divergence,
         probing_extent,
         probing_direction = probing_direction,
@@ -85,14 +85,14 @@ for i, Np in enumerate(rays):
     times[0][i] = duration
     print(colour.BOLD + "\n\nDuration of" + times[0][i] + "sec for domain of size" + dims + "^3 and" + Np + "rays with updated solver." + colour.END)
 
-for i, Np in enumerate(rays):
+for i in range(len(rays)):
     slab = fs.ScalarDomain(ne_x, ne_y, ne_z, ne_extent)
     slab.test_exponential_cos(n_e0 = 2e17 * 1e6, Ly = 1e-3, s = -4e-3)
     slab.calc_dndr(lwl)
 
     ## Initialise rays and solve
     s0 = fs.init_beam(
-        Np, beam_size, divergence, ne_extent,
+        rays[i], beam_size, divergence, ne_extent,
         probing_direction = probing_direction,
         beam_type = beam_type
     )
