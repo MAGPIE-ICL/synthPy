@@ -206,9 +206,9 @@ class ScalarDomain(eqx.Module):
                 free_mem = info.free
 
                 print("\nMemory prior to domain creation:")
-                print(f'total : {mem_conversion(info.total)}')
-                print(f'free  : {mem_conversion(info.free)}')
-                print(f'used  : {mem_conversion(info.used)}')
+                print(f' - total : {mem_conversion(info.total)}')
+                print(f' - free  : {mem_conversion(info.free)}')
+                print(f' - used  : {mem_conversion(info.used)}')
             elif running_device == 'tpu':
                 free_mem = None
             else:

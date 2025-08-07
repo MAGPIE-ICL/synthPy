@@ -250,6 +250,7 @@ def solve(s0_import, ScalarDomain, probing_depth, *, return_E = False, paralleli
     Np = s0_import.shape[1]
 
     print("\nSize in memory of initial rays:", mem_conversion(getsizeof_default(s0_import) * Np))
+    print(" --> Np = {}".format(Np))
     # if batched: or if auto_batching: etc.
     # proing_depth /= some integer with some corrections I expect
     # make logic too loop it and pick up from previous solution

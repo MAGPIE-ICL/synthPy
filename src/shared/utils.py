@@ -93,8 +93,13 @@ def dalloc(var):
         var = None
         #print(f'set {var = }')
 
-def domain_estimate(dim):
-    return dim[0] * dim[1] * dim[2] * 4
+def domain_estimate(dim, *, enable_x64 = False):
+    if enable_x64:
+        conv = 8
+    else:
+        conv = 4
+
+    return dim[0] * dim[1] * dim[2] * conv
 
 def add_integer_postfix(int):
     if int // 10 == 1:
