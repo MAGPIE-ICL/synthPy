@@ -66,7 +66,7 @@ probing_direction = "z"
 lwl = 1064e-9
 beam_type = "square"
 
-times = np.zeros((2, len(rays)))
+times = np.zeros((2, len(rays)), dtype = np.int32)
 
 for i in range(len(rays)):
     domain = d.ScalarDomain(lengths, dims, ne_type = "test_exponential_cos", probing_direction = probing_direction)
