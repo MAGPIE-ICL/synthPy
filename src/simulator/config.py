@@ -87,7 +87,7 @@ def resolve_path(path: str) -> str:
     # Handle root path (if path starts with '/')
     return '/' + '/'.join(stack) if path.startswith('/') else '/'.join(stack)
 
-def jax_init(force_device = None, core_limit = None, extra_info = False, disable_python_multithreading = True, enable_x64 = False, debugging = False):
+def jax_init(force_device = None, core_limit = None, extra_info = False, disable_python_multithreading = True, enable_x64 = False, debugging = True, jax_updated = True):
     import sys
     import os
 
@@ -169,8 +169,9 @@ def jax_init(force_device = None, core_limit = None, extra_info = False, disable
         jax.config.update('jax_traceback_filtering', 'off')
         # HPC doesn't recognise these config options due to old jax version (added in jax-0.6.0)
         # - you need to speak to RCS to get an updated version (either forcing them to do it or to find out how to do it yourself)
-        jax.config.update('jax_captured_constants_report_frames', -1)
-        jax.config.update('jax_captured_constants_warn_bytes', 128 * 1024 ** 2)
+        if jax_updated:
+            jax.config.update('jax_captured_constants_report_frames', -1)
+            jax.config.update('jax_captured_constants_warn_bytes', 128 * 1024 ** 2)
 
     print(colour.END)
 

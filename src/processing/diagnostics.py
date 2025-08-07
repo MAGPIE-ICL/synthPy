@@ -393,32 +393,32 @@ class Diagnostic:
         self.histogram(bin_scale = bin_scale, pix_x = pix_x, pix_y = pix_y, clear_mem = clear_mem, plain_plot = True)
 
     def lens_cutoff(self, rf, Jf = None, *, L = None, R = None):
-            """
-            Masks the Jonesvector resulting array to avoid plotting any values outside of some set limit
-            - important as even if you set limits for the histogram to "zoom in", binning is based on raw data
-            --> leading to low resolutions if this is not used!
+        """
+        Masks the Jonesvector resulting array to avoid plotting any values outside of some set limit
+        - important as even if you set limits for the histogram to "zoom in", binning is based on raw data
+        --> leading to low resolutions if this is not used!
 
-            Args:
-                rf (jax.Array): Jonesvector output from solver
-                L (int): Length till next lens
-                R (int): Radius of lens
+        Args:
+            rf (jax.Array): Jonesvector output from solver
+            L (int): Length till next lens
+            R (int): Radius of lens
 
-            Return:
-                rf (jax.Array): Masked Jonesvector
-            """
+        Return:
+            rf (jax.Array): Masked Jonesvector
+        """
 
-            if L is None:
-                L = self.L
-            if R is None:
-                R = self.R
+        if L is None:
+            L = self.L
+        if R is None:
+            R = self.R
 
-            mask = jnp.pow(jnp.pow(L * jnp.tan(rf[1]) + rf[0], 2) + jnp.pow(L * jnp.tan(rf[3]) + rf[2], 2), 0.5) <= R
+        mask = jnp.pow(jnp.pow(L * jnp.tan(rf[1]) + rf[0], 2) + jnp.pow(L * jnp.tan(rf[3]) + rf[2], 2), 0.5) <= R
 
-            rf = jnp.asarray(rf)[:, mask]
-            if Jf is not None:
-                Jf = jnp.asarray(Jf)[:, mask]
+        rf = jnp.asarray(rf)[:, mask]
+        if Jf is not None:
+            Jf = jnp.asarray(Jf)[:, mask]
 
-            return rf, Jf
+        return rf, Jf
 
 class Shadowgraphy(Diagnostic):
     """
@@ -604,21 +604,18 @@ class Interferometry(Diagnostic):
             'Interfered with' E field
         """
 
-        if self.Jf == None:
-            print("This diagnostic requires a calculated Jf matrix.")
-            return None
+        assert self.Jf is not None, print("\nThis diagnostic requires a calculated Jf matrix.")
 
         if deg >= 45:
             deg = - jnp.abs(deg - 90)
 
-        rad = deg * jnp.pi /180 #deg to rad
+        rad = deg * jnp.pi / 180 #deg to rad
         y_weight = jnp.arctan(rad) #take x_weight is 1
         x_weight = jnp.sqrt(1 - y_weight**2)
 
         ref_beam = jnp.exp(2 * n_fringes / 3 * 1.0j * (x_weight * self.rf[0, :] + y_weight * self.rf[2, :]))
 
         self.Jf = self.Jf.at[1, :].set(self.Jf[1, :] + ref_beam) # assume ref_beam is polarised in y
-        print(self.Jf)
 
     def bkg(self, domain_length, n_fringes, deg, ne_extent):
         rr0, E0 = ray_to_Jonesvector(self.rf, ne_extent, probing_direction = probing_direction, keep_current_plane = True, return_E = True)
@@ -677,5 +674,5 @@ class Interferometry(Diagnostic):
 
         self.rf = r7
 
-    def interferogram(self, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
+    def interferogram(self, *, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
         self.histogram_legacy(bin_scale = bin_scale, pix_x = pix_x, pix_y = pix_y, clear_mem = clear_mem)
