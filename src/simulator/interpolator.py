@@ -1,3 +1,4 @@
+import jax
 import jax.numpy as jnp
 
 from itertools import product
@@ -11,6 +12,7 @@ from jax._src.numpy.util import check_arraylike, promote_dtypes_inexact
 # if we can sort out my original solution to this - clip would not be necessary at all
 # can we speed this up even further?
 
+@jax.jit
 def RegularGridInterpolator(points, values, xi, method = "linear", bounds_error = False, fill_value = 0.0):
     if method != "linear":
         raise NotImplementedError("`method` has no effect, defaults to `linear` with no other options available")

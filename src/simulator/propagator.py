@@ -497,7 +497,7 @@ def solve(s0_import, ScalarDomain, probing_depth, *, return_E = False, paralleli
             )
 
         duration = time() - start
-        print("\nCompleted ray trace in", jnp.round(duration, 3), "seconds.")
+        print("\nCompleted ray trace in", colour.BOLD + str(jnp.round(duration, 3)) + colour.END, "seconds.")
 
         solutions.append(sol)
 
