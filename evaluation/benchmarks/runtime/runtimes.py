@@ -54,8 +54,16 @@ extent_x = 5e-3
 extent_y = 5e-3
 extent_z = 10e-3
 
+# legacy
+ne_x = np.linspace(-extent_x, extent_x, dims)
+ne_y = np.linspace(-extent_y, extent_y, dims)
+ne_z = np.linspace(-extent_z, extent_z, dims)
+ne_extent = extent_z
+
+# updated
 lengths = 2 * jnp.array([extent_x, extent_y, extent_z])
 
+# general
 beam_size = extent_z * 0.9
 divergence = 5e-5
 probing_extent = extent_z

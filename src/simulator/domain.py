@@ -143,7 +143,8 @@ class ScalarDomain(eqx.Module):
         if leeway_factor is not None:
             self.leeway_factor = leeway_factor
         else:
-            self.leeway_factor = 1.1
+            # set to 2 as a result of concerns of ray memory size
+            self.leeway_factor = 2
 
         self.debug = debug
 
@@ -235,11 +236,14 @@ class ScalarDomain(eqx.Module):
             if phaseshift:
                 allocation_count += 1
 
-            estimate_limit = predicted_domain_allocation * allocation_count * self.leeway_factor
-            print("Est. memory limit: {} --> inc. +{}% variance margin.".format(mem_conversion(estimate_limit), jnp.int32((self.leeway_factor - 1) * 100)))
+            estimate_limit = jnp.float32(predicted_domain_allocation * allocation_count * self.leeway_factor)
+            print(estimate_limit)
+            print(mem_conversion(estimate_limit))
+            print(str(mem_conversion(estimate_limit)))
+            print("Est. memory limit: {} --> inc. +{}% variance margin.".format(str(mem_conversion(estimate_limit)), jnp.int32((self.leeway_factor - 1) * 100)))
 
             # when jnp.float32 is not used, will cause overflow error if 64 bit floats are not enabled
-            if jnp.float32(estimate_limit) > jnp.float32(free_mem):
+            if estimate_limit > jnp.float32(free_mem):
                 print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
                 print("--> Auto-batching domain based on memory available and domain size estimate...")
 

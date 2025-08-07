@@ -338,7 +338,7 @@ class Diagnostic:
 
         k = 2 * jnp.pi / self.wavelength
 
-        self.Jf = self.Jf.at[:, :].set(self.Jf[:, :] * jnp.exp(1.0j * k * jnp.sqrt(dx ** 2 + dy ** 2)))
+        self.Jf = self.Jf.at[:, :].set(self.Jf[:, :] * jnp.exp(1.0j * k * jnp.sqrt(dx ** 2 + dy ** 2 + (r1[1, :] - r0[1, :]) ** 2)))
 
     def histogram(self, *, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False, plain_plot = False, extra_info = True):
         """
@@ -522,7 +522,6 @@ class Refractometry(Diagnostic):
         r8 = travel(r7, self.L)               # displace rays to detector
         self.rf = r8
 
-    '''
     def coherent_solve(self):
         ## Imaging the spatial axis - M = 2 - Coherent Implementation of the Refractometer
         r1 = travel(self.r0, 3 * self.L / 4 - self.focal_plane)
@@ -542,13 +541,12 @@ class Refractometry(Diagnostic):
 
         self.rf = travel(r6, self.L)               # displace rays to detector
         self.propagate_E(self.rf, r6)
-    '''
 
-    def coherent_solve(self):
+    def coherent_solve_alt(self):
         ## Imaging the spatial axis - M = 2 - Coherent Implementation of the Refractometer
         r1 = travel(self.r0, 3 * self.L / 4 - self.focal_plane)
 
-        r2, self.Jf = circular_aperture(self.r0, self.R, E = self.Jf)      # cut off
+        r2, self.Jf = circular_aperture(r1, self.R, E = self.Jf)      # cut off
         # propagate E field
         self.propagate_E(r2, r1)
 
@@ -556,9 +554,11 @@ class Refractometry(Diagnostic):
         self.propagate_E(r3, r2)
 
         r4 = travel(r3, 3 * self.L / 2)
-        self.propagate_E(r4, r3)                 # displace rays to lens 2 - hybrid
 
         r5, self.Jf = circular_aperture(r4, self.R, E = self.Jf)      # cut off
+        self.propagate_E(r4, r3)                 # displace rays to lens 2 - hybrid
+        self.propagate_E(r5, r4)                 # displace rays to lens 2 - hybrid
+
         r6 = lens(r5, self.L / 3, self.L / 2)       # lens 2 - hybrid lens
         self.propagate_E(r6, r5)
 

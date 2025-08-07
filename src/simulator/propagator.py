@@ -250,8 +250,14 @@ def solve(s0_import, ScalarDomain, probing_depth, *, return_E = False, paralleli
 
     Np = s0_import.shape[1]
 
-    print("\nSize in memory of initial rays:", mem_conversion(getsizeof_default(s0_import) * Np))
+    # s0_import[:, 0] and s0_import input to getsizeof_default(...) produce the same result
+    # I think this estimation is correct, if jax reports failing to allocate a lower amount, check the amount reported isn't just the max memory available
+    # if it is, estimation is likely correct and this is just an issue with reporting
+    # if it is lower, you likely have a memory leak
+    # this is relevant generally not just for ray memory - just cropped up as an issue here first
+    print("\nSize in memory of initial rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np))
     print(" --> Np = {}".format(Np))
+
     # if batched: or if auto_batching: etc.
     # proing_depth /= some integer with some corrections I expect
     # make logic too loop it and pick up from previous solution
