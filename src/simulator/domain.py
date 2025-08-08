@@ -160,6 +160,7 @@ class ScalarDomain(eqx.Module):
             self.lengths = jnp.array([lengths, lengths, lengths])
         # if array given, checks len = 3 and assigns accordingly
         else:
+            print(len(lengths))
             if len(lengths) != 3:
                 raise Exception('lengths must have len = 3: (x,y,z)')
 
