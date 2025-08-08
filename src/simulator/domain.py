@@ -202,7 +202,8 @@ class ScalarDomain(eqx.Module):
         #print(self.dims)
         #print(domain_estimate(self.dims))
         #print(np.int64(domain_estimate(self.dims)))
-        predicted_domain_allocation = self.dims[0] * self.dims[1] * self.dims[2] * 4#np.int64(domain_estimate(self.dims))
+        predicted_domain_allocation = self.x_n * self.y_n * self.z_n * 4#np.int64(domain_estimate(self.dims))
+        print(predicted_domain_allocation)
         print("Predicted size in memory of domain:", mem_conversion(predicted_domain_allocation))
 
         if iteration == 1 and auto_batching:
