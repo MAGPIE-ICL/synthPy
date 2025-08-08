@@ -53,7 +53,7 @@ def fresnel_propagate(U0_prepared, L, wavelength, z, original_shape, pad_factor=
     start_x, end_x = pad_width_x, pad_width_x + Nx_orig
     start_y, end_y = pad_width_y, pad_width_y + Ny_orig
     
-    return Uz_padded[start_x:end_x, start_y:end_y]
+    return Uz_padded[start_x:end_x, start_y:end_y], FX, FY, U0_ft
 
 def propagate(Propagator, jones_vector, amplitudes, phases, z, pad_factor = 2, res = 1):
     """
@@ -121,10 +121,10 @@ def propagate(Propagator, jones_vector, amplitudes, phases, z, pad_factor = 2, r
     U_0_prepared = prepare_field_for_propagation(U_0, pad_factor = pad_factor)
     
     # Pass the dynamically calculated FWHM to the propagation function
-    U_0_proped = fresnel_propagate(
+    U_0_proped, FX, FY, U0_ft = fresnel_propagate(
         U_0_prepared, (Propagator.ScalarDomain.x_length, Propagator.ScalarDomain.y_length), 
         wavelength, z, U_0.shape, pad_factor = pad_factor, lanex_fwhm_m = None
     )
     
     #print("--- Propagation Complete ---")
-    return U_0_proped
+    return U_0_proped, FX, FY, U0_ft

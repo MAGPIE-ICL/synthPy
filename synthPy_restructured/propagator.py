@@ -152,8 +152,6 @@ class Propagator:
             opa_max=self.ScalarDomain.x_n/(self.ScalarDomain.x_length)
             opa_data_capped=np.minimum(opa_max, opa_data)
             self.opacity_interp = RegularGridInterpolator((grp_centres, rho, Te), opa_data_capped, bounds_error = False, fill_value = 0.0)
-            # self.Te_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.Te, bounds_error = False, fill_value = 0.0)
-            self.rho_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), self.ScalarDomain.rho, bounds_error = False, fill_value = 0.0, method = "nearest")
             opacity_grid = self.opacity_interp((self.energy, self.ScalarDomain.rho, self.ScalarDomain.Te))
             self.opacity_spatial_interp = RegularGridInterpolator((self.ScalarDomain.x, self.ScalarDomain.y, self.ScalarDomain.z), opacity_grid, bounds_error = False, fill_value = 0.0)
 
