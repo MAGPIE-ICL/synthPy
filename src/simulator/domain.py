@@ -237,7 +237,6 @@ class ScalarDomain(eqx.Module):
                 del single_ray
 
                 print("Est. ray size in memory:", mem_conversion(ray_memory_raw))
-            else:
 
             estimate_limit = np.float64(predicted_domain_allocation * allocation_count * self.leeway_factor)
             print("Est. domain memory limit: {} --> inc. +{}% variance margin.".format(mem_conversion(estimate_limit), jnp.int32((self.leeway_factor - 1) * 100)))
