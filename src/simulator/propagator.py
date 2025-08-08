@@ -277,6 +277,10 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
     # make logic too loop it and pick up from previous solution
 
     solutions = []
+    print(rays)
+    print(rays_per_batch)
+    print(ray_batch_count)
+    print(Np_total)
 
     for Np in rays:
         depth_traced = 0.0
