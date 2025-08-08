@@ -64,7 +64,8 @@ extent_z = 10e-3
 ne_extent = extent_z
 
 # updated
-lengths = 2 * jnp.array([extent_x, extent_y, extent_z])
+lengths = 2 * jnp.array([extent_x, extent_y, extent_z], dtype = jnp.int32)
+print("len:", len(lengths))
 
 # general
 beam_size = extent_z * 0.9
