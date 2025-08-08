@@ -307,7 +307,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
         if not isinstance(beam, Beam):
             print("Est. potential size in memory of total rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np_total))
         if len(rays) > 1:
-            print(" --> Np = {} ({}, batches)".format(Np_total, len(rays)))
+            print(" --> Np = {} ({} batches)".format(Np_total, len(rays)))
         else:
             print(" --> Np = {}".format(Np))
 
@@ -347,7 +347,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                     except:
                         ScalarDomain = None
 
-                    import domain as d
+                    import simulator.domain as d
                     ScalarDomain = d.ScalarDomain(
                         lengths, dims,
                         ne_type = ne_type,
