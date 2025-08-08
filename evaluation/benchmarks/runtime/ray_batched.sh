@@ -14,4 +14,4 @@ echo 'packages loaded successfully'
 
 echo 'starting job'
 
-python -u evaluation/benchmarks/runtime/runtimes.py
+python -u evaluation/benchmarks/runtime/runtimes.py -d 1024

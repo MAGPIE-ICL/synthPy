@@ -246,11 +246,14 @@ class ScalarDomain(eqx.Module):
             if self.Np_total is not None:
                 limiting_value = estimate_limit + ray_memory_raw
                 print("Total estimated maximum: {}".format(mem_conversion(limiting_value)))
+                print("a")
             else:
                 limiting_value = estimate_limit
+                print("b")
 
             # when jnp.float32 is not used, will cause overflow error if 64 bit floats are not enabled
             if limiting_value > np.float64(memory_stats['free_raw']):
+                print("hi")
                 from math import ceil
                 if self.Np_total is None:
                     print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
