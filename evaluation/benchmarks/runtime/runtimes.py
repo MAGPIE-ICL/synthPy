@@ -20,8 +20,8 @@ else:
 if args.rays is not None:
     rays = np.array(args.rays).astype(np.int32)
 else:
-    #rays = np.array([1e5, 1e6, 1e7, 1e8, 1e9], dtype = np.int32)
-    rays = np.array([1e5, 1e6, 1e7, 1e8], dtype = np.int32)
+    #rays = np.array([1e5, 5e5, 1e6, 5e6, 1e7, 5e7, 1e8, 5e8, 1e9], dtype = np.int32)
+    rays = np.array([1e5, 5e5, 1e6, 5e6, 1e7, 5e7, 1e8], dtype = np.int32)
 
 cores = None
 if args.cores is not None:
