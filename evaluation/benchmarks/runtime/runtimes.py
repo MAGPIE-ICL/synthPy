@@ -61,9 +61,6 @@ extent_y = 5e-3
 extent_z = 10e-3
 
 # legacy
-ne_x = np.linspace(-extent_x, extent_x, dims)
-ne_y = np.linspace(-extent_y, extent_y, dims)
-ne_z = np.linspace(-extent_z, extent_z, dims)
 ne_extent = extent_z
 
 # updated
@@ -80,56 +77,67 @@ beam_type = "square"
 columns = ["dims", "rays", "runtime", "legacyRuntime", "domainSize", "raySize", "totalMemory"]
 df = pd.DataFrame(columns=columns)
 
-for i in range(len(rays)):
-    print("\n\n\n")
+dims_len = len(dims)
+rays_len = len(rays)
 
-    domain = d.ScalarDomain(lengths, dims, ne_type = "test_exponential_cos", probing_direction = probing_direction)
+for i in range(dims_len):
+    ne_x = np.linspace(-extent_x, extent_x, dims[i])
+    ne_y = np.linspace(-extent_y, extent_y, dims[i])
+    ne_z = np.linspace(-extent_z, extent_z, dims[i])
 
-    beam_definition = beam_initialiser.Beam(
-        rays[i], beam_size,
-        divergence,
-        probing_extent,
-        probing_direction = probing_direction,
-        wavelength = lwl,
-        beam_type = beam_type
-    )
+    for j in range(rays_len):
+        print("\n\n\n")
 
-    _, _, duration = p.solve(beam_definition.s0, domain, probing_extent)
+        domain = d.ScalarDomain(lengths, dims, ne_type = "test_exponential_cos", probing_direction = probing_direction)
 
+        beam_definition = beam_initialiser.Beam(
+            rays[j], beam_size,
+            divergence,
+            probing_extent,
+            probing_direction = probing_direction,
+            wavelength = lwl,
+            beam_type = beam_type
+        )
 
-
-    slab = fs.ScalarDomain(ne_x, ne_y, ne_z, ne_extent)
-    slab.test_exponential_cos(n_e0 = 2e17 * 1e6, Ly = 1e-3, s = -4e-3)
-    slab.calc_dndr(lwl)
-
-    ## Initialise rays and solve
-    s0 = fs.init_beam(
-        rays[i], beam_size, divergence, ne_extent,
-        probing_direction = probing_direction,
-        beam_type = beam_type
-    )
-
-    slab.solve(s0)
+        _, _, duration = p.solve(beam_definition.s0, domain, probing_extent)
 
 
 
-    print(colour.BOLD + "\n\nDuration of " + str(duration) + " sec for domain of size " + str(dims[i]) + " ^3 and " + str(rays[i]) + " rays with legacy solver." + colour.END)
-    print(colour.BOLD + "Duration of " + str(slab.duration) + " sec for domain of size " + str(dims[i]) + " ^3 and " + str(rays[i]) + " rays with updated solver.\n" + colour.END)
+        slab = fs.ScalarDomain(ne_x, ne_y, ne_z, ne_extent)
+        slab.test_exponential_cos(n_e0 = 2e17 * 1e6, Ly = 1e-3, s = -4e-3)
+        slab.calc_dndr(lwl)
 
-    new_entry = pd.DataFrame([{
-        "dims": dims[i],
-        "rays": rays[i],
-        "runtime": duration,
-        "legacyRuntime": slab.duration,
-        "domainSize": memory_domain,
-        "raySize": memory_rays,
-        "totalMemory": memory_total
-    }])
+        ## Initialise rays and solve
+        s0 = fs.init_beam(
+            rays[j], beam_size, divergence, ne_extent,
+            probing_direction = probing_direction,
+            beam_type = beam_type
+        )
 
-    df = pd.concat([df, new_entry], ignore_index=True)
+        slab.solve(s0)
 
-for i in range(len(rays)):
-    print(colour.BOLD + "\n\nDuration of " + str(df['runtime'][i]) + " sec for domain of size " + str(df['dims'][i]) + " ^3 and " + str(df['rays'][i]) + " rays with updated solver." + colour.END)
-    print(colour.BOLD + "Duration of " + str(df['legacyRuntime'][i]) + " sec for domain of size " + str(df['dims'][i]) + " ^3 and " + str(df['rays'][i]) + " rays with legacy solver.\n" + colour.END)
+
+
+        print(colour.BOLD + "\n\nDuration of " + str(duration) + " sec for domain of size " + str(dims[j]) + " ^3 and " + str(rays[j]) + " rays with legacy solver." + colour.END)
+        print(colour.BOLD + "Duration of " + str(slab.duration) + " sec for domain of size " + str(dims[j]) + " ^3 and " + str(rays[j]) + " rays with updated solver.\n" + colour.END)
+
+        new_entry = pd.DataFrame([{
+            "dims": dims[j],
+            "rays": rays[j],
+            "runtime": duration,
+            "legacyRuntime": slab.duration,
+            "domainSize": memory_domain,
+            "raySize": memory_rays,
+            "totalMemory": memory_total
+        }])
+
+        df = pd.concat([df, new_entry], ignore_index=True)
+
+for i in range(dims_len):
+    for j in range(rays_len):
+        k = j + i * rays_len
+
+        print(colour.BOLD + "\n\nDuration of " + str(df['runtime'][k]) + " sec for domain of size " + str(df['dims'][k]) + " ^3 and " + str(df['rays'][k]) + " rays with updated solver." + colour.END)
+        print(colour.BOLD + "Duration of " + str(df['legacyRuntime'][k]) + " sec for domain of size " + str(df['dims'][k]) + " ^3 and " + str(df['rays'][k]) + " rays with legacy solver.\n" + colour.END)
 
 df.to_csv("benchmark_results" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".csv", index=False)
