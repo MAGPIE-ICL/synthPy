@@ -268,15 +268,6 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
     # if it is lower, you likely have a memory leak
     # this is relevant generally not just for ray memory - just cropped up as an issue here first
 
-    print("\nEst. size in memory of initial rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np), end="")
-    if not isinstance(beam, Beam):
-        print("\nEst. potential size in memory of total rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np_total), end="")
-    if len(rays) > 1:
-        print(" - for one batch.")
-        print(" --> Np = {} ({}, batches)".format(Np_total, len(rays)))
-    else:
-        print("\n --> Np = {}".format(Np))
-
     # if batched: or if auto_batching: etc.
     # proing_depth /= some integer with some corrections I expect
     # make logic too loop it and pick up from previous solution
@@ -292,6 +283,14 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
             temp_beam = Beam(Np, beam_size = beam[0], divergence = beam[1], probing_direction = beam[2], beam_type = beam[3], seeded = beam[4])
             s0_import = temp_beam.s0
             del temp_beam
+
+        print("\nEst. size in memory of rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np), end="")
+        if not isinstance(beam, Beam):
+            print("\nEst. potential size in memory of total rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np_total), end="")
+        if len(rays) > 1:
+            print(" --> Np = {} ({}, batches)".format(Np_total, len(rays)))
+        else:
+            print("\n --> Np = {}".format(Np))
 
         for i in range(1, ScalarDomain.region_count + 1):
             if ScalarDomain.region_count == 1:
