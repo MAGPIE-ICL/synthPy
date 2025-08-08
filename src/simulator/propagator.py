@@ -240,7 +240,7 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, ret
     else:
         assert "\nWhat."
 
-def solve(s0_import, ScalarDomain, probing_depth, *, return_E = False, parallelise = True, jitted = True, save_points_per_region = 2, memory_debug = False, lwl = 1064e-9, keep_domain = False, return_raw_results = False):
+def solve(s0_import, ScalarDomain, probing_depth, *, return_E = False, parallelise = True, jitted = True, save_points_per_region = 2, memory_debug = False, lwl = 1064e-9, keep_domain = False, return_raw_results = False, verbose = True):
     # Find Faraday rotation constant http://farside.ph.utexas.edu/teaching/em/lectures/node101.html
     VerdetConst = 0.0
     if (ScalarDomain.B_on):
@@ -585,17 +585,18 @@ def solve(s0_import, ScalarDomain, probing_depth, *, return_E = False, paralleli
             # need to confirm there is no mismatch between total depth_traced and the target probing_depth
             rf, Jf, duration = process_results(solutions, depth_traced, trace_depth, ScalarDomain.probing_direction, return_E, duration, save_points_per_region)
 
-            print("\nParallelised output has resulting 3D matrix of form: [batch_count, (save_points_per_region - 1) * ScalarDomain.region_count, 9]:", sol.ys.shape)
-            print(" - 2 to account for the start and end results (typical, can be greater if set)")
-            print(" - 9 containing the 3 position and velocity components, amplitude, phase and polarisation")
-            print(" - If batch_count is lower than expected, this is likely due to jax's forced integer batch sharding requirement over cpu cores.")
-            
-            print("\nWe slice the", end = " ")
-            if len(rf.shape) == 3:
-                print("results", end = " ")
-            else:
-                print("end result", end = " ")
-            print("and transpose into the form:", rf.shape, "to work with later code.")
+            if verbose:
+                print("\nParallelised output has resulting 3D matrix of form: [batch_count, (save_points_per_region - 1) * ScalarDomain.region_count, 9]:", sol.ys.shape)
+                print(" - 2 to account for the start and end results (typical, can be greater if set)")
+                print(" - 9 containing the 3 position and velocity components, amplitude, phase and polarisation")
+                print(" - If batch_count is lower than expected, this is likely due to jax's forced integer batch sharding requirement over cpu cores.")
+
+                print("\nWe slice the", end = " ")
+                if len(rf.shape) == 3:
+                    print("results", end = " ")
+                else:
+                    print("end result", end = " ")
+                print("and transpose into the form:", rf.shape, "to work with later code.")
 
             #else:
             #    print("Ray tracer failed. This could be a case of diffrax exceeding max steps again due to apparent 'strictness' compared to solve_ivp, check error log.")

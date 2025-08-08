@@ -109,7 +109,7 @@ for i in range(dims_len):
 
         plusRays = memory_report()['used_raw']
 
-        _, _, duration = p.solve(beam_definition.s0, domain, probing_extent)
+        _, _, duration = p.solve(beam_definition.s0, domain, probing_extent, verbose = False)
 
         total = memory_report()['used']
 
@@ -130,11 +130,11 @@ for i in range(dims_len):
 
 
 
-        print(colour.BOLD + "\n\nDuration of " + str(duration) + " sec for domain of size " + str(dims[j]) + " ^3 and " + str(rays[j]) + " rays with legacy solver." + colour.END)
-        print(colour.BOLD + "Duration of " + str(slab.duration) + " sec for domain of size " + str(dims[j]) + " ^3 and " + str(rays[j]) + " rays with updated solver.\n" + colour.END)
+        print(colour.BOLD + "\n\nDuration of " + str(duration) + " sec for domain of size " + str(dims[i]) + " ^3 and " + str(rays[j]) + " rays with legacy solver." + colour.END)
+        print(colour.BOLD + "Duration of " + str(slab.duration) + " sec for domain of size " + str(dims[i]) + " ^3 and " + str(rays[j]) + " rays with updated solver.\n" + colour.END)
 
         new_entry = pd.DataFrame([{
-            "dims": dims[j],
+            "dims": dims[i],
             "rays": rays[j],
             "runtime": duration,
             "legacyRuntime": slab.duration,
@@ -144,6 +144,7 @@ for i in range(dims_len):
         }])
 
         df = pd.concat([df, new_entry], ignore_index=True)
+        print(df)
 
 for i in range(dims_len):
     for j in range(rays_len):
