@@ -14,4 +14,4 @@ echo 'packages loaded successfully'
 
 echo 'starting job'
 
-python -u evaluation/benchmarks/runtime/runtimes.py -d 1024 -r 10000000
+python -u evaluation/benchmarks/runtime/ray_batched.py -d 1024 -r 1000000000 # 1 billion, 1e9
