@@ -93,7 +93,7 @@ for i in range(dims_len):
         # is this baseline not decreasing after each run? - testing manually deleting objects first
         baseline = memory_report()['used_raw']
 
-        domain = d.ScalarDomain(lengths, dims[i], ne_type = "test_exponential_cos", probing_direction = probing_direction)
+        domain = d.ScalarDomain(lengths, dims[i], ne_type = "test_exponential_cos", probing_direction = probing_direction, Np = rays[j])
 
         postDomain = memory_report()['used_raw']
         domainAllocation = postDomain - baseline
