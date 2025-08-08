@@ -199,11 +199,7 @@ class ScalarDomain(eqx.Module):
         del dims
         del valid_types
 
-        #print(self.dims)
-        #print(domain_estimate(self.dims))
-        #print(np.int64(domain_estimate(self.dims)))
-        predicted_domain_allocation = self.x_n * self.y_n * self.z_n * 4#np.int64(domain_estimate(self.dims))
-        print(predicted_domain_allocation)
+        predicted_domain_allocation = np.int64(domain_estimate(x_n * y_n * z_n))
         print("Predicted size in memory of domain:", mem_conversion(predicted_domain_allocation))
 
         if iteration == 1 and auto_batching:
@@ -248,9 +244,6 @@ class ScalarDomain(eqx.Module):
 
                 print("Est. ray size in memory:", mem_conversion(ray_memory_raw))
 
-            print(predicted_domain_allocation)
-            print(allocation_count)
-            print(self.leeway_factor)
             estimate_limit = np.float64(predicted_domain_allocation * allocation_count * self.leeway_factor)
             print("Est. domain memory limit: {} --> inc. +{}% variance margin.".format(mem_conversion(estimate_limit), jnp.int32((self.leeway_factor - 1) * 100)))
 

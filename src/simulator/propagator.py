@@ -342,8 +342,6 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                     coord_backup = ScalarDomain.coord_backup
                     future_dims = ScalarDomain.future_dims
 
-                    debug = ScalarDomain.debug
-
                     try:
                         del ScalarDomain
                     except:
@@ -362,8 +360,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                         region_count = region_count,
                         leeway_factor = leeway_factor,
                         coord_backup = coord_backup,
-                        future_dims = future_dims,
-                        debug = debug
+                        future_dims = future_dims
                     )
 
                     del lengths
@@ -383,8 +380,6 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
                     del coord_backup
                     del future_dims
-
-                    del debug
 
                 # Need to make sure all rays have left volume
                 # Conservative estimate of diagonal across volume
