@@ -331,7 +331,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
     print(ray_batch_count)
     print(Np_total)
 
-    for Np in rays:
+    for ray_index, Np in enumerate(rays):
         depth_traced = 0.0
 
         if ray_batch_count > 1:
@@ -656,7 +656,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
             del s0
 
             if i == ScalarDomain.region_count:
-                solutions.append(sol)
+                solutions[ray_index] = sol
                 del sol
 
             depth_traced += trace_depth
