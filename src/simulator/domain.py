@@ -78,6 +78,7 @@ class ScalarDomain(eqx.Module):
     memory_reporting: bool
 
     Np_total: np.int64
+    ray_batch_count: np.int64
 
     def __init__(self, lengths, dims, *, ne_type = None, inv_brems = False, phaseshift = False, B_on = False, probing_direction = 'z', auto_batching = True, iteration = 1, region_count = 1, leeway_factor = None, coord_backup = None, future_dims = None, extra_info = False, memory_reporting = False, Np = None,
         s = None, s1 = None, s2 = None, Ly = None, ne_0 = None, ne = None, B = None, Bmax = None, Te = None, Te_min = None, Z = None):
@@ -157,6 +158,7 @@ class ScalarDomain(eqx.Module):
         self.memory_reporting = memory_reporting
 
         self.Np_total = np.int64(Np)
+        self.ray_batch_count = 1
 
         valid_types = (int, float, jnp.int32)
 
@@ -254,7 +256,7 @@ class ScalarDomain(eqx.Module):
                     print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
                 else:
                     print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN + RAYS CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
-                    self.ray_batch_count = ceil(ray_memory_raw * self.leeway_factor / np.float64(memory_stats['free_raw']))
+                    self.ray_batch_count = np.int64(ceil(ray_memory_raw * self.leeway_factor / np.float64(memory_stats['free_raw'])))
                 print(" --> Auto-batching domain based on memory available and domain size estimate...")
 
                 ##
