@@ -269,6 +269,29 @@ def d2r(d):
     # helper function, degrees to radians
     return d * jnp.pi / 180
 
+def lens_cutoff(rf, Jf = None, *, L = 400, R = 25):
+    """
+    Masks the Jonesvector resulting array to avoid plotting any values outside of some set limit
+    - important as even if you set limits for the histogram to "zoom in", binning is based on raw data
+    --> leading to low resolutions if this is not used!
+
+    Args:
+        rf (jax.Array): Jonesvector output from solver
+        L (int): Length till next lens
+        R (int): Radius of lens
+
+    Return:
+        rf (jax.Array): Masked Jonesvector
+    """
+
+    mask = jnp.pow(jnp.pow(L * jnp.tan(rf[1]) + rf[0], 2) + jnp.pow(L * jnp.tan(rf[3]) + rf[2], 2), 0.5) <= R
+
+    rf = jnp.asarray(rf)[:, mask]
+    if Jf is not None:
+        Jf = jnp.asarray(Jf)[:, mask]
+
+    return rf, Jf
+
 class Diagnostic:
     """
     Inheritable class for ray diagnostics.
@@ -311,7 +334,7 @@ class Diagnostic:
 
             # masks rf (& Jf) to only hold entries corr. to rays that will be captured by the lense setup
             # also forces matrices to type jax.Array via jnp.asarray()
-            self.rf, Jf = self.lens_cutoff(rf, Jf)
+            self.rf, Jf = lens_cutoff(rf, Jf)
 
             self.Np_inc = self.rf.shape[-1]
             if self.Np == self.Np_inc:
@@ -391,34 +414,6 @@ class Diagnostic:
 
     def plot_rays(self, *, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
         self.histogram(bin_scale = bin_scale, pix_x = pix_x, pix_y = pix_y, clear_mem = clear_mem, plain_plot = True)
-
-    def lens_cutoff(self, rf, Jf = None, *, L = None, R = None):
-        """
-        Masks the Jonesvector resulting array to avoid plotting any values outside of some set limit
-        - important as even if you set limits for the histogram to "zoom in", binning is based on raw data
-        --> leading to low resolutions if this is not used!
-
-        Args:
-            rf (jax.Array): Jonesvector output from solver
-            L (int): Length till next lens
-            R (int): Radius of lens
-
-        Return:
-            rf (jax.Array): Masked Jonesvector
-        """
-
-        if L is None:
-            L = self.L
-        if R is None:
-            R = self.R
-
-        mask = jnp.pow(jnp.pow(L * jnp.tan(rf[1]) + rf[0], 2) + jnp.pow(L * jnp.tan(rf[3]) + rf[2], 2), 0.5) <= R
-
-        rf = jnp.asarray(rf)[:, mask]
-        if Jf is not None:
-            Jf = jnp.asarray(Jf)[:, mask]
-
-        return rf, Jf
 
 class Shadowgraphy(Diagnostic):
     """
