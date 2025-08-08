@@ -293,9 +293,13 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
     from simulator.beam import Beam
     if ray_batch_count == 1:
         if not isinstance(beam, Beam):
+            beam_instance = False
+
             s0_import = beam
             del beam
         elif isinstance(beam, Beam):
+            beam_instance = True
+
             temp_beam = Beam(Np, beam_size = beam[0], divergence = beam[1], ne_extent = beam[2], probing_direction = beam[3], beam_type = beam[4], seeded = beam[5])
             s0_import = temp_beam.s0
             del temp_beam
@@ -339,7 +343,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
         print("d")
 
         print("\nEst. size in memory of rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np))
-        if not isinstance(beam, Beam):
+        if not beam_instance:
             print("Est. potential size in memory of total rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np_total))
         if len(rays) > 1:
             print(" --> Np = {} ({} batches)".format(Np_total, len(rays)))
