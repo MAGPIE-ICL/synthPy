@@ -172,11 +172,11 @@ class ScalarDomain(eqx.Module):
             self.lengths = jnp.array([lengths, lengths, lengths])
         # if array given, checks len = 3 and assigns accordingly
         else:
-            if len(lengths) != 3:
+            self.lengths = jnp.array(lengths)
+            if len(self.lengths) != 3:
                 raise Exception('lengths must have len = 3: (x,y,z)')
 
-            self.x_length, self.y_length, self.z_length = lengths[0], lengths[1], lengths[2]
-            self.lengths = jnp.array(lengths)
+            self.x_length, self.y_length, self.z_length = self.lengths[0], self.lengths[1], self.lengths[2]
 
         del lengths
         
@@ -186,11 +186,11 @@ class ScalarDomain(eqx.Module):
             self.x_n, self.y_n, self.z_n = dims, dims, dims
             self.dims = jnp.array([dims, dims, dims])
         else:
-            if len(dims) != 3:
+            self.dims = jnp.array(dims)
+            if len(self.dims) != 3:
                 raise Exception('n must have len = 3: (x_n, y_n, z_n)')
 
-            self.x_n, self.y_n, self.z_n = dims[0], dims[1], dims[2]
-            self.dims = jnp.array(dims)
+            self.x_n, self.y_n, self.z_n = self.dims[0], self.dims[1], self.dims[2]
 
         del dims
         del valid_types
