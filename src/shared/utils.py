@@ -167,3 +167,33 @@ def heat_plot(x, y, *, bin_scale = 1, pix_x = 3448, pix_y = 2574, Lx = 18, Ly = 
     #axis.set_ylabel("z (mm)")
     #axis.set_xlim([-9, 9])
     #axis.set_ylim([-6.75, 6.75])
+
+def memory_report():
+    from jax.lib import xla_bridge
+    running_device = xla_bridge.get_backend().platform
+
+    if running_device == 'cpu':
+        from psutil import virtual_memory
+
+        info = virtual_memory()
+
+        total = mem_conversion(info.total)
+        free = mem_conversion(info.available)
+        used = mem_conversion(info.used)
+    elif running_device == 'gpu':
+        from pynvml import nvmlInit, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
+
+        nvmlInit()
+
+        h = nvmlDeviceGetHandleByIndex(0)
+        info = nvmlDeviceGetMemoryInfo(h)
+
+        total = mem_conversion(info.total)
+        free = mem_conversion(info.free)
+        used = mem_conversion(info.used)
+    elif running_device == 'tpu':
+        free_mem = None
+    else:
+        assert "\nNo suitable device detected when checking ram/vram available."
+
+    return (total, free, used)

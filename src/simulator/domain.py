@@ -59,7 +59,7 @@ class ScalarDomain(eqx.Module):
     coord_backup: jax.Array
     future_dims: jax.Array
 
-    debug: bool
+    extra_info: bool
 
     s: jnp.float32
     s1: jnp.float32
@@ -73,7 +73,7 @@ class ScalarDomain(eqx.Module):
 
     Te_min: jnp.float32
 
-    def __init__(self, lengths, dims, *, ne_type = None, inv_brems = False, phaseshift = False, B_on = False, probing_direction = 'z', auto_batching = True, iteration = 1, region_count = 1, leeway_factor = None, coord_backup = None, future_dims = None, debug = False,
+    def __init__(self, lengths, dims, *, ne_type = None, inv_brems = False, phaseshift = False, B_on = False, probing_direction = 'z', auto_batching = True, iteration = 1, region_count = 1, leeway_factor = None, coord_backup = None, future_dims = None, extra_info = False, memory_reporting = False,
         s = None, s1 = None, s2 = None, Ly = None, ne_0 = None, ne = None, B = None, Bmax = None, Te = None, Te_min = None, Z = None):
 
         """
@@ -146,7 +146,9 @@ class ScalarDomain(eqx.Module):
             # set to 2 as a result of concerns of ray memory size
             self.leeway_factor = 2
 
-        self.debug = debug
+        self.extra_info = extra_info
+        # not used right now but probably will be in the future so not bothering to remove
+        self.memory_reporting = memory_reporting
 
         valid_types = (int, float, jnp.int32)
 
@@ -187,33 +189,12 @@ class ScalarDomain(eqx.Module):
         print("Predicted size in memory of domain:", mem_conversion(predicted_domain_allocation))
 
         if iteration == 1 and auto_batching:
-            from jax.lib import xla_bridge
-            running_device = xla_bridge.get_backend().platform
+            memory_stats = self.memory_report()
 
-            if running_device == 'cpu':
-                from psutil import virtual_memory
-
-                free_mem = virtual_memory().available
-
-                print("\nFree memory:", mem_conversion(free_mem))
-            elif running_device == 'gpu':
-                from pynvml import nvmlInit, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
-
-                nvmlInit()
-
-                h = nvmlDeviceGetHandleByIndex(0)
-                info = nvmlDeviceGetMemoryInfo(h)
-
-                free_mem = info.free
-
-                print("\nMemory prior to domain creation:")
-                print(f' - total : {mem_conversion(info.total)}')
-                print(f' - free  : {mem_conversion(info.free)}')
-                print(f' - used  : {mem_conversion(info.used)}')
-            elif running_device == 'tpu':
-                free_mem = None
-            else:
-                assert "\nNo suitable device detected when checking ram/vram available."
+            print("\nMemory prior to domain creation:")
+            print(f' - total : {memory_stats[0]}')
+            print(f' - free  : {memory_stats[1]}')
+            print(f' - used  : {memory_stats[2]}')
 
             ##
             ## Need to work out the max allocation at any point and that estimated size
@@ -369,7 +350,7 @@ class ScalarDomain(eqx.Module):
         else:
             print("\nUsing imported ne domain. Be careful that your import matches with other passed variables, this is not sanity checked by the init function.")
 
-        if self.debug:
+        if self.extra_info:
             from shared.utils import round_to_n
 
             print(colour.BOLD + "\nScalarDomain object attribute info:" + colour.END)
