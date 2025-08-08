@@ -249,11 +249,11 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, ret
         print(" - If batch_count is lower than expected, this is likely due to jax's forced integer batch sharding requirement over cpu cores.")
 
         print("\nWe slice the", end = " ")
-        if len(solutions[0].shape) == 3:
+        if len(solutions[0].ys.shape) == 3:
             print("results", end = " ")
         else:
             print("end result", end = " ")
-        print("and transpose into the form:", solutions[0].shape, "to work with later code.")
+        print("and transpose into the form:", solutions[0].ys.shape, "to work with later code.")
 
     if save_points_per_region == 2 or save_points_per_region == 1:
         rf = solutions[0].ys[:, -1, :].T
@@ -345,24 +345,16 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
     # proing_depth /= some integer with some corrections I expect
     # make logic too loop it and pick up from previous solution
 
-    duration = 0
+    duration = np.float64(0.0)
     solutions = np.empty(ray_batch_count, dtype = Solution)
-    print(rays)
-    print(rays_per_batch)
-    print(ray_batch_count)
-    print(Np_total)
 
     for ray_index, Np in enumerate(rays):
         depth_traced = 0.0
 
         if ray_batch_count > 1:
-            print("c")
-            #def __init__(self, Np, beam_size, divergence, ne_extent, *, probing_direction = 'z', wavelength = 1064e-9, beam_type = 'circular', seeded = False):
-
             temp_beam = Beam(Np, beam_size = beam[0], divergence = beam[1], ne_extent = beam[2], probing_direction = beam[3], beam_type = beam[4], seeded = beam[5])
             s0_import = temp_beam.s0
             del temp_beam
-        print("d")
 
         print("\nEst. size in memory of rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np))
         if beam_instance:
@@ -372,9 +364,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
         else:
             print(" --> Np = {}".format(Np))
 
-        print("ScalarDomain.region_count", ScalarDomain.region_count)
         for i in range(1, ScalarDomain.region_count + 1):
-            print("hello")
             if ScalarDomain.region_count == 1:
                 print("\nNo need to generate any sections of the domain, batching not utilised.")
 
@@ -608,7 +598,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                     jax.vmap(ODE_solve, in_axes = (0, None))(s0, args)
                 )
 
-            duration += time() - start
+            duration += np.float64(time() - start)
 
             if memory_debug:
                 if parallelise:
@@ -681,10 +671,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
             depth_traced += trace_depth
 
-    print("\nCompleted ray trace in", colour.BOLD + str(jnp.round(duration, 3)) + colour.END, "seconds.")
-
-    print("solutions.shape", solutions.shape)
-    print(solutions[0])
+    print("\nCompleted ray trace in", colour.BOLD + str(np.round(duration, 3).astype(np.float64)) + colour.END, "seconds.")
 
     if return_raw_results:
         return solutions, None, duration

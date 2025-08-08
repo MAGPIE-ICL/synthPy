@@ -21,7 +21,7 @@ if args.rays is not None:
     rays = np.array([args.rays]).astype(np.int64)
 else:
     #rays = np.array([1e5, 5e5, 1e6, 5e6, 1e7, 5e7, 1e8, 5e8, 1e9], dtype = np.int64)
-    rays = np.array([1e5, 5e5, 1e6, 5e6, 1e7, 5e7, 1e8], dtype = np.int64)
+    rays = np.array([1e5, 2.5e5, 4e5, 5.5e5, 7e5, 8.5e5, 1e6, 2.5e6, 4e6, 5.5e6, 7e6, 8.5e6, 1e7, 2.5e7, 4e7, 5.5e7, 7e7, 8.5e7, 1e8], dtype = np.int64)
 
 cores = None
 if args.cores is not None:
