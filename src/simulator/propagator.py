@@ -8,6 +8,9 @@ from scipy.integrate import odeint, solve_ivp
 from time import time
 from sys import getsizeof as getsizeof_default
 
+# object type of diffrax output
+from diffrax import Solution
+
 from scipy.constants import c
 from scipy.constants import e
 
@@ -198,8 +201,6 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, ret
     """
 
     if ray_batch_count > 1:
-        from diffrax import Solution
-
         # Concatenate time and state arrays
         ts = jnp.concatenate([sol.ts for sol in solutions], axis = 0)
         ys = jnp.concatenate([sol.ys for sol in solutions], axis = 0)
@@ -324,7 +325,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
     # make logic too loop it and pick up from previous solution
 
     duration = 0
-    solutions = np.empty(ray_batch_count, dtype=object)
+    solutions = np.empty(ray_batch_count, dtype = Solution)
     print(rays)
     print(rays_per_batch)
     print(ray_batch_count)
