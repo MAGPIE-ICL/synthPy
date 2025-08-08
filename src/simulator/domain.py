@@ -220,9 +220,9 @@ class ScalarDomain(eqx.Module):
                 allocation_count += 1
 
             if Np is not None:
-                import simulator.beam as Beam
+                import simulator.beam as ray_test_case
 
-                single_ray = Beam(1, 1, 1, 1) # just initialises 1 ray of any variety
+                single_ray = ray_test_case.Beam(1, 1, 1, 1) # just initialises 1 ray of any variety
                 print(getsizeof_default(single_ray) * Np)
 
             estimate_limit = predicted_domain_allocation * allocation_count * self.leeway_factor
