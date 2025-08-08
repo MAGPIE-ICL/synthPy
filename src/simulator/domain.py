@@ -9,6 +9,7 @@ from shared.utils import mem_conversion
 from shared.printing import colour
 from shared.utils import dalloc
 from shared.utils import domain_estimate
+from shared.utils import memory_report
 
 class ScalarDomain(eqx.Module):
     """
@@ -189,12 +190,12 @@ class ScalarDomain(eqx.Module):
         print("Predicted size in memory of domain:", mem_conversion(predicted_domain_allocation))
 
         if iteration == 1 and auto_batching:
-            memory_stats = self.memory_report()
+            memory_stats = memory_report()
 
             print("\nMemory prior to domain creation:")
-            print(f' - total : {memory_stats[0]}')
-            print(f' - free  : {memory_stats[1]}')
-            print(f' - used  : {memory_stats[2]}')
+            print(f' - total : {memory_stats['total']}')
+            print(f' - free  : {memory_stats['free']}')
+            print(f' - used  : {memory_stats['used']}')
 
             ##
             ## Need to work out the max allocation at any point and that estimated size

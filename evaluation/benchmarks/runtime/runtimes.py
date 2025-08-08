@@ -55,7 +55,7 @@ importlib.reload(fs)
 importlib.reload(rtm)
 
 from shared.printing import colour
-from utils import memory_report
+from shared.utils import memory_report
 
 extent_x = 5e-3
 extent_y = 5e-3
@@ -90,11 +90,11 @@ for i in range(dims_len):
     for j in range(rays_len):
         print("\n\n\n")
 
-        _, _, baseline = *memory_report()
+        baseline = memory_report()['used']
 
         domain = d.ScalarDomain(lengths, dims[i], ne_type = "test_exponential_cos", probing_direction = probing_direction)
 
-        _, _, postDomain = *memory_report()
+        postDomain = memory_report()['used']
         domainAllocation = postDomain - baseline
 
         beam_definition = beam_initialiser.Beam(
@@ -106,11 +106,11 @@ for i in range(dims_len):
             beam_type = beam_type
         )
 
-        _, _, plusRays = *memory_report()
+        plusRays = memory_report()['used']
 
         _, _, duration = p.solve(beam_definition.s0, domain, probing_extent)
 
-        _, _, total = *memory_report()
+        total = memory_report()['used']
 
 
 

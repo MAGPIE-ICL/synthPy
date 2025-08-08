@@ -196,4 +196,9 @@ def memory_report():
     else:
         assert "\nNo suitable device detected when checking ram/vram available."
 
-    return (total, free, used)
+    return {
+        'device': running_device,
+        'total': total,
+        'free': free,
+        'used': used
+    }
