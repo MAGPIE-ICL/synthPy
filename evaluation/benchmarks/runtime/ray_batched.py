@@ -101,7 +101,7 @@ for i in range(dims_len):
 
         plusRays = memory_report()['used_raw']
 
-        _, _, duration = p.solve((beam_size, divergence, ne_extent, probing_direction, beam_type), domain, probing_extent, verbose = False)
+        _, _, duration = p.solve((beam_size, divergence, ne_extent, probing_direction, beam_type, seeded = False), domain, probing_extent, verbose = False)
 
         total = memory_report()['used']
 
