@@ -201,7 +201,7 @@ class ScalarDomain(eqx.Module):
 
         # changed function to pass to np.int64 to prevent overflow - this was causing the negatives
         # --> (exactly 0 in the case of a 1024^3 domain as it is right on the limit)
-        predicted_domain_allocation = domain_estimate(x_n, y_n, z_n)
+        predicted_domain_allocation = domain_estimate(self.x_n, self.y_n, self.z_n)
         print("Predicted size in memory of domain:", mem_conversion(predicted_domain_allocation))
 
         if iteration == 1 and auto_batching:
