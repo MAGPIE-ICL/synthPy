@@ -227,8 +227,13 @@ class ScalarDomain(eqx.Module):
 
                 import simulator.beam as ray_test_case
 
-                single_ray = np.float64(ray_test_case.Beam(1, 1, 1, 1)) # just initialises 1 ray of any variety
-                ray_memory_raw = getsizeof_default(single_ray) * Np
+                test_beam = ray_test_case.Beam(1, 1, 1, 1)
+                single_ray = test_beam.s0 # just initialises 1 ray of any variety
+                del test_beam
+
+                ray_memory_raw = np.float64(getsizeof_default(single_ray) * Np)
+                del single_ray
+
                 print("Est. ray size in memory:", mem_conversion(ray_memory_raw))
 
             estimate_limit = np.float64(predicted_domain_allocation * allocation_count * self.leeway_factor)
