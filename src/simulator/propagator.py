@@ -658,7 +658,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
     print("\nCompleted ray trace in", colour.BOLD + str(jnp.round(duration, 3)) + colour.END, "seconds.")
 
-    print(solutions)
+    print("solutions.shape", solutions.shape)
     print(solutions[0])
 
     if return_raw_results:
@@ -669,6 +669,9 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
         else:
             # need to confirm there is no mismatch between total depth_traced and the target probing_depth
             rf, Jf, duration = process_results(solutions, depth_traced, trace_depth, ScalarDomain.probing_direction, return_E, duration, save_points_per_region, ray_batch_count)
+
+            print("rf.shape", rf.shape)
+            print(rf)
 
             if verbose:
                 print("\nParallelised output has resulting 3D matrix of form: [batch_count, (save_points_per_region - 1) * ScalarDomain.region_count, 9]:", sol.ys.shape)
