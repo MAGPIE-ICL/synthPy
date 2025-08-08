@@ -249,16 +249,19 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
     omega = 2 * jnp.pi * c / lwl
 
+    Np_total = ScalarDomain.Np_total
+    ray_batch_count = ScalarDomain.ray_batch_count
+
     from simulator.beam import Beam
     if isinstance(beam, Beam):
+        print("a")
         s0_import = beam.s0
 
         Np = s0_import.shape[1]
+
         rays = np.array([Np], dtype = np.int64)
     else:
-        Np_total = ScalarDomain.Np_total
-        ray_batch_count = ScalarDomain.ray_batch_count
-
+        print("b")
         Np = Np_total // ray_batch_count
         rays_per_batch = Np_total // ray_batch_count
         rays = np.array([rays_per_batch] * (ray_batch_count - 1) + [Np_total - rays_per_batch * (ray_batch_count - 1)], dtype = np.int64)
@@ -279,11 +282,13 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
         depth_traced = 0.0
 
         if len(rays) > 1:
+            print("c")
             #def __init__(self, Np, beam_size, divergence, ne_extent, *, probing_direction = 'z', wavelength = 1064e-9, beam_type = 'circular', seeded = False):
 
             temp_beam = Beam(Np, beam_size = beam[0], divergence = beam[1], probing_direction = beam[2], beam_type = beam[3], seeded = beam[4])
             s0_import = temp_beam.s0
             del temp_beam
+        print("d")
 
         print("\nEst. size in memory of rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np), end="")
         if not isinstance(beam, Beam):
