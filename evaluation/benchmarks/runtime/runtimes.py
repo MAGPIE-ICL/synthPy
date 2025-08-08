@@ -15,14 +15,13 @@ args = parser.parse_args()
 if args.dims is not None:
     dims = np.array(args.dims).astype(np.int32)
 else:
-    #dims = np.array([128, 256, 512], dtype = np.int32)
-    dims = np.array([128], dtype = np.int32)
+    dims = np.array([128, 256, 512], dtype = np.int32)
 
 if args.rays is not None:
     rays = np.array(args.rays).astype(np.int32)
 else:
     #rays = np.array([1e5, 1e6, 1e7, 1e8, 1e9], dtype = np.int32)
-    rays = np.array([1e5, 1e6, 1e7], dtype = np.int32)
+    rays = np.array([1e5, 1e6, 1e7, 1e8], dtype = np.int32)
 
 cores = None
 if args.cores is not None:
