@@ -310,6 +310,11 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
         rays = np.array([Np], dtype = np.int64)
     else:
+        if isinstance(beam, Beam):
+            assert "\nNeed to pass Beam parameters as a tuple instead of the beam itself when batching rays."
+        else:
+            beam_instance = False
+
         #Np = Np_total // ray_batch_count
         rays_per_batch = Np_total // ray_batch_count
         rays = np.array([rays_per_batch] * (ray_batch_count - 1) + [Np_total - rays_per_batch * (ray_batch_count - 1)], dtype = np.int64)
