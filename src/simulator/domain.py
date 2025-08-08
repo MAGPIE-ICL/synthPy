@@ -242,10 +242,12 @@ class ScalarDomain(eqx.Module):
 
             # when jnp.float32 is not used, will cause overflow error if 64 bit floats are not enabled
             if limiting_value > np.float64(memory_stats['free_raw']):
+                from math import ceil
                 if Np is None:
                     print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
                 else:
                     print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN + RAYS CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
+                    self.ray_batch_count = ceil(ray_memory_raw * self.leeway_factor / np.float64(memory_stats['free_raw']))
                 print(" --> Auto-batching domain based on memory available and domain size estimate...")
 
                 ##
@@ -253,8 +255,7 @@ class ScalarDomain(eqx.Module):
                 ## Then call generate_electron_density_profile(...) and re-do calculations with end of prior domain
                 ##
 
-                from math import ceil
-                self.region_count = ceil(estimate_limit / np.float64(memory_stats['free_raw']))
+                self.region_count = ceil(estimate_limit / np.float64(memory_stats['free_raw'] - ray_memory_raw * self.leeway_factor / self.ray_batch_count))
 
                 self.coord_backup = jnp.float32(jnp.linspace(
                    -self.lengths[['x', 'y', 'z'].index(self.probing_direction)] / 2,
