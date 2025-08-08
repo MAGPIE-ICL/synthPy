@@ -269,7 +269,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
     # this is relevant generally not just for ray memory - just cropped up as an issue here first
 
     print("\nEst. size in memory of initial rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np), end="")
-    if !isinstance(beam, Beam):
+    if not isinstance(beam, Beam):
         print("\nEst. potential size in memory of total rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np_total), end="")
     if len(rays) > 1:
         print(" - for one batch.")
