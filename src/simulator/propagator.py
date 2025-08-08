@@ -291,15 +291,12 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
     ray_batch_count = ScalarDomain.ray_batch_count
 
     from simulator.beam import Beam
-    if isinstance(beam, Beam) and ray_batch_count == 1:
-        print("a")
+    if not isinstance(beam, Beam) and ray_batch_count == 1:
         s0_import = beam.s0
 
         Np = s0_import.shape[1]
-
         rays = np.array([Np], dtype = np.int64)
-    elif not isinstance(beam, Beam) and ray_batch_count == 1:
-        print("b")
+    elif isinstance(beam, Beam) and ray_batch_count == 1:
         temp_beam = Beam(Np, beam_size = beam[0], divergence = beam[1], ne_extent = beam[2], probing_direction = beam[3], beam_type = beam[4], seeded = beam[5])
         s0_import = temp_beam.s0
         del temp_beam
@@ -308,7 +305,6 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
         rays = np.array([Np], dtype = np.int64)
     else:
-        print("c")
         Np = Np_total // ray_batch_count
         rays_per_batch = Np_total // ray_batch_count
         rays = np.array([rays_per_batch] * (ray_batch_count - 1) + [Np_total - rays_per_batch * (ray_batch_count - 1)], dtype = np.int64)
