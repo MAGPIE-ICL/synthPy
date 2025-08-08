@@ -88,7 +88,7 @@ for i in range(dims_len):
     ne_z = np.linspace(-extent_z, extent_z, dims[i])
 
     for j in range(rays_len):
-        print("\n\n\n")
+        print("\n\n")
 
         # is this baseline not decreasing after each run? - testing manually deleting objects first
         baseline = memory_report()['used_raw']
@@ -126,7 +126,7 @@ for i in range(dims_len):
             beam_type = beam_type
         )
 
-        print("\n")
+        print("\n\n")
         slab.solve(s0)
 
 
