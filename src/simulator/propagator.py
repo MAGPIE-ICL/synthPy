@@ -181,7 +181,7 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
     # - as then data would be in the wrong place
     return sprime.flatten()
 
-def process_results(solutions, depth_traced, trace_depth, probing_direction, return_E, duration, save_points_per_region):
+def process_results(solutions, depth_traced, trace_depth, probing_direction, return_E, duration, save_points_per_region, ray_batch_count):
     """
     #for i in enumerate(sol.result):
     #    print(i)
@@ -196,6 +196,42 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, ret
     #print(next(sol.result))
     #print(type(sol.result[0]))  # Check the type of results
     """
+
+    if ray_batch_count > 1:
+        from diffrax import Solution
+
+        # Concatenate time and state arrays
+        ts = jnp.concatenate([sol.ts for sol in solutions], axis = 0)
+        ys = jnp.concatenate([sol.ys for sol in solutions], axis = 0)
+
+        # Combine stats
+        stats_keys = solutions[0].stats.keys()
+        stats = {
+            key: jnp.concatenate([sol.stats[key] for sol in solutions], axis = 0)
+            for key in stats_keys
+        }
+
+        # Combine other fields
+        t0 = solutions[0].t0
+        t1 = solutions[-1].t1
+        result = solutions[-1].result  # Use the last result
+
+        del solutions
+
+        # if info is missing that you need, this is why - implement it !
+        solutions = Solution(
+            t0=t0,
+            t1=t1,
+            ts=ts,
+            ys=ys,
+            interpolation=None,  # Optional: you can implement logic to keep interpolations
+            stats=stats,
+            result=result,
+            solver_state=None,
+            controller_state=None,
+            made_jump=None,
+            event_mask=None
+        )
 
     #if sol.result == RESULTS.successful:
     #rf = sol.ys[:, -1, :].reshape(9, Np)# / scalar
@@ -285,6 +321,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
     # proing_depth /= some integer with some corrections I expect
     # make logic too loop it and pick up from previous solution
 
+    duration = 0
     solutions = []
     print(rays)
     print(rays_per_batch)
@@ -547,8 +584,8 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                     jax.vmap(ODE_solve, in_axes = (0, None))(s0, args)
                 )
 
-            duration = time() - start
-            print("\nCompleted ray trace in", colour.BOLD + str(jnp.round(duration, 3)) + colour.END, "seconds.")
+
+            duration += time() - start
 
             if memory_debug:
                 if parallelise:
@@ -613,11 +650,15 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                 else:
                     print("No pprof install detected. Please download to visualise memory usage - requires Golang to run.")
 
-            solutions.append(sol)
+            del s0
+
+            if i == ScalarDomain.region_count:
+                solutions.append(sol)
+                del sol
 
             depth_traced += trace_depth
 
-        del s0
+    print("\nCompleted ray trace in", colour.BOLD + str(jnp.round(duration, 3)) + colour.END, "seconds.")
 
     print(solutions)
     print(solutions[0])
