@@ -77,6 +77,8 @@ class ScalarDomain(eqx.Module):
     extra_info: bool
     memory_reporting: bool
 
+    Np_total: np.int64
+
     def __init__(self, lengths, dims, *, ne_type = None, inv_brems = False, phaseshift = False, B_on = False, probing_direction = 'z', auto_batching = True, iteration = 1, region_count = 1, leeway_factor = None, coord_backup = None, future_dims = None, extra_info = False, memory_reporting = False, Np = None,
         s = None, s1 = None, s2 = None, Ly = None, ne_0 = None, ne = None, B = None, Bmax = None, Te = None, Te_min = None, Z = None):
 
@@ -154,6 +156,8 @@ class ScalarDomain(eqx.Module):
         # not used right now but probably will be in the future so not bothering to remove
         self.memory_reporting = memory_reporting
 
+        self.Np_total = np.int64(Np)
+
         valid_types = (int, float, jnp.int32)
 
         ##
@@ -222,24 +226,23 @@ class ScalarDomain(eqx.Module):
                 allocation_count += 1
 
             print("")
-            if Np is not None:
-                Np = np.float64(Np)
-
+            if self.Np_total is not None:
                 import simulator.beam as ray_test_case
 
                 test_beam = ray_test_case.Beam(1, 1, 1, 1)
                 single_ray = test_beam.s0 # just initialises 1 ray of any variety
                 del test_beam
 
-                ray_memory_raw = np.float64(getsizeof_default(single_ray) * Np)
+                ray_memory_raw = np.float64(getsizeof_default(single_ray) * self.Np_total)
                 del single_ray
 
                 print("Est. ray size in memory:", mem_conversion(ray_memory_raw))
+            else:
 
             estimate_limit = np.float64(predicted_domain_allocation * allocation_count * self.leeway_factor)
             print("Est. domain memory limit: {} --> inc. +{}% variance margin.".format(mem_conversion(estimate_limit), jnp.int32((self.leeway_factor - 1) * 100)))
 
-            if Np is not None:
+            if self.Np_total is not None:
                 limiting_value = estimate_limit + ray_memory_raw
                 print("Total estimated maximum: {}".format(mem_conversion(limiting_value)))
             else:
@@ -248,7 +251,7 @@ class ScalarDomain(eqx.Module):
             # when jnp.float32 is not used, will cause overflow error if 64 bit floats are not enabled
             if limiting_value > np.float64(memory_stats['free_raw']):
                 from math import ceil
-                if Np is None:
+                if self.Np_total is None:
                     print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
                 else:
                     print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN + RAYS CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
@@ -276,7 +279,7 @@ class ScalarDomain(eqx.Module):
 
                 print(" --> Batching calculation completed. Domain will be split into " + str(self.region_count) + " regions with " + str(dim_per_region) + " dims per region.")
                 print(colour.BOLD + "\nWARNING:" + colour.END + " This functionality will cause the solver to run slower due to domain regeneration, for optimal performance, increase the memory available to this program.")
-                if Np is not None:
+                if self.Np_total is not None:
                     print(" --> The domain is batched with the goal of minimising ray batching. Ray batches introduce sequantiality which reduces speed.")
             else:
                 self.region_count = 1
