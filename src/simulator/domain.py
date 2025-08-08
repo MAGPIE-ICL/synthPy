@@ -200,7 +200,7 @@ class ScalarDomain(eqx.Module):
         del valid_types
 
         # calculation is more consistent when using r_n's instead of dims - likely due to jax tracing
-        predicted_domain_allocation = np.int64(domain_estimate(self.x_n, self.y_n, self.z_n))
+        predicted_domain_allocation = np.int64(domain_estimate(1024, 1024, 1024))
         print("Predicted size in memory of domain:", mem_conversion(predicted_domain_allocation))
 
         if iteration == 1 and auto_batching:
