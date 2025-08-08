@@ -303,15 +303,17 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
             del temp_beam
         print("d")
 
-        print("\nEst. size in memory of rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np), end="")
+        print("\nEst. size in memory of rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np))
         if not isinstance(beam, Beam):
-            print("\nEst. potential size in memory of total rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np_total), end="")
+            print("Est. potential size in memory of total rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np_total))
         if len(rays) > 1:
             print(" --> Np = {} ({}, batches)".format(Np_total, len(rays)))
         else:
-            print("\n --> Np = {}".format(Np))
+            print(" --> Np = {}".format(Np))
 
+        print("ScalarDomain.region_count", ScalarDomain.region_count)
         for i in range(1, ScalarDomain.region_count + 1):
+            print("hello")
             if ScalarDomain.region_count == 1:
                 print("\nNo need to generate any sections of the domain, batching not utilised.")
 
