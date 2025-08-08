@@ -233,6 +233,8 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, ret
             event_mask=None
         )
 
+        solutions = np.asarray(solutions)
+
     #if sol.result == RESULTS.successful:
     #rf = sol.ys[:, -1, :].reshape(9, Np)# / scalar
 
@@ -327,7 +329,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
     print(rays_per_batch)
     print(ray_batch_count)
     print(Np_total)
-
+process_results
     for Np in rays:
         depth_traced = 0.0
 
