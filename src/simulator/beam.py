@@ -9,7 +9,7 @@ from shared.printing import colour
 
 class Beam:
 # Initialise beam
-    def __init__(self, Np, beam_size, self.divergence, ne_extent, *, self.probing_direction = 'z', self.beam_type = 'circular', seeded = False):
+    def __init__(self, Np, beam_size, divergence, ne_extent, *, probing_direction = 'z', beam_type = 'circular', seeded = False):
         """
         [summary]
 
