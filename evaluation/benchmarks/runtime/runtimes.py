@@ -63,9 +63,9 @@ extent_z = 10e-3
 # legacy
 ne_extent = extent_z
 
-# updated
+# updated - was reporting isse with lengths when actually was with dims, was passing full array not just one vale
+# --> this is the issue with python not declaring expected types in functions, SO MUCH undefined behaviour
 lengths = 2 * jnp.array([extent_x, extent_y, extent_z], dtype = jnp.int32)
-print("len:", len(lengths))
 
 # general
 beam_size = extent_z * 0.9
@@ -89,7 +89,7 @@ for i in range(dims_len):
     for j in range(rays_len):
         print("\n\n\n")
 
-        domain = d.ScalarDomain(lengths, dims, ne_type = "test_exponential_cos", probing_direction = probing_direction)
+        domain = d.ScalarDomain(lengths, dims[i], ne_type = "test_exponential_cos", probing_direction = probing_direction)
 
         beam_definition = beam_initialiser.Beam(
             rays[j], beam_size,
