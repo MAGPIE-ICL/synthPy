@@ -13,14 +13,19 @@ parser.add_argument("-c", "--cores", type = int)
 args = parser.parse_args()
 
 if args.dims is not None:
-    dims = np.array(args.dims).astype(np.int32)
+    dims = np.array([args.dims], dtype = np.int64)
+    dims_len = 1
 else:
-    dims = np.array([128], dtype = np.int32)
+    dims = np.array([128, 256, 512], dtype = np.int64)
+    dims_len = len(dims)
 
 if args.rays is not None:
-    rays = np.array(args.rays).astype(np.int32)
+    rays = np.array([args.rays], dtype = np.int64)
+    rays_len = 1
 else:
-    rays = np.array([5e7, 1e8], dtype = np.int32)
+    #rays = np.array([1e5, 5e5, 1e6, 5e6, 1e7, 5e7, 1e8, 5e8, 1e9], dtype = np.int32)
+    rays = np.array([1e5, 5e5, 1e6, 5e6, 1e7, 5e7, 1e8], dtype = np.int64)
+    rays_len = len(rays)
 
 cores = None
 if args.cores is not None:
@@ -77,9 +82,6 @@ beam_type = "square"
 
 columns = ["dims", "rays", "runtime", "legacyRuntime", "domainSize", "raySize", "totalMemory"]
 df = pd.DataFrame(columns=columns)
-
-dims_len = len(dims)
-rays_len = len(rays)
 
 for i in range(dims_len):
     ne_x = np.linspace(-extent_x, extent_x, dims[i])
