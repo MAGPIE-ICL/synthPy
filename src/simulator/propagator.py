@@ -184,7 +184,7 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
     # - as then data would be in the wrong place
     return sprime.flatten()
 
-def process_results(solutions, depth_traced, trace_depth, probing_direction, return_E, duration, save_points_per_region, ray_batch_count):
+def process_results(solutions, depth_traced, trace_depth, probing_direction, return_E, duration, save_points_per_region, ray_batch_count, verbose):
     """
     #for i in enumerate(sol.result):
     #    print(i)
@@ -199,6 +199,12 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, ret
     #print(next(sol.result))
     #print(type(sol.result[0]))  # Check the type of results
     """
+
+    #else:
+    #    print("Ray tracer failed. This could be a case of diffrax exceeding max steps again due to apparent 'strictness' compared to solve_ivp, check error log.")
+
+    #if sol.result == RESULTS.successful:
+    #rf = sol.ys[:, -1, :].reshape(9, Np)# / scalar
 
     if ray_batch_count > 1:
         # Concatenate time and state arrays
@@ -236,8 +242,18 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, ret
 
         solutions = np.asarray([solutions], dtype = Solution)
 
-    #if sol.result == RESULTS.successful:
-    #rf = sol.ys[:, -1, :].reshape(9, Np)# / scalar
+    if verbose:
+        print("\nParallelised output has resulting 3D matrix of form: [batch_count, (save_points_per_region - 1) * ScalarDomain.region_count, 9]:", solutions[0].ys.shape)
+        print(" - 2 to account for the start and end results (typical, can be greater if set)")
+        print(" - 9 containing the 3 position and velocity components, amplitude, phase and polarisation")
+        print(" - If batch_count is lower than expected, this is likely due to jax's forced integer batch sharding requirement over cpu cores.")
+
+        print("\nWe slice the", end = " ")
+        if len(solutions[0].shape) == 3:
+            print("results", end = " ")
+        else:
+            print("end result", end = " ")
+        print("and transpose into the form:", solutions[0].shape, "to work with later code.")
 
     if save_points_per_region == 2 or save_points_per_region == 1:
         rf = solutions[0].ys[:, -1, :].T
@@ -592,7 +608,6 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                     jax.vmap(ODE_solve, in_axes = (0, None))(s0, args)
                 )
 
-
             duration += time() - start
 
             if memory_debug:
@@ -678,25 +693,4 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
             return *ray_to_Jonesvector(solutions.y[:,-1].reshape(9, Np), probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E), duration
         else:
             # need to confirm there is no mismatch between total depth_traced and the target probing_depth
-            rf, Jf, duration = process_results(solutions, depth_traced, trace_depth, ScalarDomain.probing_direction, return_E, duration, save_points_per_region, ray_batch_count)
-
-            print("rf.shape", rf.shape)
-            print(rf)
-
-            if verbose:
-                print("\nParallelised output has resulting 3D matrix of form: [batch_count, (save_points_per_region - 1) * ScalarDomain.region_count, 9]:", sol.ys.shape)
-                print(" - 2 to account for the start and end results (typical, can be greater if set)")
-                print(" - 9 containing the 3 position and velocity components, amplitude, phase and polarisation")
-                print(" - If batch_count is lower than expected, this is likely due to jax's forced integer batch sharding requirement over cpu cores.")
-
-                print("\nWe slice the", end = " ")
-                if len(rf.shape) == 3:
-                    print("results", end = " ")
-                else:
-                    print("end result", end = " ")
-                print("and transpose into the form:", rf.shape, "to work with later code.")
-
-            #else:
-            #    print("Ray tracer failed. This could be a case of diffrax exceeding max steps again due to apparent 'strictness' compared to solve_ivp, check error log.")
-
-            return rf, Jf, duration
+            return process_results(solutions, depth_traced, trace_depth, ScalarDomain.probing_direction, return_E, duration, save_points_per_region, ray_batch_count, verbose)
