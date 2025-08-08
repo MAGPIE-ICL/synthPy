@@ -614,7 +614,6 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                     print("No pprof install detected. Please download to visualise memory usage - requires Golang to run.")
 
             solutions.append(sol)
-            del sol
 
             depth_traced += trace_depth
 
