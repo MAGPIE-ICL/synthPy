@@ -10,7 +10,7 @@ from shared.printing import colour
 from shared.utils import dalloc
 from shared.utils import domain_estimate
 from shared.utils import memory_report
-from shared.utisl import getsizeof_default
+from shared.utils import getsizeof_default
 
 class ScalarDomain(eqx.Module):
     """
