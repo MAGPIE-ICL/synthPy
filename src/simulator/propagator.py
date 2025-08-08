@@ -324,7 +324,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
     # make logic too loop it and pick up from previous solution
 
     duration = 0
-    solutions = []
+    solutions = np.empty(n, dtype=object)
     print(rays)
     print(rays_per_batch)
     print(ray_batch_count)
@@ -343,7 +343,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
         print("d")
 
         print("\nEst. size in memory of rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np))
-        if not beam_instance:
+        if beam_instance:
             print("Est. potential size in memory of total rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np_total))
         if len(rays) > 1:
             print(" --> Np = {} ({} batches)".format(Np_total, len(rays)))
