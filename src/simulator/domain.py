@@ -164,7 +164,7 @@ class ScalarDomain(eqx.Module):
 
         self.ray_batch_count = 1
 
-        valid_types = (int, float, jnp.int32)
+        valid_types = (int, np.int32, np.int64, jnp.int32, jnp.int64, float, np.float32, np.float64, jnp.float32, jnp.float64)
 
         ##
         ## NOT FORCING THESE CONVERSIONS MAY CAUSE ISSUES WITH EQUINOX CLASS LATER DOWN THE LINE DEPENDING ON USER INPUT
