@@ -91,6 +91,7 @@ for i in range(dims_len):
     for j in range(rays_len):
         print("\n\n\n")
 
+        # is this baseline not decreasing after each run? - testing manually deleting objects first
         baseline = memory_report()['used_raw']
 
         domain = d.ScalarDomain(lengths, dims[i], ne_type = "test_exponential_cos", probing_direction = probing_direction)
@@ -126,11 +127,12 @@ for i in range(dims_len):
             beam_type = beam_type
         )
 
+        print("\n")
         slab.solve(s0)
 
 
 
-        print(colour.BOLD + "\n\nDuration of " + str(duration) + " sec for domain of size " + str(dims[i]) + " ^3 and " + str(rays[j]) + " rays with legacy solver." + colour.END)
+        print(colour.BOLD + "\nDuration of " + str(duration) + " sec for domain of size " + str(dims[i]) + " ^3 and " + str(rays[j]) + " rays with legacy solver." + colour.END)
         print(colour.BOLD + "Duration of " + str(slab.duration) + " sec for domain of size " + str(dims[i]) + " ^3 and " + str(rays[j]) + " rays with updated solver.\n" + colour.END)
 
         new_entry = pd.DataFrame([{
@@ -146,11 +148,19 @@ for i in range(dims_len):
         df = pd.concat([df, new_entry], ignore_index=True)
         print(df)
 
+        del domain
+        del beam_definition
+
+        del slab
+        del s0
+
+print("\n\n")
+
 for i in range(dims_len):
     for j in range(rays_len):
         k = j + i * rays_len
 
-        print(colour.BOLD + "\n\nDuration of " + str(df['runtime'][k]) + " sec for domain of size " + str(df['dims'][k]) + " ^3 and " + str(df['rays'][k]) + " rays with updated solver." + colour.END)
+        print(colour.BOLD + "\nDuration of " + str(df['runtime'][k]) + " sec for domain of size " + str(df['dims'][k]) + " ^3 and " + str(df['rays'][k]) + " rays with updated solver." + colour.END)
         print(colour.BOLD + "Duration of " + str(df['legacyRuntime'][k]) + " sec for domain of size " + str(df['dims'][k]) + " ^3 and " + str(df['rays'][k]) + " rays with legacy solver.\n" + colour.END)
 
 df.to_csv("benchmark_results" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".csv", index=False)

@@ -334,7 +334,7 @@ class Diagnostic:
 
             # masks rf (& Jf) to only hold entries corr. to rays that will be captured by the lense setup
             # also forces matrices to type jax.Array via jnp.asarray()
-            self.rf, Jf = lens_cutoff(rf, Jf)
+            self.rf, self.Jf = lens_cutoff(rf, Jf)  # DO pass Jf to this, else self.Jf will be assigned None even if Jf is not None
 
             self.Np_inc = self.rf.shape[-1]
             if self.Np == self.Np_inc:
@@ -344,11 +344,6 @@ class Diagnostic:
                 print(" --> {} % of rays wasted!".format(str(round_to_n((1 - self.Np_inc / self.Np) * 100, 3))))
         else:
             assert "rf should not be of Noneype! diffrax clearly failed."
-
-        if Jf is not None:
-            self.Jf = jnp.asarray(Jf)
-        else:
-            self.Jf = Jf
 
         # however, doesn't have to be done manually now as already sorted in propagator.py, therefore no more duplication
         # still odd though... (hence the keeping of the comment)

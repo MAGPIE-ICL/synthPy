@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import jax.numpy as jnp
 
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
@@ -73,14 +74,14 @@ def graph_domain(domain, *, save = False):
 
 from processing.diagnostics import lens_cutoff
 
-def general_ray_plots(rf, lwl = 1032e-9, *, l_x = 0, u_x = 0.3, l_y = -5, u_y = 5, extra_info = True):
+def general_ray_plots(rf, nbins, lwl = 1032e-9, *, l_x = 0, u_x = 0.3, l_y = -5, u_y = 5, extra_info = True):
     fig1, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
-    nbins = 201
 
     # lens_cutoff may not make a difference to the angle plot (after already masked seperately) - but it does to this
-    rf = lens_cutoff(rf)
+    # lens_cutoff(...) passes a tuple of rf and Jf (= None), not just rf
+    rf, _ = lens_cutoff(rf)
 
-    _, _, _, im1 = ax1.hist2d(rf[0] * 1e3, rf[2] * 1e3, bins=(nbins, nbins), cmap=plt.cm.jet);
+    _, _, _, im1 = ax1.hist2d(rf[0] * 1e3, rf[2] * 1e3, bins=(nbins, nbins), cmap=plt.cm.jet)
     plt.colorbar(im1, ax = ax1)
     ax1.set_xlabel("x (mm)")
     ax1.set_ylabel("y (mm)")
