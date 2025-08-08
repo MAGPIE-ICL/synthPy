@@ -226,7 +226,7 @@ class ScalarDomain(eqx.Module):
             print("Est. memory limit: {} --> inc. +{}% variance margin.".format(str(mem_conversion(estimate_limit)), jnp.int32((self.leeway_factor - 1) * 100)))
 
             # when jnp.float32 is not used, will cause overflow error if 64 bit floats are not enabled
-            if estimate_limit > jnp.float32(memory_stats['free']):
+            if estimate_limit > jnp.float32(memory_stats['free_raw']):
                 print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
                 print("--> Auto-batching domain based on memory available and domain size estimate...")
 
@@ -236,7 +236,7 @@ class ScalarDomain(eqx.Module):
                 ##
 
                 from math import ceil
-                self.region_count = ceil(estimate_limit / memory_stats['free'])
+                self.region_count = ceil(estimate_limit / memory_stats['free_raw'])
 
                 self.coord_backup = jnp.float32(jnp.linspace(
                    -self.lengths[['x', 'y', 'z'].index(self.probing_direction)] / 2,

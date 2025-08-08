@@ -177,9 +177,7 @@ def memory_report():
 
         info = virtual_memory()
 
-        total = mem_conversion(info.total)
-        free = mem_conversion(info.available)
-        used = mem_conversion(info.used)
+        free = info.available
     elif running_device == 'gpu':
         from pynvml import nvmlInit, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
 
@@ -188,17 +186,21 @@ def memory_report():
         h = nvmlDeviceGetHandleByIndex(0)
         info = nvmlDeviceGetMemoryInfo(h)
 
-        total = mem_conversion(info.total)
-        free = mem_conversion(info.free)
-        used = mem_conversion(info.used)
+        free = info.free
     elif running_device == 'tpu':
         free_mem = None
     else:
         assert "\nNo suitable device detected when checking ram/vram available."
 
+    total = info.total
+    used = info.used
+
     return {
         'device': running_device,
-        'total': total,
-        'free': free,
-        'used': used
+        'total_raw': total,
+        'total': mem_conversion(total),
+        'free_raw': free,
+        'free': mem_conversion(free),
+        'used_raw': used,
+        'used': mem_conversion(used)
     }
