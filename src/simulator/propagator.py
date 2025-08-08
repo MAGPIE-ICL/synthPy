@@ -253,14 +253,14 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
         s0_import = beam.s0
 
         Np = s0_import.shape[1]
-        rays = jnp.array([Np])
+        rays = np.array([Np], dtype = np.int64)
     else:
         Np_total = ScalarDomain.Np_total
         ray_batch_count = ScalarDomain.ray_batch_count
 
         Np = Np_total // ray_batch_count
         rays_per_batch = Np_total // ray_batch_count
-        rays = jnp.array([rays_per_batch] * (ray_batch_count - 1), Np_total - rays_per_batch * (ray_batch_count - 1))
+        rays = np.array([rays_per_batch] * (ray_batch_count - 1), Np_total - rays_per_batch * (ray_batch_count - 1), dtype = np.int64)
 
     # s0_import[:, 0] and s0_import input to getsizeof_default(...) produce the same result
     # I think this estimation is correct, if jax reports failing to allocate a lower amount, check the amount reported isn't just the max memory available
