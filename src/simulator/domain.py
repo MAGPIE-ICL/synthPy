@@ -157,7 +157,11 @@ class ScalarDomain(eqx.Module):
         # not used right now but probably will be in the future so not bothering to remove
         self.memory_reporting = memory_reporting
 
-        self.Np_total = np.int64(Np)
+        if Np_total is not None:
+            self.Np_total = np.int64(Np)
+        else:
+            self.Np_total = None
+
         self.ray_batch_count = 1
 
         valid_types = (int, float, jnp.int32)
@@ -173,7 +177,7 @@ class ScalarDomain(eqx.Module):
         # if array given, checks len = 3 and assigns accordingly
         else:
             self.lengths = jnp.array(lengths)
-            if len(self.lengths) != 3:
+            if self.lengths.shape != (3,):
                 raise Exception('lengths must have len = 3: (x,y,z)')
 
             self.x_length, self.y_length, self.z_length = self.lengths[0], self.lengths[1], self.lengths[2]
@@ -187,7 +191,7 @@ class ScalarDomain(eqx.Module):
             self.dims = jnp.array([dims, dims, dims])
         else:
             self.dims = jnp.array(dims)
-            if len(self.dims) != 3:
+            if self.dims.shape != (3,):
                 raise Exception('n must have len = 3: (x_n, y_n, z_n)')
 
             self.x_n, self.y_n, self.z_n = self.dims[0], self.dims[1], self.dims[2]
