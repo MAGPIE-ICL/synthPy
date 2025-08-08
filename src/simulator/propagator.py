@@ -233,7 +233,7 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, ret
             event_mask=None
         )
 
-        solutions = np.asarray(solutions)
+        solutions = np.asarray([solutions], dtype = Solution)
 
     #if sol.result == RESULTS.successful:
     #rf = sol.ys[:, -1, :].reshape(9, Np)# / scalar
