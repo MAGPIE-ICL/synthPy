@@ -241,13 +241,14 @@ class ScalarDomain(eqx.Module):
                 single_ray = test_beam.s0 # just initialises 1 ray of any variety
                 del test_beam
 
-                ray_memory_raw = np.float64(getsizeof_default(single_ray) * self.Np_total)
+                ray_memory_raw = np.float64(getsizeof_default(single_ray) * self.Np_total) * self.leeway_factor
                 del single_ray
 
                 print("Est. ray size in memory:", mem_conversion(ray_memory_raw))
 
             estimate_limit = np.float64(predicted_domain_allocation * allocation_count * self.leeway_factor)
-            print("Est. domain memory limit: {} --> inc. +{}% variance margin.".format(mem_conversion(estimate_limit), jnp.float32((self.leeway_factor - 1) * 100)))
+            print("Est. domain memory limit: {}".format(mem_conversion(estimate_limit)))
+            print(" --> inc. +{}% variance margin".format(jnp.float32((self.leeway_factor - 1) * 100)))
 
             if self.Np_total is not None:
                 limiting_value = estimate_limit + ray_memory_raw
@@ -270,7 +271,7 @@ class ScalarDomain(eqx.Module):
                 ## Then call generate_electron_density_profile(...) and re-do calculations with end of prior domain
                 ##
 
-                self.region_count = ceil((estimate_limit - ray_memory_raw * self.leeway_factor / self.ray_batch_count) / np.float64(memory_stats['free_raw']))
+                self.region_count = ceil((limiting_value - ray_memory_raw * self.leeway_factor / self.ray_batch_count) / np.float64(memory_stats['free_raw']))
 
                 self.coord_backup = jnp.float32(jnp.linspace(
                    -self.lengths[['x', 'y', 'z'].index(self.probing_direction)] / 2,
