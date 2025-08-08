@@ -262,7 +262,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
         rays = np.array([Np], dtype = np.int64)
     elif not isinstance(beam, Beam) and ray_batch_count == 1:
         print("b")
-        temp_beam = Beam(Np_total, beam_size = beam[0], divergence = beam[1], probing_direction = beam[2], beam_type = beam[3], seeded = beam[4])
+        temp_beam = Beam(Np, beam_size = beam[0], divergence = beam[1], ne_extent = beam[2], probing_direction = beam[3], beam_type = beam[4], seeded = beam[5])
         s0_import = temp_beam.s0
         del temp_beam
 
@@ -298,7 +298,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
             print("c")
             #def __init__(self, Np, beam_size, divergence, ne_extent, *, probing_direction = 'z', wavelength = 1064e-9, beam_type = 'circular', seeded = False):
 
-            temp_beam = Beam(Np, beam_size = beam[0], divergence = beam[1], probing_direction = beam[2], beam_type = beam[3], seeded = beam[4])
+            temp_beam = Beam(Np, beam_size = beam[0], divergence = beam[1], ne_extent = beam[2], probing_direction = beam[3], beam_type = beam[4], seeded = beam[5])
             s0_import = temp_beam.s0
             del temp_beam
         print("d")
