@@ -157,7 +157,7 @@ class ScalarDomain(eqx.Module):
         # not used right now but probably will be in the future so not bothering to remove
         self.memory_reporting = memory_reporting
 
-        if Np_total is not None:
+        if Np is not None:
             self.Np_total = np.int64(Np)
         else:
             self.Np_total = None
