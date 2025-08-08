@@ -81,6 +81,8 @@ columns = ["dims", "rays", "runtime", "legacyRuntime", "domainSize", "raySize", 
 df = pd.DataFrame(columns=columns)
 
 for i in range(len(rays)):
+    print("\n\n\n")
+
     domain = d.ScalarDomain(lengths, dims, ne_type = "test_exponential_cos", probing_direction = probing_direction)
 
     beam_definition = beam_initialiser.Beam(
@@ -112,7 +114,7 @@ for i in range(len(rays)):
 
 
     print(colour.BOLD + "\n\nDuration of " + str(duration) + " sec for domain of size " + str(dims[i]) + " ^3 and " + str(rays[i]) + " rays with legacy solver." + colour.END)
-    print(colour.BOLD + "\n\nDuration of " + str(slab.duration) + " sec for domain of size " + str(dims[i]) + " ^3 and " + str(rays[i]) + " rays with updated solver.\n" + colour.END)
+    print(colour.BOLD + "Duration of " + str(slab.duration) + " sec for domain of size " + str(dims[i]) + " ^3 and " + str(rays[i]) + " rays with updated solver.\n" + colour.END)
 
     new_entry = pd.DataFrame([{
         "dims": dims[i],
@@ -128,6 +130,6 @@ for i in range(len(rays)):
 
 for i in range(len(rays)):
     print(colour.BOLD + "\n\nDuration of " + str(df['runtime'][i]) + " sec for domain of size " + str(df['dims'][i]) + " ^3 and " + str(df['rays'][i]) + " rays with updated solver." + colour.END)
-    print(colour.BOLD + "\n\nDuration of " + str(df['legacyRuntime'][i]) + " sec for domain of size " + str(df['dims'][i]) + " ^3 and " + str(df['rays'][i]) + " rays with legacy solver.\n" + colour.END)
+    print(colour.BOLD + "Duration of " + str(df['legacyRuntime'][i]) + " sec for domain of size " + str(df['dims'][i]) + " ^3 and " + str(df['rays'][i]) + " rays with legacy solver.\n" + colour.END)
 
 df.to_csv("benchmark_results" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".csv", index=False)

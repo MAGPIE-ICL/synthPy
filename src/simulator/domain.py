@@ -236,7 +236,7 @@ class ScalarDomain(eqx.Module):
             if phaseshift:
                 allocation_count += 1
 
-            estimate_limit = jnp.float32(predicted_domain_allocation * allocation_count * self.leeway_factor)
+            estimate_limit = predicted_domain_allocation * allocation_count * self.leeway_factor
             print(estimate_limit)
             print(mem_conversion(estimate_limit))
             print(str(mem_conversion(estimate_limit)))
