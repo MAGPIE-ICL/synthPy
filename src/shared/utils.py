@@ -99,7 +99,7 @@ def domain_estimate(x_n, y_n, z_n, *, enable_x64 = False):
     else:
         conv = 4
 
-    return jnp.int64(x_n * y_n * z_n * conv)
+    return np.int64(x_n * y_n * z_n * conv)
 
 def add_integer_postfix(int):
     if int // 10 == 1:
