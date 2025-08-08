@@ -56,6 +56,7 @@ importlib.reload(rtm)
 
 from shared.printing import colour
 from shared.utils import memory_report
+from shared.utils import mem_conversion
 
 extent_x = 5e-3
 extent_y = 5e-3
@@ -90,11 +91,11 @@ for i in range(dims_len):
     for j in range(rays_len):
         print("\n\n\n")
 
-        baseline = memory_report()['used']
+        baseline = memory_report()['used_raw']
 
         domain = d.ScalarDomain(lengths, dims[i], ne_type = "test_exponential_cos", probing_direction = probing_direction)
 
-        postDomain = memory_report()['used']
+        postDomain = memory_report()['used_raw']
         domainAllocation = postDomain - baseline
 
         beam_definition = beam_initialiser.Beam(
@@ -106,7 +107,7 @@ for i in range(dims_len):
             beam_type = beam_type
         )
 
-        plusRays = memory_report()['used']
+        plusRays = memory_report()['used_raw']
 
         _, _, duration = p.solve(beam_definition.s0, domain, probing_extent)
 
@@ -137,8 +138,8 @@ for i in range(dims_len):
             "rays": rays[j],
             "runtime": duration,
             "legacyRuntime": slab.duration,
-            "domainSize": domainAllocation,
-            "raySize": plusRays - domainAllocation,
+            "domainSize": mem_conversion(domainAllocation),
+            "raySize": mem_conversion(plusRays - domainAllocation),
             "totalMemory": total
         }])
 
