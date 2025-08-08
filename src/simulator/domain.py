@@ -1,5 +1,6 @@
 import jax
 import jax.numpy as jnp
+import numpy as np
 
 import equinox as eqx
 
@@ -222,19 +223,30 @@ class ScalarDomain(eqx.Module):
 
             print("")
             if Np is not None:
+                Np = np.float64(Np)
+
                 import simulator.beam as ray_test_case
 
-                single_ray = ray_test_case.Beam(1, 1, 1, 1) # just initialises 1 ray of any variety
+                single_ray = np.float64(ray_test_case.Beam(1, 1, 1, 1)) # just initialises 1 ray of any variety
                 ray_memory_raw = getsizeof_default(single_ray) * Np
-                print("Estimated ray size:", mem_conversion(ray_memory_raw))
+                print("Est. ray size in memory:", mem_conversion(ray_memory_raw))
 
-            estimate_limit = predicted_domain_allocation * allocation_count * self.leeway_factor
-            print("Est. memory limit: {} --> inc. +{}% variance margin.".format(mem_conversion(estimate_limit), jnp.int32((self.leeway_factor - 1) * 100)))
+            estimate_limit = np.float64(predicted_domain_allocation * allocation_count * self.leeway_factor)
+            print("Est. domain memory limit: {} --> inc. +{}% variance margin.".format(mem_conversion(estimate_limit), jnp.int32((self.leeway_factor - 1) * 100)))
+
+            if Np is not None:
+                limiting_value = estimate_limit + ray_memory_raw
+                print("Total estimated maximum: {}".format(mem_conversion(limiting_value)))
+            else:
+                limiting_value = estimate_limit
 
             # when jnp.float32 is not used, will cause overflow error if 64 bit floats are not enabled
-            if jnp.float32(estimate_limit) > jnp.float32(memory_stats['free_raw']):
-                print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
-                print("--> Auto-batching domain based on memory available and domain size estimate...")
+            if limiting_value > np.float64(memory_stats['free_raw']):
+                if Np is None:
+                    print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
+                else:
+                    print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN + RAYS CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
+                print(" --> Auto-batching domain based on memory available and domain size estimate...")
 
                 ##
                 ## Used backed up information to re-assign to ScalarDomain in propagator
@@ -242,7 +254,7 @@ class ScalarDomain(eqx.Module):
                 ##
 
                 from math import ceil
-                self.region_count = ceil(estimate_limit / memory_stats['free_raw'])
+                self.region_count = ceil(estimate_limit / np.float64(memory_stats['free_raw']))
 
                 self.coord_backup = jnp.float32(jnp.linspace(
                    -self.lengths[['x', 'y', 'z'].index(self.probing_direction)] / 2,
@@ -256,8 +268,10 @@ class ScalarDomain(eqx.Module):
                     jnp.array([self.dims[['x', 'y', 'z'].index(self.probing_direction)] - dim_per_region * self.region_count])
                 ])
 
-                print("--> Batching calculation completed. Domain will be split into " + str(self.region_count) + " regions with " + str(dim_per_region) + " dims per region.")
+                print(" --> Batching calculation completed. Domain will be split into " + str(self.region_count) + " regions with " + str(dim_per_region) + " dims per region.")
                 print(colour.BOLD + "\nWARNING:" + colour.END + " This functionality will cause the solver to run slower due to domain regeneration, for optimal performance, increase the memory available to this program.")
+                if Np is not None:
+                    print(" --> The domain is batched with the goal of minimising ray batching. Ray batches introduce sequantiality which reduces speed.")
             else:
                 self.region_count = 1
         else:
