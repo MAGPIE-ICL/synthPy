@@ -291,18 +291,17 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
     ray_batch_count = ScalarDomain.ray_batch_count
 
     from simulator.beam import Beam
-    if not isinstance(beam, Beam) and ray_batch_count == 1:
-        s0_import = beam
-        del beam
+    if ray_batch_count == 1:
+        if not isinstance(beam, Beam):
+            s0_import = beam
+            del beam
+        elif isinstance(beam, Beam):
+            temp_beam = Beam(Np, beam_size = beam[0], divergence = beam[1], ne_extent = beam[2], probing_direction = beam[3], beam_type = beam[4], seeded = beam[5])
+            s0_import = temp_beam.s0
+            del temp_beam
 
         Np = s0_import.shape[1]
-        rays = np.array([Np], dtype = np.int64)
-    elif isinstance(beam, Beam) and ray_batch_count == 1:
-        temp_beam = Beam(Np, beam_size = beam[0], divergence = beam[1], ne_extent = beam[2], probing_direction = beam[3], beam_type = beam[4], seeded = beam[5])
-        s0_import = temp_beam.s0
-        del temp_beam
-
-        Np = s0_import.shape[1]
+        rays_per_batch = Np # not necessary, just so there is something to print if someone tries
 
         rays = np.array([Np], dtype = np.int64)
     else:
