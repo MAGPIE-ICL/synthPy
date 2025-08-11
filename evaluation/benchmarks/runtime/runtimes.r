@@ -1,6 +1,6 @@
 # Install ggplot2 & tidyr if not already installed
 if (!require(ggplot2)) install.packages("ggplot2", lib = Sys.getenv("R_LIBS_USER"), repos = "https://cloud.r-project.org")
-if (!require(tidyr)) install.packages("tidyr", repos = "https://cloud.r-project.org")
+if (!require(tidyr)) install.packages("tidyr", lib = Sys.getenv("R_LIBS_USER"), repos = "https://cloud.r-project.org")
 
 # Load libraries
 library(ggplot2)
