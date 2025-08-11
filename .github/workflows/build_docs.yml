@@ -29,20 +29,12 @@ jobs:
           make -C docs clean
           make -C docs html
 
-      - run: ls -la ./docs/build/html
-      - run: git -C ./docs/build/html status || echo "Not a repo"
-
-      - name: Remove accidental .git folder
-        run: rm -rf ./docs/build/html/.git
-
-      - name: Mark repo as safe
-        run: git config --global --add safe.directory ${{ github.workspace }}/docs/build/html
-
       - name: Init new repo in dist folder and commit
         run: |
           mkdir -p docs/build/html/
           cd docs/build/html/
           git init
+          git config --global --add safe.directory ${{ github.workspace }}/docs/build/html
           touch .nojekyll
           git add -A
           git config --local user.email "action@github.com"
