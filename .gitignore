@@ -17,6 +17,7 @@ evaluation/benchmarks/memory/memory-*
 evaluation/benchmarks/runtime/benchmark*
 evaluation/benchmarks/runtime/*.csv
 evaluation/benchmarks/runtime/*.pdf
+evaluation/benchmarks/runtime/*.txt
 
 evaluation/interferometry_testing/.ipynb_checkpoints
 

@@ -23,6 +23,10 @@ csv_file <- args[1]
 # Load CSV
 data <- read.csv(csv_file)
 
+# in case data is read in as a character somehow
+data$runtime <- as.numeric(data$runtime)
+data$legacyRuntime <- as.numeric(data$legacyRuntime)
+
 #Use pivot_longer() to stack runtime and legacyRuntime into a single column
 data_long <- pivot_longer(
   data,
@@ -50,7 +54,10 @@ result <- ggplot(data_long, aes(x = rays, y = time, color = factor(dims), linety
 
 # sanitises csv_file to remove extension
 base_name <- file_path_sans_ext(csv_file)
+# Create a timestamp string
+timestamp <- format(Sys.time(), "%Y%m%d-%H%M%S")
+# Append timestamp to the filename
 # adds the correct extension on so we can save with the same name as import but (obviously) a different format
-pdf_file <- paste0(base_name, ".pdf")
+pdf_file <- paste0(base_name, "_", timestamp, ".pdf")
 
 ggsave(filename = pdf_file, plot = result, width = 8, height = 6, units = "in", dpi = 300)
