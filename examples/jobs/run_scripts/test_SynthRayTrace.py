@@ -22,7 +22,7 @@ cores = None
 if args.cores is not None:
     cores = args.cores
 
-import config
+import simulator.config as config
 config.jax_init(force_device = force_device, core_limit = cores)
 
 import jax
@@ -48,7 +48,7 @@ probing_direction = 'z'
 
 lengths = 2 * np.array([extent_x, extent_y, extent_z])
 
-import domain as d
+import simulator.domain as d
 import importlib
 importlib.reload(d)
 
@@ -62,10 +62,10 @@ beam_size = extent_x    # beam radius
 ne_extent = probing_extent  # so the beam knows where to initialise initial positions
 beam_type = 'circular'
 
-import beam as beam_initialiser
+import simulator.beam as beam_initialiser
 importlib.reload(beam_initialiser)
 
-import propagator as p
+import simulator.propagator as p
 importlib.reload(p)
 
 with jax.checking_leaks():
