@@ -39,7 +39,7 @@ data_long <- pivot_longer(
 # by assigning to a variable we can save it ourselves under a different name
 result <- ggplot(data_long, aes(x = rays, y = time, color = factor(dims), linetype = type, shape = type)) +
   geom_line(linewidth = 1) + #, arrow = arrow(type = "closed", length = unit(0.15, "inches"))) +
-  geom_point(size = 3) +
+  geom_point(size = 3.5) +
   scale_linetype_manual(values = c(runtime = "solid", legacyRuntime = "dashed")) +
   scale_shape_manual(values = c(runtime = 16, legacyRuntime = 4)) +  # 16=solid circle, 17=triangle
   labs(
