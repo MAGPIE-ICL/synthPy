@@ -32,7 +32,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install flake8 pytest
+        python -m pip install flake8 pytest pytest-xdist
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
     - name: Lint with flake8
@@ -44,4 +44,4 @@ jobs:
 
     - name: Test with pytest
       run: | #runs with path set inline for imports
-        PYTHONPATH=$(pwd)/src pytest
+        PYTHONPATH=$(pwd) pytest -n auto
