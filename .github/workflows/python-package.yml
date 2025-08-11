@@ -43,5 +43,5 @@ jobs:
         flake8 src/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
     - name: Test with pytest
-      run: |
-        pytest
+      run: | #runs with path set inline for imports
+        PYTHONPATH=$(pwd) pytest
