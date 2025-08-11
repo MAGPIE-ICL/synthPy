@@ -7,3 +7,5 @@ matplotlib
 scipy
 vtk
 sympy
+psutil
+pynvml
