@@ -150,7 +150,7 @@ for i in range(dims_len):
             'display.max_columns', None,
             'display.width', None,
             'display.max_colwidth', -1,
-            'display.precision', 3,
+            'display.precision', 3
         ):
 
             print(df)
