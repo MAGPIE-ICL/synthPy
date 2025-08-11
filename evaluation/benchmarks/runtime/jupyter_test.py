@@ -149,7 +149,7 @@ for i in range(dims_len):
             'display.max_rows', None,
             'display.max_columns', None,
             'display.width', None,
-            'display.max_colwidth', -1,
+            'display.max_colwidth', None,
             'display.precision', 3
         ):
 
