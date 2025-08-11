@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
-#import numpy as np
+import numpy as np
 import jax.numpy as jnp
 from sympy import Matrix
 
@@ -375,7 +375,7 @@ class Diagnostic:
         else:
             x, y = count_nans(self.rf, ret = True)
 
-        self.H, self.xedges, self.yedges = jnp.histogram2d(x, y, bins=[pix_x // bin_scale, pix_y // bin_scale], range=[[-self.Lx / 2, self.Lx / 2],[-self.Ly / 2, self.Ly / 2]])
+        self.H, self.xedges, self.yedges = jnp.histogram2d(x, y, bins=[np.floor(pix_x / bin_scale).astype(np.int64), np.floor(pix_y / bin_scale).astype(np.int64)], range=[[-self.Lx / 2, self.Lx / 2],[-self.Ly / 2, self.Ly / 2]])
         self.H = self.H.T
 
         #Optional - clear ray attributes to save memory
@@ -389,8 +389,8 @@ class Diagnostic:
         # repeated across many functions, have made a wrapper for it instead of repeats to preserve backwards compatability
         # was this replaced by jnp.histogram2d function?
         # this function is far slower for a general histogram than the new function - yet is used for refractogram and interferogram so kept to be wrapped for those
-        x_bins = jnp.linspace(-self.Lx // 2, self.Lx // 2, pix_x // bin_scale)
-        y_bins = jnp.linspace(-self.Ly // 2, self.Ly // 2, pix_y // bin_scale)
+        x_bins = jnp.linspace(-self.Lx // 2, self.Lx // 2, np.floor(pix_x / bin_scale).astype(np.int64))
+        y_bins = jnp.linspace(-self.Ly // 2, self.Ly // 2, np.floor(pix_y / bin_scale).astype(np.int64))
 
         amplitude_x = jnp.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype = complex)
         amplitude_y = jnp.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype = complex)

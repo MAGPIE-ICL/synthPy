@@ -479,7 +479,7 @@ class ScalarDomain(eqx.Module):
 
             self.test_B()
         elif self.ne_type == "import":
-            pass
+            print("pre-generated ne field is auto-imported if passed (not None)...")
         else:
             assert "\nNo valid profile detected! Ensure passed name is correct or call yourself."
 
@@ -571,9 +571,8 @@ class ScalarDomain(eqx.Module):
 
         #self.ne = jnp.float32(ne_0 * 10 ** (self.XX / s) * (1 + jnp.cos(2 * jnp.pi * self.YY / Ly)))
 
-    '''
     #@partial(jax.jit, static_argnames=("self",))  
-    def external_ne(self, *, ne):
+    def external_ne(self):
         """
         Load externally generated grid
 
@@ -583,6 +582,7 @@ class ScalarDomain(eqx.Module):
 
         self.ne = self.ne.at[:, :, :].set(self.ne)
 
+    '''
     #@partial(jax.jit, static_argnames=("self",))  
     def external_B(self, *, B):
         """
