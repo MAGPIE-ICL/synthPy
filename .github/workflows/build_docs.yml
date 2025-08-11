@@ -33,6 +33,7 @@ jobs:
         run: |
           mkdir -p docs/build/html/
           cd docs/build/html/
+          git config --global --add safe.directory docs/build/html
           git init
           touch .nojekyll
           git add -A
