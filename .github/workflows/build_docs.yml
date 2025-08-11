@@ -25,6 +25,7 @@ jobs:
       
       - name: make the sphinx docs
         run: |
+          mkdir -p docs
           make -C docs clean
           make -C docs html
                 
