@@ -589,7 +589,7 @@ class Interferometry(Diagnostic):
 
         self.Jf = self.Jf.at[1, :].set(self.Jf[1, :] + ref_beam) # assume ref_beam is polarised in y
 
-    def bkg(self, domain_length, n_fringes, deg, ne_extent):
+    def bkg(self, domain_length, n_fringes, deg, ne_extent, probing_direction):
         rr0, E0 = ray_to_Jonesvector(self.rf, ne_extent, probing_direction = probing_direction, keep_current_plane = True, return_E = True)
 
         E = self.Jf.copy() #temporarily store E field in another variable

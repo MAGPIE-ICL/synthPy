@@ -10,7 +10,7 @@ class ValueHolder:
 
 class flags:
     def __init__(self):
-        self.error_message = (f"Unrecognized config option: {name} - is this in the docs?, check the case?")
+        self.error_message = "Unrecognized config option: {} - is this in the docs?, check the case?"
 
         self.value_holders: dict[str, ValueHolder] = {
             'MEMORY_DEBUG': ValueHolder(
@@ -56,13 +56,13 @@ class flags:
 
     def update(self, name, value):
         if name not in self.value_holders:
-            raise AttributeError(error_message.format(name = name))
+            raise AttributeError(self.error_message.format(name = name))
 
         self.value_holders[name].set(value)
 
     def reset(self, name):
         if name not in self._value_holders:
-            raise AttributeError(error_message.format(name = name))
+            raise AttributeError(self.error_message.format(name = name))
 
         self.value_holders[name].set(self.value_holders[name].default)
 

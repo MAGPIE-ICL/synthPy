@@ -465,9 +465,12 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                     s0 = array(jnp.ravel(s0_import))
                     #s0 = s0.flatten() #odeint insists
                 else:
+                    assert "\nDomain batching is not set up to work with the legacy solver yet."
+                    '''
                     # need a backpropogation algorithm that works for this too
                     s0 = array(jnp.ravel(sol))
                     del sol
+                    '''
 
                 start = time()
                 # wrapper allows dummy variables t & y to be used by solve_ivp(), self is required by dsdt
