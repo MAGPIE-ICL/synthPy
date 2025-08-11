@@ -23,9 +23,7 @@ csv_file <- args[1]
 # Load CSV
 data <- read.csv(csv_file)
 
-# in case data is read in as a character somehow
-data$runtime <- as.numeric(data$runtime)
-data$legacyRuntime <- as.numeric(data$legacyRuntime)
+data <- data[apply(data >= 0, 1, all), ]
 
 #Use pivot_longer() to stack runtime and legacyRuntime into a single column
 data_long <- pivot_longer(
@@ -49,6 +47,14 @@ result <- ggplot(data_long, aes(x = rays, y = time, color = factor(dims), linety
     color = "Dimension",
     linetype = "Runtime Type",
     shape = "Runtime Type"
+  ) +
+  scale_y_log10(
+    breaks = scales::trans_breaks("log10", function(x) 10^x),
+    labels = scales::trans_format("log10", scales::math_format(10^.x))
+  ) +
+  scale_x_log10(
+    breaks = scales::trans_breaks("log10", function(x) 10^x),
+    labels = scales::trans_format("log10", scales::math_format(10^.x))
   ) +
   theme_minimal()
 
