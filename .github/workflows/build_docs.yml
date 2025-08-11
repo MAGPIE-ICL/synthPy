@@ -29,6 +29,9 @@ jobs:
           make -C docs clean
           make -C docs html
 
+      - run: ls -la ./docs/build/html
+      - run: git -C ./docs/build/html status || echo "Not a repo"
+
       - name: Remove accidental .git folder
         run: rm -rf ./docs/build/html/.git
 
