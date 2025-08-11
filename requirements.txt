@@ -5,3 +5,4 @@ jax
 equinox
 matplotlib
 scipy
+vtk
