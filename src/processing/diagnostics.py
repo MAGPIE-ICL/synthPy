@@ -4,7 +4,7 @@ import matplotlib as mpl
 #import numpy as np
 import jax.numpy as jnp
 
-import simulator.fresnel_integral
+import simulator.fresnel_integral as fresnel_integral
 
 from shared.propagation import ray_to_Jonesvector
 
