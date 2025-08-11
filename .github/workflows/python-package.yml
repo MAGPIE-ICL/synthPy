@@ -44,4 +44,4 @@ jobs:
 
     - name: Test with pytest
       run: | #runs with path set inline for imports
-        PYTHONPATH=$(pwd) pytest
+        PYTHONPATH=$(pwd)/src pytest
