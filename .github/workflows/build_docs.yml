@@ -31,9 +31,10 @@ jobs:
                 
       - name: Init new repo in dist folder and commit
         run: |
+          rm -rf docs/build/html/.git
           mkdir -p docs/build/html/
-          cd docs/build/html/
           git config --global --add safe.directory /github/workspace/docs/build/html
+          cd docs/build/html/
           git init
           touch .nojekyll
           git add -A
