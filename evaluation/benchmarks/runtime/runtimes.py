@@ -130,8 +130,8 @@ for i in range(dims_len):
 
 
 
-        print(colour.BOLD + "\nDuration of " + str(duration) + " sec for domain of size " + str(dims[i]) + " ^3 and " + str(rays[j]) + " rays with legacy solver." + colour.END)
-        print(colour.BOLD + "Duration of " + str(slab.duration) + " sec for domain of size " + str(dims[i]) + " ^3 and " + str(rays[j]) + " rays with updated solver.\n" + colour.END)
+        print(colour.BOLD + "\nDuration of " + str(duration) + " sec for domain of size " + str(dims[i]) + " ^3 and " + str(rays[j]) + " rays with updated solver." + colour.END)
+        print(colour.BOLD + "Duration of " + str(slab.duration) + " sec for domain of size " + str(dims[i]) + " ^3 and " + str(rays[j]) + " rays with legacy solver.\n" + colour.END)
 
         new_entry = pd.DataFrame([{
             "dims": dims[i],
@@ -144,7 +144,16 @@ for i in range(dims_len):
         }])
 
         df = pd.concat([df, new_entry], ignore_index=True)
-        print(df)
+
+        with pd.option_context(
+            'display.max_rows', None,
+            'display.max_columns', None,
+            'display.width', None,
+            'display.max_colwidth', -1,
+            'display.precision', 3,
+        ):
+
+            print(df)
 
         del domain
         del beam_definition
