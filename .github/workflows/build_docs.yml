@@ -29,11 +29,8 @@ jobs:
           make -C docs clean
           make -C docs html
 
-      - name: Remove accidental .git folder
-        run: rm -rf ./docs/build/html/.git
-
       - name: Mark repo as safe
-        run: git config --global --add safe.directory ${{ github.workspace }}/docs/build/html
+        run: git config --global --add safe.directory $GITHUB_WORKSPACE
 
       - name: Init new repo in dist folder and commit
         run: |
