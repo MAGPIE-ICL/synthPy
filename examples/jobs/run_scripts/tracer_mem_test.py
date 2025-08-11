@@ -14,16 +14,16 @@ from vtk.util import numpy_support as vtk_np
 
 sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/simulator')
 
-import config
+import simulator.config as config
 config.jax_init()
 
 # cwd is set to synthPy acc. to hpc
 
-import beam as beam_initialiser
-import diagnostics as diag
-import domain as d
-import propagator as p
-import utils
+import simulator.beam as beam_initialiser
+import processing.diagnostics as diag
+import simulator.domain as d
+import simulator.propagator as p
+import shared.utils as utils
 
 def display_top(snapshot, key_type='lineno', limit=3):
     snapshot = snapshot.filter_traces((

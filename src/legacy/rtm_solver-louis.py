@@ -130,7 +130,7 @@ def knife_edge(axis, rays):
     Filters rays using a knife edge.
     Default is a knife edge in y, can also do a knife edge in x.
     '''
-    if axis is 'y':
+    if axis == 'y':
         a=2
     else:
         a=0

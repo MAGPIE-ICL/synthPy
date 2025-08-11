@@ -10,7 +10,7 @@ class ValueHolder:
 
 class flags:
     def __init__(self):
-        self.error_message = (f"Unrecognized config option: {name} - is this in the docs?, check the case?")
+        self.error_message = "Unrecognized config option: {} - is this in the docs?, check the case?"
 
         self.value_holders: dict[str, ValueHolder] = {
             'MEMORY_DEBUG': ValueHolder(
@@ -56,13 +56,13 @@ class flags:
 
     def update(self, name, value):
         if name not in self.value_holders:
-            raise AttributeError(error_message.format(name = name))
+            raise AttributeError(self.error_message.format(name = name))
 
         self.value_holders[name].set(value)
 
     def reset(self, name):
         if name not in self._value_holders:
-            raise AttributeError(error_message.format(name = name))
+            raise AttributeError(self.error_message.format(name = name))
 
         self.value_holders[name].set(self.value_holders[name].default)
 
@@ -70,15 +70,64 @@ class flags:
         for i, (k, v) in enumerate(self.value_holders):
             self.value_holders[k].value = self.value_holders[k].default
 
-def jax_init(force_device = None, core_limit = None, extra_info = False, disable_python_multithreading = True, enable_x64 = False, debugging = False):
+def resolve_path(path: str) -> str:
+    # Split the path into parts
+    parts = path.strip().split('/')
+    stack = []
+
+    for part in parts:
+        if part == '' or part == '.':
+            continue  # Skip empty or current dir
+        elif part == '..':
+            if stack:
+                stack.pop()  # Go back one directory
+        else:
+            stack.append(part)
+
+    # Handle root path (if path starts with '/')
+    return '/' + '/'.join(stack) if path.startswith('/') else '/'.join(stack)
+
+##
+## HPC runs on older jax version than local (infact local requires newer version of jax than (as of writing) is released)
+## jax_updated [bool] filters for this, set it to False if on the HPC
+##
+
+def jax_init(force_device = None, core_limit = None, extra_info = False, disable_python_multithreading = True, enable_x64 = False, debugging = True, jax_updated = True):
     import sys
     import os
 
-    from printing import colour
+    ### DO NOT REMOVE UNLESS YOU ARE VERY CERTAIN OF CORRECT PACKAGING
+
+    # os.getcwd()                                   # - don't want cwd, want the dir of this file
+    # os.path.dirname(os.path.realpath(__file__))   # cannot be called interactively - ? - seems's fine though
+    # sys.path[0]                                   # haven't tested...
+    # os.path.abspath(sys.argv[0])                  # haven't tested...
+
+    try:
+        current_file = os.path.realpath(__file__)
+    except NameError:
+        # __file__ not defined
+        if sys.argv[0]:  # Might still work in some IDEs
+            current_file = os.path.realpath(sys.argv[0])
+        else:
+            # Fallback to current working directory (e.g. Jupyter)
+            current_file = os.getcwd()
+
+    #top_level_path = resolve_path(str(os.path.dirname(os.path.realpath(__file__))) + "/../")
+    top_level_path = os.path.abspath(os.path.join(os.path.dirname(current_file), '..'))
+    print("Setting top level path for imports:", top_level_path)
+
+    # Ensure top-level path is in sys.path
+    if top_level_path not in sys.path:
+        # makes sure top level directory path is present in system so that relative imports work
+        sys.path.insert(0, top_level_path)
+
+    from shared.printing import colour
     print(colour.BOLD)
 
+    # has to be disabled by default to prevent possible interference with jax parallelisation (caused issues on the cluster)
     if disable_python_multithreading:
-        print("Disabling python multi-threading...\n")
+        print("Disabling python multi-threading...")
 
         thread_count = str(1)
         os.environ["OMP_NUM_THREADS"]        = thread_count
@@ -106,12 +155,11 @@ def jax_init(force_device = None, core_limit = None, extra_info = False, disable
             core_count = core_limit
 
     os.environ['XLA_FLAGS'] = "--xla_force_host_platform_device_count=" + str(core_count)
-    #os.environ['JAX_ENABLE_X64'] = "True"
 
-    # triggers a jax breakpoint for debugging on error - works with filter_jit not jax.jit
-    # if this is causing erroneous errors see equinox issue #1047: https://github.com/patrick-kidger/equinox/issues/1047
-    if debugging:
-        os.environ["EQX_ON_ERROR"] = "breakpoint"
+    # https://docs.jax.dev/en/latest/gpu_memory_allocation.html
+    # can't set via jax.config.update as jax requires this to be initialised on first use
+
+    #jax.config.update('jax_compiler_enable_remat_pass', False) # look into for future reference to debug mem use.
 
     if force_device == "cpu":
         os.environ['JAX_PLATFORM_NAME'] = 'cpu'
@@ -122,6 +170,12 @@ def jax_init(force_device = None, core_limit = None, extra_info = False, disable
         os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"
         #os.environ["TF_CUDA_MALLOC_ASYNC_SUPPORTED_PREALLOC"] = "0.95"
 
+    # triggers a jax breakpoint for debugging on error - works with filter_jit not jax.jit
+    # if this is causing erroneous errors see equinox issue #1047: https://github.com/patrick-kidger/equinox/issues/1047
+    if debugging:
+        if jax_updated:
+            os.environ["EQX_ON_ERROR"] = "breakpoint"
+
     import jax
 
     # enables float data types to use 64-bit instead of 32 for greater precision
@@ -130,16 +184,13 @@ def jax_init(force_device = None, core_limit = None, extra_info = False, disable
         print("\nWARNING: x64 bit currently disabled by default as greater precision will vastly increase run times")
         jax.config.update('jax_enable_x64', True)
 
-    # HPC doesn't recognise this config option
-    #jax.config.update('jax_captured_constants_report_frames', -1)
-    #jax.config.update('jax_captured_constants_warn_bytes', 128 * 1024 ** 2)
-    #jax.config.update('jax_traceback_filtering', 'off')
-    # https://docs.jax.dev/en/latest/gpu_memory_allocation.html
-    #jax.config.update('xla_python_client_preallocate', False)
-    #jax.config.update('xla_python_client_allocator', '\"platform\"')
-    # can't set via jax.config.update for some reason
-
-    #jax.config.update('jax_compiler_enable_remat_pass', False)
+    if debugging:
+        jax.config.update('jax_traceback_filtering', 'off')
+        # HPC doesn't recognise these config options due to old jax version (added in jax-0.6.0)
+        # - you need to speak to RCS to get an updated version (either forcing them to do it or to find out how to do it yourself)
+        if jax_updated:
+            jax.config.update('jax_captured_constants_report_frames', -1)
+            jax.config.update('jax_captured_constants_warn_bytes', 128 * 1024 ** 2)
 
     print(colour.END)
 

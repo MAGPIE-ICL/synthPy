@@ -1,18 +1,35 @@
-import numpy as np
-import jax.numpy as jnp
 import jax
+import jax.numpy as jnp
+import numpy as np
+
 import equinox as eqx
 
-from utils import mem_conversion
-from printing import colour
-from utils import dalloc
-from utils import domain_estimate
+#from functools import partial
+
+from shared.utils import mem_conversion
+from shared.printing import colour
+from shared.utils import dalloc
+from shared.utils import domain_estimate
+from shared.utils import memory_report
+from shared.utils import getsizeof_default
 
 class ScalarDomain(eqx.Module):
     """
     A class to hold and generate scalar domains.
     This contains also the method to propagate rays through the scalar domain
     """
+
+    s: jnp.float32
+    s1: jnp.float32
+    s2: jnp.float32
+
+    Ly: jnp.float32
+
+    ne_0: jnp.float32
+
+    Bmax: jnp.float32
+
+    Te_min: jnp.float32
 
     inv_brems: bool
     phaseshift: bool
@@ -57,9 +74,15 @@ class ScalarDomain(eqx.Module):
     coord_backup: jax.Array
     future_dims: jax.Array
 
-    debug: bool
+    extra_info: bool
+    memory_reporting: bool
 
-    def __init__(self, lengths, dims, *, ne_type = None, inv_brems = False, phaseshift = False, B_on = False, probing_direction = 'z', auto_batching = True, iteration = 1, region_count = 1, leeway_factor = None, coord_backup = None, future_dims = None, debug = False):
+    Np_total: np.int64
+    ray_batch_count: np.int64
+
+    def __init__(self, lengths, dims, *, ne_type = None, inv_brems = False, phaseshift = False, B_on = False, probing_direction = 'z', auto_batching = True, iteration = 1, region_count = 1, leeway_factor = None, coord_backup = None, future_dims = None, extra_info = False, memory_reporting = False, Np = None,
+        s = None, s1 = None, s2 = None, Ly = None, ne_0 = None, ne = None, B = None, Bmax = None, Te = None, Te_min = None, Z = None):
+
         """
         Example:
             N_V = 100
@@ -76,11 +99,43 @@ class ScalarDomain(eqx.Module):
             extent (float): physical size, m
         """
 
-        # initalise to none for equinox incase not initialised properly later on
-        self.ne = None
-        self.B = None
-        self.Te = None
-        self.Z = None
+        # initalise
+        self.s = s
+        del s
+
+        self.s1 = s1
+        del s1
+
+        self.s2 = s2
+        del s2
+
+        self.Ly = Ly
+        del Ly
+
+        self.ne_0 = ne_0
+        del ne_0
+
+        self.ne = ne
+        del ne
+
+        self.B = B
+        del B
+
+        self.Bmax = Bmax
+        del Bmax
+
+        self.Te_min = Te_min
+        del Te_min
+
+        if self.Te_min is not None and Te is not None:
+            self.Te = jnp.maximum(self.Te_min, Te)
+        else:
+            self.Te = Te
+
+        del Te
+
+        self.Z = Z
+        del Z
 
         # Logical switches
         self.inv_brems = inv_brems
@@ -95,11 +150,21 @@ class ScalarDomain(eqx.Module):
         if leeway_factor is not None:
             self.leeway_factor = leeway_factor
         else:
-            self.leeway_factor = 1.1
+            # set to 2 as a result of concerns of ray memory size
+            self.leeway_factor = 2
 
-        self.debug = debug
+        self.extra_info = extra_info
+        # not used right now but probably will be in the future so not bothering to remove
+        self.memory_reporting = memory_reporting
 
-        valid_types = (int, float, jnp.int32)
+        if Np is not None:
+            self.Np_total = np.int64(Np)
+        else:
+            self.Np_total = None
+
+        self.ray_batch_count = 1
+
+        valid_types = (int, np.int32, np.int64, jnp.int32, jnp.int64, float, np.float32, np.float64, jnp.float32, jnp.float64)
 
         ##
         ## NOT FORCING THESE CONVERSIONS MAY CAUSE ISSUES WITH EQUINOX CLASS LATER DOWN THE LINE DEPENDING ON USER INPUT
@@ -111,11 +176,11 @@ class ScalarDomain(eqx.Module):
             self.lengths = jnp.array([lengths, lengths, lengths])
         # if array given, checks len = 3 and assigns accordingly
         else:
-            if len(lengths) != 3:
+            self.lengths = jnp.array(lengths)
+            if self.lengths.shape != (3,):
                 raise Exception('lengths must have len = 3: (x,y,z)')
 
-            self.x_length, self.y_length, self.z_length = lengths[0], lengths[1], lengths[2]
-            self.lengths = jnp.array(lengths)
+            self.x_length, self.y_length, self.z_length = self.lengths[0], self.lengths[1], self.lengths[2]
 
         del lengths
         
@@ -125,46 +190,27 @@ class ScalarDomain(eqx.Module):
             self.x_n, self.y_n, self.z_n = dims, dims, dims
             self.dims = jnp.array([dims, dims, dims])
         else:
-            if len(dims) != 3:
+            self.dims = jnp.array(dims)
+            if self.dims.shape != (3,):
                 raise Exception('n must have len = 3: (x_n, y_n, z_n)')
 
-            self.x_n, self.y_n, self.z_n = dims[0], dims[1], dims[2]
-            self.dims = jnp.array(dims)
+            self.x_n, self.y_n, self.z_n = self.dims[0], self.dims[1], self.dims[2]
 
         del dims
         del valid_types
 
-        predicted_domain_allocation = domain_estimate(self.dims)
+        # changed function to pass to np.int64 to prevent overflow - this was causing the negatives
+        # --> (exactly 0 in the case of a 1024^3 domain as it is right on the limit)
+        predicted_domain_allocation = domain_estimate(self.x_n, self.y_n, self.z_n)
         print("Predicted size in memory of domain:", mem_conversion(predicted_domain_allocation))
 
         if iteration == 1 and auto_batching:
-            from jax.lib import xla_bridge
-            running_device = xla_bridge.get_backend().platform
+            memory_stats = memory_report()
 
-            if running_device == 'cpu':
-                from psutil import virtual_memory
-
-                free_mem = virtual_memory().available
-
-                print("\nFree memory:", mem_conversion(free_mem))
-            elif running_device == 'gpu':
-                from pynvml import nvmlInit, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
-
-                nvmlInit()
-
-                h = nvmlDeviceGetHandleByIndex(0)
-                info = nvmlDeviceGetMemoryInfo(h)
-
-                free_mem = info.free
-
-                print("\nMemory prior to domain creation:")
-                print(f'total : {mem_conversion(info.total)}')
-                print(f'free  : {mem_conversion(info.free)}')
-                print(f'used  : {mem_conversion(info.used)}')
-            elif running_device == 'tpu':
-                free_mem = None
-            else:
-                assert "\nNo suitable device detected when checking ram/vram available."
+            print("\nMemory prior to domain creation:")
+            print(f' - total : {memory_stats['total']}')
+            print(f' - free  : {memory_stats['free']}')
+            print(f' - used  : {memory_stats['used']}')
 
             ##
             ## Need to work out the max allocation at any point and that estimated size
@@ -187,21 +233,45 @@ class ScalarDomain(eqx.Module):
             if phaseshift:
                 allocation_count += 1
 
-            estimate_limit = predicted_domain_allocation * allocation_count * self.leeway_factor
-            print("Est. memory limit: {} --> inc. +{}% variance margin.".format(mem_conversion(estimate_limit), jnp.int32((self.leeway_factor - 1) * 100)))
+            print("")
+            if self.Np_total is not None:
+                import simulator.beam as ray_test_case
+
+                test_beam = ray_test_case.Beam(1, 1, 1, 1)
+                single_ray = test_beam.s0 # just initialises 1 ray of any variety
+                del test_beam
+
+                ray_memory_raw = np.float64(getsizeof_default(single_ray) * self.Np_total) * self.leeway_factor
+                del single_ray
+
+                print("Est. ray size in memory:", mem_conversion(ray_memory_raw))
+
+            estimate_limit = np.float64(predicted_domain_allocation * allocation_count * self.leeway_factor)
+            print("Est. domain memory limit: {}".format(mem_conversion(estimate_limit)))
+            print(" --> inc. +{}% variance margin".format(jnp.float32((self.leeway_factor - 1) * 100)))
+
+            if self.Np_total is not None:
+                limiting_value = estimate_limit + ray_memory_raw
+                print("Total estimated maximum: {}".format(mem_conversion(limiting_value)))
+            else:
+                limiting_value = estimate_limit
 
             # when jnp.float32 is not used, will cause overflow error if 64 bit floats are not enabled
-            if jnp.float32(estimate_limit) > jnp.float32(free_mem):
-                print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
-                print("--> Auto-batching domain based on memory available and domain size estimate...")
+            if limiting_value > np.float64(memory_stats['free_raw']):
+                from math import ceil
+                if self.Np_total is None:
+                    print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
+                else:
+                    print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN + RAYS CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
+                    self.ray_batch_count = np.int64(ceil(ray_memory_raw * self.leeway_factor / np.float64(memory_stats['free_raw'])))
+                print(" --> Auto-batching domain based on memory available and domain size estimate...")
 
                 ##
                 ## Used backed up information to re-assign to ScalarDomain in propagator
                 ## Then call generate_electron_density_profile(...) and re-do calculations with end of prior domain
                 ##
 
-                from math import ceil
-                self.region_count = ceil(estimate_limit / free_mem)
+                self.region_count = ceil((limiting_value - ray_memory_raw * self.leeway_factor / self.ray_batch_count) / np.float64(memory_stats['free_raw']))
 
                 self.coord_backup = jnp.float32(jnp.linspace(
                    -self.lengths[['x', 'y', 'z'].index(self.probing_direction)] / 2,
@@ -215,8 +285,10 @@ class ScalarDomain(eqx.Module):
                     jnp.array([self.dims[['x', 'y', 'z'].index(self.probing_direction)] - dim_per_region * self.region_count])
                 ])
 
-                print("--> Batching calculation completed. Domain will be split into " + str(self.region_count) + " regions with " + str(dim_per_region) + " dims per region.")
+                print(" --> Batching calculation completed. Domain will be split into " + str(self.region_count) + " regions with " + str(dim_per_region) + " dims per region.")
                 print(colour.BOLD + "\nWARNING:" + colour.END + " This functionality will cause the solver to run slower due to domain regeneration, for optimal performance, increase the memory available to this program.")
+                if self.Np_total is not None:
+                    print(" --> The domain is batched with the goal of minimising ray batching. Ray batches introduce sequantiality which reduces speed.")
             else:
                 self.region_count = 1
         else:
@@ -302,19 +374,23 @@ class ScalarDomain(eqx.Module):
             print(" --> y padded with: {} nan's".format(max_dim - self.y_n))
             print(" --> z padded with: {} nan's".format(max_dim - self.z_n))
 
-        if self.ne_type is not None:
-            self.generate_electron_density_profile()
+        if self.ne is None:
+            if self.ne_type is not None:
+                self.generate_electron_density_profile()
+            else:
+                assert auto_batching == True, colour.BOLD + "\nne_type must be passed to domain creation in order to utilise auto-batching." + colour.END
+
+                # can't initialise yourself as equinox.Module inherited class is not mutable and self.ne is set during creation -- FIX!
+                print("\nWARNING: Electron density profile to generate not passed. You will need to initialise this yourself with a call to this library.")
+                print("\t If you run low on memory, you can enforce a manual domain cleanup with a call to ScalarDomain.cleanup()")
+
+                self.XX, self.YY, self.ZZ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)#False) - has to be true for jnp
+                self.ne = jnp.zeros((self.dims[0], self.dims[1], self.dims[2]))
         else:
-            assert auto_batching == True, colour.BOLD + "\nne_type must be passed to domain creation in order to utilise auto-batching." + colour.END
+            print("\nUsing imported ne domain. Be careful that your import matches with other passed variables, this is not sanity checked by the init function.")
 
-            # can't initialise yourself as equinox.Module inherited class is not mutable and self.ne is set during creation -- FIX!
-            print("\nWARNING: Electron density profile to generate not passed. You will need to initialise this yourself with a call to this library.")
-            print("If you run low on memory, you can enforce a manual domain cleanup with a call to ScalarDomain.cleanup()")
-
-            self.XX, self.YY, self.ZZ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)#False) - has to be true for jnp
-
-        if self.debug:
-            from utils import round_to_n
+        if self.extra_info:
+            from shared.utils import round_to_n
 
             print(colour.BOLD + "\nScalarDomain object attribute info:" + colour.END)
             print(" --> lengths: {}, {}, {}".format(self.x_length, self.y_length, self.z_length))
@@ -352,6 +428,16 @@ class ScalarDomain(eqx.Module):
 
                 print("\n --> future dims: {}".format(self.future_dims))
 
+        '''
+        if B_on:
+            self.B = jnp.array
+        else:
+            self.B = None
+
+        etc...
+        '''
+
+    #@partial(jax.jit, static_argnames=("self",))  
     def generate_electron_density_profile(self):
         print("\nGenerating test", end = " ")
         if self.ne_type == "test_null":
@@ -384,19 +470,31 @@ class ScalarDomain(eqx.Module):
             self.ZZ = None
 
             self.test_exponential_cos()
+        elif self.ne_type == "test_B":
+            print("testB field...")
+            self.XX, _, _ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)
+
+            self.YY = None
+            self.ZZ = None
+
+            self.test_B()
+        elif self.ne_type == "import":
+            pass
         else:
             assert "\nNo valid profile detected! Ensure passed name is correct or call yourself."
 
         self.cleanup()
 
+    #@partial(jax.jit, static_argnames=("self",))  
     def test_null(self):
         """
         Null test, an empty cube
         """
 
-        self.ne = jnp.zeros_like(self.XX)
-    
-    def test_slab(self, s = 1, ne_0 = 2e23):
+        self.ne = self.ne.at[:, :, :].set(jnp.zeros_like(self.XX))
+
+    #@partial(jax.jit, static_argnames=("self",))  
+    def test_slab(self, *, s = 1, ne_0 = 2e23):
         """
         A slab with a linear gradient in x:
         n_e =  ne_0 * (1 + s*x/extent)
@@ -408,9 +506,15 @@ class ScalarDomain(eqx.Module):
             ne_0 ([type], optional): mean density. Defaults to 2e23 m^-3.
         """
 
-        self.ne = ne_0 * (1.0 + s * self.XX / self.x_length)
+        if self.s is not None:
+            s = self.s
+        if self.ne_0 is not None:
+            ne_0 = self.ne_0
 
-    def test_linear_cos(self, s1 = 0.1, s2 = 0.1, ne_0 = 2e23, Ly = 1):
+        self.ne = self.ne.at[:, :, :].set(ne_0 * (1.0 + s * self.XX / self.x_length))
+
+    #@partial(jax.jit, static_argnames=("self",))  
+    def test_linear_cos(self, *, s1 = 0.1, s2 = 0.1, ne_0 = 2e23, Ly = 1):
         """
         Linearly growing sinusoidal perturbation
 
@@ -421,36 +525,55 @@ class ScalarDomain(eqx.Module):
             Ly (int, optional): spatial scale of sinusoidal perturbation. Defaults to 1.
         """
 
-        self.ne = ne_0 * (1.0 + s1 * self.XX / self.x_length) * (1 + s2 * jnp.cos(2 * jnp.pi * self.YY / Ly))
+        if self.s1 is not None:
+            s1 = self.s1
+        if self.s2 is not None:
+            s2 = self.s2
+        if self.ne_0 is not None:
+            ne_0 = self.ne_0
+        if self.Ly is not None:
+            Ly = self.Ly
+
+        self.ne = self.ne.at[:, :, :].set(ne_0 * (1.0 + s1 * self.XX / self.x_length) * (1 + s2 * jnp.cos(2 * jnp.pi * self.YY / Ly)))
     
-    def test_exponential_cos(self, ne_0 = 1e24, Ly = 1e-3, s = 2e-3):
+    #@partial(jax.jit, static_argnames=("self",))  
+    def test_exponential_cos(self, *, ne_0 = 1e24, Ly = 1e-3, s = -2e-3):
         """
-        Exponentially growing sinusoidal perturbation
+        Exponentially growing/decaying sinusoidal perturbation
 
         Args:
             ne_0 ([type], optional): mean electron density. Defaults to 1e24 m^-3.
             Ly (int, optional): spatial scale of sinusoidal perturbation. Defaults to 1e-3 m.
-            s ([type], optional): scale of exponential growth. Defaults to 2e-3 m.
+            s ([type], optional): scale of exponential change. Defaults to -2e-3 m (exponential decay).
         """
 
-        self.XX = self.XX.at[:, :].set(self.XX / s)
-        self.XX = self.XX.at[:, :].set(10 ** self.XX)
+        if self.ne_0 is not None:
+            ne_0 = self.ne_0
+        if self.Ly is not None:
+            Ly = self.Ly
+        if self.s is not None:
+            s = self.s
 
-        self.YY = self.YY.at[:, :].set(self.YY / Ly)
-        self.YY = self.YY.at[:, :].set(jnp.pi * self.YY)
-        self.YY = self.YY.at[:, :].set(2 * self.YY)
-        self.YY = self.YY.at[:, :].set(jnp.cos(self.YY))
-        self.YY = self.YY.at[:, :].set(1 + self.YY)
+        self.XX = self.XX.at[:, :, :].set(self.XX / s)
+        self.XX = self.XX.at[:, :, :].set(10 ** self.XX)
+
+        self.YY = self.YY.at[:, :, :].set(self.YY / Ly)
+        self.YY = self.YY.at[:, :, :].set(jnp.pi * self.YY)
+        self.YY = self.YY.at[:, :, :].set(2 * self.YY)
+        self.YY = self.YY.at[:, :, :].set(jnp.cos(self.YY))
+        self.YY = self.YY.at[:, :, :].set(1 + self.YY)
 
         # any difference if float32 (or even 64 if changed later) or not? shouldn't be.
         self.ne = self.XX * self.YY
         self.cleanup()
 
-        self.ne = self.ne.at[:, :].set(ne_0 * self.ne)
+        self.ne = self.ne.at[:, :, :].set(ne_0 * self.ne)
 
         #self.ne = jnp.float32(ne_0 * 10 ** (self.XX / s) * (1 + jnp.cos(2 * jnp.pi * self.YY / Ly)))
 
-    def external_ne(self, ne):
+    '''
+    #@partial(jax.jit, static_argnames=("self",))  
+    def external_ne(self, *, ne):
         """
         Load externally generated grid
 
@@ -458,9 +581,10 @@ class ScalarDomain(eqx.Module):
             ne ([type]): MxMxM grid of density in m^-3
         """
 
-        self.ne = ne
+        self.ne = self.ne.at[:, :, :].set(self.ne)
 
-    def external_B(self, B):
+    #@partial(jax.jit, static_argnames=("self",))  
+    def external_B(self, *, B):
         """
         Load externally generated grid
 
@@ -468,9 +592,10 @@ class ScalarDomain(eqx.Module):
             B ([type]): MxMxMx3 grid of B field in T
         """
 
-        self.B = B
+        self.B = self.B.at[:, :, :].set(B)
 
-    def external_Te(self, Te, Te_min = 1.0):
+    #@partial(jax.jit, static_argnames=("self",))  
+    def external_Te(self, *, Te, Te_min = 1.0):
         """
         Load externally generated grid
 
@@ -478,9 +603,10 @@ class ScalarDomain(eqx.Module):
             Te ([type]): MxMxM grid of electron temperature in eV
         """
 
-        self.Te = jnp.maximum(Te_min, Te)
+        self.Te = self.Te.at[:, :, :].set(jnp.maximum(Te_min, Te))
 
-    def external_Z(self, Z):
+    #@partial(jax.jit, static_argnames=("self",))  
+    def external_Z(self, *, Z):
         """
         Load externally generated grid
 
@@ -488,9 +614,11 @@ class ScalarDomain(eqx.Module):
             Z ([type]): MxMxM grid of ionisation
         """
 
-        self.Z = Z
-        
-    def test_B(self, Bmax=1.0):
+        self.Z = self.Z.at[:, :, :].set(Z)
+    '''
+
+    #@partial(jax.jit, static_argnames=("self",))  
+    def test_B(self, *, Bmax = 1.0):
         """
         A Bz field with a linear gradient in x:
         Bz =  Bmax*x/extent
@@ -499,8 +627,11 @@ class ScalarDomain(eqx.Module):
             Bmax ([type], optional): maximum B field, default 1.0 T
         """
 
-        self.B = jnp.zeros(jnp.append(jnp.array(self.XX.shape), 3))
-        self.B[:, :, :, 2] = Bmax * self.XX / self.x_length
+        if self.Bmax is not None:
+            Bmax = self.Bmax
+
+        self.B = self.B.at[:, :, :, :].set(jnp.zeros(jnp.append(jnp.array(self.XX.shape), 3)))
+        self.B = self.B.at[:, :, :, 2].set(Bmax * self.XX / self.x_length)
 
     def export_scalar_field(self, property: str = 'ne', fname: str = None):
         """
@@ -578,6 +709,7 @@ class ScalarDomain(eqx.Module):
 
         print(f'Scalar Domain electron density succesfully saved under {fname}.pvti !')
 
+    #@jax.jit
     def cleanup(self):
         if self.XX is not None:
             dalloc(self.XX)

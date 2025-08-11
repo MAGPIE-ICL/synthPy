@@ -3,15 +3,21 @@
 
 src/solvers-legacy/__pycache__
 
-src/utils/__pycache__
-
 src/simulator/__pycache__
 
 src/field_generator/__pycache__
 
+src/processing/__pycache__
+src/shared/__pycache__
+src/utils/__pycache__
+
 examples/notebooks/.ipynb_checkpoints
 
-evaluation/memory_benchmarks/memory-*
+evaluation/benchmarks/memory/memory-*
+evaluation/benchmarks/runtime/benchmark*
+evaluation/benchmarks/runtime/*.csv
+evaluation/benchmarks/runtime/*.pdf
+evaluation/benchmarks/runtime/*.txt
 
 evaluation/interferometry_testing/.ipynb_checkpoints
 
@@ -22,3 +28,4 @@ evaluation/error_reading/*
 !evaluation/error_reading/error_parser.py
 
 **/__pycache__/
+**/.ipynb_checkpoints/

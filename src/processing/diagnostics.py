@@ -3,10 +3,14 @@ import matplotlib as mpl
 
 #import numpy as np
 import jax.numpy as jnp
+from sympy import Matrix
 
-import fresnel_integral
+import simulator.fresnel_integral as fresnel_integral
 
-from propagator import ray_to_Jonesvector
+from shared.propagation import ray_to_Jonesvector
+
+from shared.utils import count_nans
+from shared.utils import round_to_n
 
 #import jax
 #jax.tree_util.tree_leaves(x, is_leaf = lambda x: x is None)
@@ -27,7 +31,7 @@ rr0[4,:]-= 0.5 #rand generates [0,1], so we recentre [-0.5,0.5]
 rr0[5,:]-= 0.5
 
 #x, θ, y, ϕ
-scales=jnp.diag(jnp.array([10, 0, 10, 0, 1, 1j])) #set angles to 0, collimated beam. x, y in [-5,5]. Circularly polarised beam, E_x = iE_y
+scales=jnp.diag(jnp.asarray([10, 0, 10, 0, 1, 1j])) #set angles to 0, collimated beam. x, y in [-5,5]. Circularly polarised beam, E_x = iE_y
 rr0=jnp.matmul(scales, rr0)
 r0=circular_aperture(5, rr0) #cut out a circle
 
@@ -71,7 +75,7 @@ a=α(x, n_e0=ne0, w=w, Dx=Dx, x0=x0)
 n=ne(x, n_e0=ne0, w=w, Dx=Dx, x0=x0)
 ne0s=ne_ramp(y, ne_0=ne0, scale=s)
 
-nn=jnp.array([ne(x, n_e0=n0, w=w, Dx=Dx, x0=x0) for n0 in ne0s])
+nn=jnp.asarray([ne(x, n_e0=n0, w=w, Dx=Dx, x0=x0) for n0 in ne0s])
 nn=jnp.rot90(nn)
 
 ###PLOT SHOCKS###
@@ -137,9 +141,9 @@ def lens(r, f1, f2):
     See: https://en.wikipedia.org/wiki/Ray_transfer_matrix_analysis
     """
 
-    l1 = jnp.array([[1, 0],
+    l1 = jnp.asarray([[1, 0],
             [-1 / f1, 1]])
-    l2 = jnp.array([[1, 0],
+    l2 = jnp.asarray([[1, 0],
             [-1 / f2, 1]])
 
     L = jnp.zeros((4, 4))
@@ -160,8 +164,8 @@ def travel(r, d):
     See: https://en.wikipedia.org/wiki/Ray_transfer_matrix_analysis
     """
 
-    d = jnp.array([[1, d],
-                  [0, 1]])
+    d = jnp.asarray([[1, d],
+                     [0, 1]])
 
     L = jnp.zeros((4, 4))
 
@@ -260,11 +264,34 @@ def ray(x, θ, y, ϕ):
     Returns a 4x1 matrix representing a ray. Spatial units must be consistent, angular units in radians.
     """
 
-    return sym.Matrix([x, θ, y, ϕ])
+    return Matrix([x, θ, y, ϕ])
 
 def d2r(d):
     # helper function, degrees to radians
     return d * jnp.pi / 180
+
+def lens_cutoff(rf, Jf = None, *, L = 400, R = 25):
+    """
+    Masks the Jonesvector resulting array to avoid plotting any values outside of some set limit
+    - important as even if you set limits for the histogram to "zoom in", binning is based on raw data
+    --> leading to low resolutions if this is not used!
+
+    Args:
+        rf (jax.Array): Jonesvector output from solver
+        L (int): Length till next lens
+        R (int): Radius of lens
+
+    Return:
+        rf (jax.Array): Masked Jonesvector
+    """
+
+    mask = jnp.pow(jnp.pow(L * jnp.tan(rf[1]) + rf[0], 2) + jnp.pow(L * jnp.tan(rf[3]) + rf[2], 2), 0.5) <= R
+
+    rf = jnp.asarray(rf)[:, mask]
+    if Jf is not None:
+        Jf = jnp.asarray(Jf)[:, mask]
+
+    return rf, Jf
 
 class Diagnostic:
     """
@@ -272,7 +299,7 @@ class Diagnostic:
     """
 
     # this is in mm's not metres - self.rf is converted to mm's (not sure if everything else is covered though)
-    def __init__(self, wavelength, rf, Jf = None, *, focal_plane = 0, L = 400, R = 25, Lx = 18, Ly = 13.5, x = None, y = None, x_l = None, y_l = None, amp = None, phase = None):
+    def __init__(self, wavelength, rf, Jf = None, *, focal_plane = 0, L = 400, R = 25, Lx = 18, Ly = 13.5, x = None, y = None, x_l = None, y_l = None, amp = None, phase = None, l_x = 0, u_x = 0.3, l_y = -5, u_y = 5):
         """
         Initialise ray diagnostic.
 
@@ -298,14 +325,26 @@ class Diagnostic:
         # just re-assert type here to fix
 
         if rf is not None:
-            self.rf = jnp.array(rf)
+            # forces self.rf to the last slice if rf returns multiple samples
+            # also preserves the whole pass if required
+            if len(rf.shape) == 3:
+                #self.rf_full = rf
+                rf = rf[-1, :, :]
+
+            self.Np = rf.shape[-1]
+
+            # masks rf (& Jf) to only hold entries corr. to rays that will be captured by the lense setup
+            # also forces matrices to type jax.Array via jnp.asarray()
+            self.rf, self.Jf = lens_cutoff(rf, Jf)  # DO pass Jf to this, else self.Jf will be assigned None even if Jf is not None
+
+            self.Np_inc = self.rf.shape[-1]
+            if self.Np == self.Np_inc:
+                print("\nAll rays incident on lens!")
+            else:
+                print("\n{} rays received, {} incident on the first lens.".format(str(self.Np), str(self.Np_inc)))
+                print(" --> {} % of rays wasted!".format(str(round_to_n((1 - self.Np_inc / self.Np) * 100, 3))))
         else:
             assert "rf should not be of Noneype! diffrax clearly failed."
-
-        if Jf is not None:
-            self.Jf = jnp.array(Jf)
-        else:
-            self.Jf = Jf
 
         # however, doesn't have to be done manually now as already sorted in propagator.py, therefore no more duplication
         # still odd though... (hence the keeping of the comment)
@@ -318,9 +357,9 @@ class Diagnostic:
 
         k = 2 * jnp.pi / self.wavelength
 
-        self.Jf = self.Jf.at[:, :].set(self.Jf[:, :] * jnp.exp(1.0j * k * jnp.sqrt(dx ** 2 + dy ** 2)))
+        self.Jf = self.Jf.at[:, :].set(self.Jf[:, :] * jnp.exp(1.0j * k * jnp.sqrt(dx ** 2 + dy ** 2 + (r1[1, :] - r0[1, :]) ** 2)))
 
-    def histogram(self, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
+    def histogram(self, *, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False, plain_plot = False, extra_info = True):
         """
         Bin data into a histogram. Defaults are for a KAF-8300.
         Outputs are H, the histogram, and xedges and yedges, the bin edges.
@@ -331,19 +370,10 @@ class Diagnostic:
             pix_y (int, optional): number of y pixels in detector plane. Defaults to 2574.
         """
 
-        x = self.rf[0, :]
-        y = self.rf[2, :]
-
-        print("\nrf size expected: (", len(x), ", ", len(y), ")", sep='')
-
-        # means that jnp.isnan(a) returns True when a is not Nan
-        # ensures that x & y are the same length, if output of either is Nan then will not try to render ray in histogram
-        mask = ~jnp.isnan(x) & ~jnp.isnan(y)
-
-        x = x[mask]
-        y = y[mask]
-
-        print("rf after clearing nan's: (", len(x), ", ", len(y), ")", sep='')
+        if plain_plot:
+            x, y = count_nans(self.r0, ret = True)
+        else:
+            x, y = count_nans(self.rf, ret = True)
 
         self.H, self.xedges, self.yedges = jnp.histogram2d(x, y, bins=[pix_x // bin_scale, pix_y // bin_scale], range=[[-self.Lx / 2, self.Lx / 2],[-self.Ly / 2, self.Ly / 2]])
         self.H = self.H.T
@@ -368,15 +398,18 @@ class Diagnostic:
         x_indices = jnp.digitize(self.rf[0, :], x_bins) - 1
         y_indices = jnp.digitize(self.rf[2, :], y_bins) - 1
 
-        for i in range(self.rf.shape[1]):
-            if 0 <= x_indices[i] < amplitude_x.shape[1] and 0 <= y_indices[i] < amplitude_x.shape[0]:
-                # jax arrays are immutable - fix later
-                amplitude_x = amplitude_x.at[y_indices[i], x_indices[i]].set(amplitude_x[y_indices[i], x_indices[i]] + self.Jf[0, i])
-                amplitude_y = amplitude_y.at[y_indices[i], x_indices[i]].set(amplitude_y[y_indices[i], x_indices[i]] + self.Jf[1, i])
+        mask = (0 <= x_indices) & (x_indices < amplitude_x.shape[1]) & (0 <= y_indices) & (y_indices < amplitude_x.shape[0])
+
+        # jax arrays are immutable - fix later
+        amplitude_x = amplitude_x.at[y_indices[mask], x_indices[mask]].set(amplitude_x[y_indices[mask], x_indices[mask]] + self.Jf[0, mask])
+        amplitude_y = amplitude_y.at[y_indices[mask], x_indices[mask]].set(amplitude_y[y_indices[mask], x_indices[mask]] + self.Jf[1, mask])
 
         amplitude = jnp.sqrt(jnp.real(amplitude_x) ** 2 + jnp.real(amplitude_y) ** 2)
         # amplitude_normalised = (amplitude - amplitude.min()) / (amplitude.max() - amplitude.min()) # this line needs work and is currently causing problems
         self.H = amplitude
+
+    def plot_rays(self, *, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
+        self.histogram(bin_scale = bin_scale, pix_x = pix_x, pix_y = pix_y, clear_mem = clear_mem, plain_plot = True)
 
 class Shadowgraphy(Diagnostic):
     """
@@ -480,7 +513,6 @@ class Refractometry(Diagnostic):
         r8 = travel(r7, self.L)               # displace rays to detector
         self.rf = r8
 
-    '''
     def coherent_solve(self):
         ## Imaging the spatial axis - M = 2 - Coherent Implementation of the Refractometer
         r1 = travel(self.r0, 3 * self.L / 4 - self.focal_plane)
@@ -500,13 +532,12 @@ class Refractometry(Diagnostic):
 
         self.rf = travel(r6, self.L)               # displace rays to detector
         self.propagate_E(self.rf, r6)
-    '''
 
-    def coherent_solve(self):
+    def coherent_solve_alt(self):
         ## Imaging the spatial axis - M = 2 - Coherent Implementation of the Refractometer
         r1 = travel(self.r0, 3 * self.L / 4 - self.focal_plane)
 
-        r2, self.Jf = circular_aperture(self.r0, self.R, E = self.Jf)      # cut off
+        r2, self.Jf = circular_aperture(r1, self.R, E = self.Jf)      # cut off
         # propagate E field
         self.propagate_E(r2, r1)
 
@@ -514,9 +545,11 @@ class Refractometry(Diagnostic):
         self.propagate_E(r3, r2)
 
         r4 = travel(r3, 3 * self.L / 2)
-        self.propagate_E(r4, r3)                 # displace rays to lens 2 - hybrid
 
         r5, self.Jf = circular_aperture(r4, self.R, E = self.Jf)      # cut off
+        self.propagate_E(r4, r3)                 # displace rays to lens 2 - hybrid
+        self.propagate_E(r5, r4)                 # displace rays to lens 2 - hybrid
+
         r6 = lens(r5, self.L / 3, self.L / 2)       # lens 2 - hybrid lens
         self.propagate_E(r6, r5)
 
@@ -527,29 +560,8 @@ class Refractometry(Diagnostic):
         self.histogram_legacy(bin_scale = bin_scale, pix_x = pix_x, pix_y = pix_y, clear_mem = clear_mem)
 
     def fresnel_solve(self, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
-        # repeated across many functions, have made a wrapper for it instead of repeats to preserve backwards compatability
-        # was this replaced by jnp.histogram2d function?
-        # this function is far slower for a general histogram than the new function - yet is used for refractogram and interferogram so kept to be wrapped for those
-        x_bins = jnp.linspace(-self.Lx // 2, self.Lx // 2, pix_x // bin_scale)
-        y_bins = jnp.linspace(-self.Ly // 2, self.Ly // 2, pix_y // bin_scale)
-
-        amplitude_x = jnp.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype = complex)
-        amplitude_y = jnp.zeros((len(y_bins) - 1, len(x_bins) - 1), dtype = complex)
-
-        x_indices = jnp.digitize(self.rf[0, :], x_bins) - 1
-        y_indices = jnp.digitize(self.rf[2, :], y_bins) - 1
-
         self.Jf = fresnel_integral.propagate(self.wavelength, self.x, self.y, self.x_l, self.y_l, self.r0, self.amp, self.phase, 3 * self.L / 4 - self.focal_plane)
-
-        for i in range(self.rf.shape[1]):
-            if 0 <= x_indices[i] < amplitude_x.shape[1] and 0 <= y_indices[i] < amplitude_x.shape[0]:
-                # jax arrays are immutable - fix later
-                amplitude_x = amplitude_x.at[y_indices[i], x_indices[i]].set(amplitude_x[y_indices[i], x_indices[i]] + self.Jf[0, i])
-                amplitude_y = amplitude_y.at[y_indices[i], x_indices[i]].set(amplitude_y[y_indices[i], x_indices[i]] + self.Jf[1, i])
-
-        amplitude = jnp.sqrt(jnp.real(amplitude_x) ** 2 + jnp.real(amplitude_y) ** 2)
-        # amplitude_normalised = (amplitude - amplitude.min()) / (amplitude.max() - amplitude.min()) # this line needs work and is currently causing problems
-        self.H = amplitude
+        self.histogram_legacy(bin_scale = bin_scale, pix_x = pix_x, pix_y = pix_y, clear_mem = clear_mem)
 
 class Interferometry(Diagnostic):
     """
@@ -565,22 +577,20 @@ class Interferometry(Diagnostic):
             'Interfered with' E field
         """
 
-        if self.Jf == None:
-            print("This diagnostic requires a calculated Jf matrix.")
-            return None
+        assert self.Jf is not None, print("\nThis diagnostic requires a calculated Jf matrix.")
 
         if deg >= 45:
             deg = - jnp.abs(deg - 90)
 
-        rad = deg * jnp.pi /180 #deg to rad
+        rad = deg * jnp.pi / 180 #deg to rad
         y_weight = jnp.arctan(rad) #take x_weight is 1
         x_weight = jnp.sqrt(1 - y_weight**2)
 
-        ref_beam = jnp.exp(2 * n_fringes / 3 * 1.0j * (x_weight * self.rf[0,:] + y_weight * self.rf[2,:]))
+        ref_beam = jnp.exp(2 * n_fringes / 3 * 1.0j * (x_weight * self.rf[0, :] + y_weight * self.rf[2, :]))
 
-        self.Jf = self.Jf.at[1,:].set(self.Jf[1,:] + ref_beam) # assume ref_beam is polarised in y
+        self.Jf = self.Jf.at[1, :].set(self.Jf[1, :] + ref_beam) # assume ref_beam is polarised in y
 
-    def bkg(self, domain_length, n_fringes, deg, ne_extent):
+    def bkg(self, domain_length, n_fringes, deg, ne_extent, probing_direction):
         rr0, E0 = ray_to_Jonesvector(self.rf, ne_extent, probing_direction = probing_direction, keep_current_plane = True, return_E = True)
 
         E = self.Jf.copy() #temporarily store E field in another variable
@@ -637,5 +647,5 @@ class Interferometry(Diagnostic):
 
         self.rf = r7
 
-    def interferogram(self, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
+    def interferogram(self, *, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
         self.histogram_legacy(bin_scale = bin_scale, pix_x = pix_x, pix_y = pix_y, clear_mem = clear_mem)
