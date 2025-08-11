@@ -103,7 +103,6 @@ for i in range(dims_len):
             divergence,
             probing_extent,
             probing_direction = probing_direction,
-            wavelength = lwl,
             beam_type = beam_type
         )
 
