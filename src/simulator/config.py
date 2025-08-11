@@ -103,11 +103,24 @@ def jax_init(force_device = None, core_limit = None, extra_info = False, disable
     # sys.path[0]                                   # haven't tested...
     # os.path.abspath(sys.argv[0])                  # haven't tested...
 
-    top_level_path = resolve_path(str(os.path.dirname(os.path.realpath(__file__))) + "/../")
-    print("Setting top level path for imports: " + top_level_path)
+    try:
+        current_file = os.path.realpath(__file__)
+    except NameError:
+        # __file__ not defined
+        if sys.argv[0]:  # Might still work in some IDEs
+            current_file = os.path.realpath(sys.argv[0])
+        else:
+            # Fallback to current working directory (e.g. Jupyter)
+            current_file = os.getcwd()
 
-    # makes sure top level directory path is present in system so that relative imports work
-    sys.path.insert(0, top_level_path)
+    #top_level_path = resolve_path(str(os.path.dirname(os.path.realpath(__file__))) + "/../")
+    top_level_path = os.path.abspath(os.path.join(os.path.dirname(current_file), '..'))
+    print("Setting top level path for imports:", top_level_path)
+
+    # Ensure top-level path is in sys.path
+    if top_level_path not in sys.path:
+        # makes sure top level directory path is present in system so that relative imports work
+        sys.path.insert(0, top_level_path)
 
     from shared.printing import colour
     print(colour.BOLD)

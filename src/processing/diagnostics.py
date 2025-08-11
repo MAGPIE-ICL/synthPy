@@ -3,6 +3,7 @@ import matplotlib as mpl
 
 #import numpy as np
 import jax.numpy as jnp
+from sympy import Matrix
 
 import simulator.fresnel_integral as fresnel_integral
 
@@ -263,7 +264,7 @@ def ray(x, θ, y, ϕ):
     Returns a 4x1 matrix representing a ray. Spatial units must be consistent, angular units in radians.
     """
 
-    return sym.Matrix([x, θ, y, ϕ])
+    return Matrix([x, θ, y, ϕ])
 
 def d2r(d):
     # helper function, degrees to radians
