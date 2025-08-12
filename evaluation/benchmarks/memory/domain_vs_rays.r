@@ -10,15 +10,15 @@ ray_estimate <- function(x, ray_size_bytes = single_ray_estimate) {
   (x * ray_size_bytes) / (1024 * 1024 * 1024) # Bytes to GiB
 }
 
-domain_estimate <- function(x) {
-  (x / 1024) * (x / 1024) * (x / 1024) * (32 / 8)
+domain_estimate <- function(x, y, z) {
+  (x / 1024) * (y / 1024) * (z / 1024) * (32 / 8)
 }
 
 x1 <- 10^seq(0, 9, length.out = 1000)
 y1 <- ray_estimate(x1)
 
 x2 <- 2^seq(0, log(4096 + 2048, base = 2), length.out = 64)
-y2 <- domain_estimate(x2)
+y2 <- domain_estimate(x2, x2, x2)
 
 # Main plot with base-10 log x-axis
 plot(x1, y1, type = "l", col = "blue", lwd = 2,
@@ -29,47 +29,40 @@ plot(x1, y1, type = "l", col = "blue", lwd = 2,
 )
 
 # Additional ray lines (same x scale, so log scale is automatic)
-y1_512 <- y1 + domain_estimate(512)
+y1_512 <- y1 + domain_estimate(512, 512, 512)
 lines(x1, y1_512, col = "red", lwd = 2, lty = 2)
 
-y1_1024 <- y1 + domain_estimate(1024)
+y1_1024 <- y1 + domain_estimate(1024, 1024, 1024)
 lines(x1, y1_1024, col = "purple", lwd = 2, lty = 2)
 
-y1_2048 <- y1 + domain_estimate(2048)
+y1_2048 <- y1 + domain_estimate(2048, 2048, 2048)
 lines(x1, y1_2048, col = "orange", lwd = 2, lty = 2)
 
-y1_4096 <- y1 + domain_estimate(4096)  # fixed: was domain_estimate(2048) before
+y1_4096 <- y1 + domain_estimate(4096, 4096, 4096)  # fixed: was domain_estimate(2048) before
 lines(x1, y1_4096, col = "magenta", lwd = 2, lty = 2)
 
-batcher_results <- function(dims, Np, mem_available_gb = 40, leeway_factor = 1.1, ray_size_bytes = single_ray_estimate) {
-  predicted_domain_allocation <- domain_estimate(dims)
+batcher_results <- function(dims, Np, mem_available_gb = 40, leeway_factor = 1.1, ray_size_bytes = single_ray_estimate, allocation_count = 4) {
+  mem_available = mem_available_gb * (1024 * 1024 * 1024)
+
+  predicted_domain_allocation <- domain_estimate(dims, dims, dims) * (1024 * 1024 * 1024)
   ray_memory_raw <- (ray_size_bytes * Np) / (1024 * 1024 * 1024)
+  print(ray_memory_raw)
 
   # Total estimate with leeway factor
-  total_estimate <- (predicted_domain_allocation + ray_memory_raw) * leeway_factor
+  limiting_value <- (predicted_domain_allocation * allocation_count + ray_memory_raw) * leeway_factor
+  print(limiting_value)
 
   # Determine ray batches needed to fit memory available
-  ray_batch_count <- max(1, ceiling(ray_memory_raw * leeway_factor / mem_available_gb))
-
-  # Effective ray memory per batch
-  ray_memory_per_batch <- ray_memory_raw / ray_batch_count
-
-  # Total memory needed per batch (domain + rays per batch)
-  total_per_batch <- (predicted_domain_allocation + ray_memory_per_batch) * leeway_factor
-
+  ray_batch_count <- max(1, ceiling(ray_memory_raw * leeway_factor / mem_available))
+  print(ray_batch_count)
   # Determine domain regions needed to fit per batch memory limit
-  domain_region_count <- max(1, ceiling(total_per_batch / mem_available_gb))
+  domain_region_count <- max(1, ceiling((limiting_value - (ray_memory_raw / ray_batch_count)) / mem_available))
+  print(domain_region_count)
 
-  # Return the relevant info
-  list(
-    predicted_domain_allocation_gb = predicted_domain_allocation,
-    total_ray_memory_gb = ray_memory_raw,
-    total_estimated_memory_gb = total_estimate,
-    ray_batch_count = ray_batch_count,
-    domain_region_count = domain_region_count,
-    total_memory_per_batch_gb = total_per_batch
-  )
+  return(domain_estimate(dims, dims, dims %/% domain_region_count) + ray_estimate(Np %/% ray_batch_count, ray_size_bytes = ray_size_bytes))
 }
+
+lines(x1, batcher_results(1024, x1), col = "pink", lwd = 2, lty = 2)
 
 # Overlay second plot (domain estimate) without axes
 par(new = TRUE)
@@ -85,9 +78,10 @@ axis(side = 3, at = pretty(x2), labels = pretty(x2), col = "darkgreen", col.axis
 mtext("Cubic resolution of domain", side = 3, line = 3, col = "darkgreen")
 
 legend("topleft",
-       legend = c("Ray estimate", "Ray est. in a 512 domain", "Ray est. in a 1024 domain",
-                  "Ray est. in a 2048 domain", "Ray est. in a 4096 domain", "Domain estimate"),
-       col = c("blue", "red", "purple", "orange", "magenta", "darkgreen"),
+       legend = c("Ray estimate",
+                  "Total est. in a 512 domain", "Total est. in a 1024 domain", "Total est. in a 2048 domain", "Total est. in a 4096 domain",
+                  "Batched est. in a 1024 domain", "Domain estimate"),
+       col = c("blue", "red", "purple", "orange", "magenta", "pink", "darkgreen"),
        lty = c(1, 2, 2, 2, 2, 1), lwd = 2)
 
 dev.off()
