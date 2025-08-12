@@ -313,18 +313,21 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
     beam = np.asarray(beam, dtype=object)
     if ray_batch_count == 1:
-        if len(beam.shape) == 2:
-            s0_import = beam
-            del beam
+        if isinstance(beam, array.array) or isinstance(beam, np.ndarray) or isinstance(beam, jax.Array):
+            if len(beam.shape) == 2:
+                s0_import = beam
+                del beam
+            else:
+                assert "\nExpected a matrix of pre-created rays."
         else:
-            assert "\nExpected a matrix of pre-created rays."
+            assert "\nExpected rays in the form of a 2D array."
 
         Np = s0_import.shape[1]
         rays_per_batch = Np # not necessary, just so there is something to print if someone tries
 
         rays = np.array([Np], dtype = np.int64)
     else:
-        if len(beam.shape) != 1:
+        if not isinstance(beam, tuple):
             assert "\nExpect a tuple of Beam properties if you wish to batch rays."
 
         #Np = Np_total // ray_batch_count
