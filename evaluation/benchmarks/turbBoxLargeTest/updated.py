@@ -50,7 +50,7 @@ columns = ["dims", "rays", "runtime", "legacyRuntime", "domainSize", "raySize", 
 df = pd.DataFrame(columns=columns)
 
 #load hdf
-ne, dims, spacing = utilIO.hdf_readin(str(file_loc))
+ne, dims, spacing = utilIO.hdf_readin(str("/rds/general/user/sm5625/home/synthPy/src/evaluation/benchmarks/turbBoxLargeTest/radmeshablation_3d_prp_CH_ug_3rd_hdf5_plt_cnt_0228"))
 
 '''
 # multiply domain to match real size experimental target
