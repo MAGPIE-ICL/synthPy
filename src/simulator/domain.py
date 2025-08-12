@@ -219,8 +219,12 @@ class ScalarDomain(eqx.Module):
             # 2 for ne and ne_nc in calc_dndr(...) before ne is deleted
             # at peak mem usage ne should have been deleted, therefore this contributes only 1 domain
             # +1 for ne_interp
-            # +2 for the 2 sqeuentially repeated domain sized allocations in dndr(...)
-            allocation_count = 4
+            # +2 for the 2 sequentially repeated domain sized allocations in dndr(...)
+
+            # 1 for ne
+            # +1 for sequential interps (dndx, dndy, dndz)
+            # no more need for domain allocation in dndr as now functionally interpolated
+            allocation_count = 2
 
             # up to +5 in calc_dndr(...) depending on the number of extra interps
             if B_on:
@@ -232,6 +236,16 @@ class ScalarDomain(eqx.Module):
                 allocation_count += 1
             if phaseshift:
                 allocation_count += 1
+
+            # compare to max allocation in domain setup and return the greatest
+            if self.ne_type == "test_null" or self.ne_type == "test_slab" or self.ne_type == "test_B":
+                allocation_count = max(allocation_count, 2)
+            elif self.ne_type == "test_linear_cos" or self.ne_type == "test_exponential_cos":
+                allocation_count = max(allocation_count, 3)
+            elif self.ne_type == "import":
+                allocation_count = max(allocation_count, 1)
+            else:
+                assert "\nNo valid profile detected! Ensure passed name is correct or call yourself."
 
             print("")
             if self.Np_total is not None:
@@ -274,7 +288,7 @@ class ScalarDomain(eqx.Module):
                 ##
 
                 #self.region_count = ceil((limiting_value - ray_memory_raw / self.ray_batch_count) / np.float64(memory_stats['free_raw']))
-                self.region_count = ceil((np.float64(memory_stats['free_raw']) - floor(ray_memory_raw / self.ray_batch_count)) / np.float64(predicted_domain_allocation * allocation_count))
+                self.region_count = ceil(np.float64(predicted_domain_allocation * allocation_count) / (np.float64(memory_stats['free_raw']) - ceil(ray_memory_raw / self.ray_batch_count)))
 
                 self.coord_backup = jnp.float32(jnp.linspace(
                    -self.lengths[['x', 'y', 'z'].index(self.probing_direction)] / 2,

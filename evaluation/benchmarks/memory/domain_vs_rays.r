@@ -14,7 +14,10 @@ domain_estimate <- function(x, y, z) {
   (x / 1024) * (y / 1024) * (z / 1024) * (32 / 8)
 }
 
-batcher_results <- function(dims, Np_vec, mem_available_gb = 40, leeway_factor = 1.1, ray_size_bytes = 712, allocation_count = 4) {
+leeway_factor_default = 1.1
+allocation_count_default = 3
+
+batcher_results <- function(dims, Np_vec, mem_available_gb = 40, leeway_factor = leeway_factor_default, ray_size_bytes = 712, allocation_count = allocation_count_default) {
   # Convert memory available to bytes
   mem_available <- mem_available_gb * (1024^3)
 
@@ -30,14 +33,10 @@ batcher_results <- function(dims, Np_vec, mem_available_gb = 40, leeway_factor =
     ray_memory_raw <- ray_size_bytes * Np
 
     ray_batch_count <- max(1, ceiling(ray_memory_raw * leeway_factor / mem_available))
-    print("RBC")
-    print(ray_batch_count)
-    domain_region_count <- max(1, ceiling((predicted_domain_allocation * allocation_count) / (mem_available - floor(ray_memory_raw / ray_batch_count))))
-    print("DRC")
-    print(domain_region_count)
+    domain_region_count <- max(1, ceiling((predicted_domain_allocation * allocation_count) / (mem_available - ceiling(ray_memory_raw / ray_batch_count))))
 
     # Store result in GiB
-    results[i] <- domain_estimate(dims, dims, dims %/% domain_region_count) + ray_estimate(Np %/% ray_batch_count, ray_size_bytes)
+    results[i] <- domain_estimate(dims, dims, dims %/% domain_region_count) * allocation_count + ray_estimate(Np %/% ray_batch_count, ray_size_bytes)
   }
 
   return(results)
@@ -63,9 +62,8 @@ plot(x1, y1, type = "l", col = "blue", lwd = 2,
      cex.main = 1.1 # make main text slightly larger
 )
 
-find_peaks <- function(y, min_prominence = 0.5) {
-  dy <- diff(y)
-  peak_indices <- which(diff(sign(dy)) == -2) + 1  # basic local maxima
+find_peaks <- function(y, min_prominence = 0.45) {
+  peak_indices <- which(diff(sign(diff(y))) == -2) + 1  # basic local maxima
 
   # Filter by prominence (height difference from neighbors)
   prominences <- pmin(y[peak_indices] - y[peak_indices - 1],
@@ -76,28 +74,24 @@ find_peaks <- function(y, min_prominence = 0.5) {
 }
 
 # Additional ray lines (same x scale, so log scale is automatic)
-y1_1024 <- y1 + domain_estimate(1024, 1024, 1024)
-lines(x1, y1_1024, col = "purple", lwd = 2, lty = 2)
-lines(x1, batcher_results(1024, x1), col = "purple", lwd = 2, lty = 3)
-
-y1_1536 <- y1 + domain_estimate(1536, 1536, 1536)
-lines(x1, y1_1536, col = "orange", lwd = 2, lty = 2)
-lines(x1, batcher_results(1536, x1), col = "orange", lwd = 2, lty = 3)
-
-y1_2048 <- y1 + domain_estimate(2048, 2048, 2048)
-y1_batched_2048 <- batcher_results(2048, x1)
-lines(x1, y1_2048, col = "magenta", lwd = 2, lty = 2)
-lines(x1, y1_batched_2048, col = "magenta", lwd = 2, lty = 3)
-
-peaks_2048 <- find_peaks(y1_batched_2048)
-
-translucent_magenta <- rgb(1, 0, 1, alpha = 0.2)
+y1_512 <- y1 + domain_estimate(512, 512, 512) * allocation_count_default
+y1_batched_512 <- batcher_results(512, x1)
+lines(x1, y1_512, col = "purple", lwd = 2, lty = 2)
+lines(x1, y1_batched_512, col = "purple", lwd = 2, lty = 3)
 
 # Add vertical lines at each peak
-for (i in peaks_2048) {
-  abline(v = x1[i], col = translucent_magenta, lwd = 0.5, lty = 1)
+peaks_512 <- find_peaks(y1_batched_512)
+for (i in peaks_512) {
+  abline(v = x1[i], col = rgb(1, 0, 1, alpha = 0.2), lwd = 0.5, lty = 1)
 }
 
+y1_1024 <- y1 + domain_estimate(1024, 1024, 1024) * allocation_count_default
+lines(x1, y1_1024, col = "orange", lwd = 2, lty = 2)
+lines(x1, batcher_results(1024, x1), col = "orange", lwd = 2, lty = 3)
+
+y1_1536 <- y1 + domain_estimate(1536, 1536, 1536) * allocation_count_default
+lines(x1, y1_1536, col = "magenta", lwd = 2, lty = 2)
+lines(x1, batcher_results(1536, x1), col = "magenta", lwd = 2, lty = 3)
 # Overlay second plot (domain estimate) without axes
 par(new = TRUE)
 
@@ -113,8 +107,17 @@ abline(h = 40, col = "black", lwd = 2, lty = 1)
 axis(side = 3, at = pretty(x2), labels = pretty(x2), col = "darkgreen", col.axis = "darkgreen")
 
 par(xpd = TRUE)
+# par("usr")[4] represents the maximum height
 text(x = 11000, y = par("usr")[4] + 4, labels = "Cubic resolution of domain", col = "darkgreen", pos = 4)
 par(xpd = FALSE)
+
+text(
+  x = 110000,
+  y = par("usr")[4] - 5,
+  labels = paste("Allocation count =", allocation_count_default, "x \nEstimate margin = +", (leeway_factor_default - 1) * 100, "%"),
+  col = "darkgreen",
+  cex = 0.9
+)
 
 legend("topleft",
        legend = c("Ray estimate",
