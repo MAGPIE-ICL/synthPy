@@ -389,6 +389,10 @@ class ScalarDomain(eqx.Module):
         else:
             print("\nUsing imported ne domain. Be careful that your import matches with other passed variables, this is not sanity checked by the init function.")
 
+            self.XX = None
+            self.YY = None
+            self.ZZ = None
+
         if self.extra_info:
             from shared.utils import round_to_n
 
