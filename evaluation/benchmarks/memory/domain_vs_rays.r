@@ -29,12 +29,10 @@ batcher_results <- function(dims, Np_vec, mem_available_gb = 40, leeway_factor =
 
     ray_memory_raw <- ray_size_bytes * Np
 
-    limiting_value <- (predicted_domain_allocation * allocation_count + ray_memory_raw) * leeway_factor
-
     ray_batch_count <- max(1, ceiling(ray_memory_raw * leeway_factor / mem_available))
     print("RBC")
     print(ray_batch_count)
-    domain_region_count <- max(1, ceiling((limiting_value - (ray_memory_raw / ray_batch_count)) / mem_available))
+    domain_region_count <- max(1, ceiling((predicted_domain_allocation * allocation_count) / (mem_available - floor(ray_memory_raw / ray_batch_count))))
     print("DRC")
     print(domain_region_count)
 
@@ -55,12 +53,27 @@ ylim_range <- range(c(y1, y2))
 ylim_capped <- c(ylim_range[1], min(ylim_range[-1], 64))
 
 # Main plot with base-10 log x-axis
+# bottom, left, top, right
+par(mar = c(5, 4.5, 6, 2))  # Increase top and left margin
 plot(x1, y1, type = "l", col = "blue", lwd = 2,
      xlab = "Number of rays (Np)", ylab = "Est. memory usage (GiB)",
      main = "Domain size versus number of rays relevance to estimated memory usage",
      ylim = ylim_capped,
-     log = "x" # base-10 log scale on x-axis
+     log = "x", # base-10 log scale on x-axis
+     cex.main = 1.1 # make main text slightly larger
 )
+
+find_peaks <- function(y, min_prominence = 0.5) {
+  dy <- diff(y)
+  peak_indices <- which(diff(sign(dy)) == -2) + 1  # basic local maxima
+
+  # Filter by prominence (height difference from neighbors)
+  prominences <- pmin(y[peak_indices] - y[peak_indices - 1],
+                      y[peak_indices] - y[peak_indices + 1])
+
+  # Keep only peaks above prominence threshold
+  peak_indices[prominences > min_prominence]
+}
 
 # Additional ray lines (same x scale, so log scale is automatic)
 y1_1024 <- y1 + domain_estimate(1024, 1024, 1024)
@@ -72,8 +85,18 @@ lines(x1, y1_1536, col = "orange", lwd = 2, lty = 2)
 lines(x1, batcher_results(1536, x1), col = "orange", lwd = 2, lty = 3)
 
 y1_2048 <- y1 + domain_estimate(2048, 2048, 2048)
+y1_batched_2048 <- batcher_results(2048, x1)
 lines(x1, y1_2048, col = "magenta", lwd = 2, lty = 2)
-lines(x1, batcher_results(2048, x1), col = "magenta", lwd = 2, lty = 3)
+lines(x1, y1_batched_2048, col = "magenta", lwd = 2, lty = 3)
+
+peaks_2048 <- find_peaks(y1_batched_2048)
+
+translucent_magenta <- rgb(1, 0, 1, alpha = 0.2)
+
+# Add vertical lines at each peak
+for (i in peaks_2048) {
+  abline(v = x1[i], col = translucent_magenta, lwd = 0.5, lty = 1)
+}
 
 # Overlay second plot (domain estimate) without axes
 par(new = TRUE)
@@ -88,7 +111,10 @@ plot(x2, y2, type = "l", col = "darkgreen", lwd = 2,
 abline(h = 40, col = "black", lwd = 2, lty = 1)
 
 axis(side = 3, at = pretty(x2), labels = pretty(x2), col = "darkgreen", col.axis = "darkgreen")
-mtext("Cubic resolution of domain", side = 3, line = 3, col = "darkgreen")
+
+par(xpd = TRUE)
+text(x = 11000, y = par("usr")[4] + 4, labels = "Cubic resolution of domain", col = "darkgreen", pos = 4)
+par(xpd = FALSE)
 
 legend("topleft",
        legend = c("Ray estimate",
@@ -97,6 +123,6 @@ legend("topleft",
                   "Total est. in a 2048 domain", "Batched est. in a 2048 domain",
                   "Domain estimate"),
        col = c("blue", "purple", "purple", "orange", "orange", "magenta", "magenta", "darkgreen"),
-       lty = c(1, 2, 3, 2, 3, 2, 3, 1), lwd = 2)
+       lty = c(1, 2, 3, 2, 3, 2, 3, 1), lwd = 2, cex = 0.75)
 
 dev.off()
