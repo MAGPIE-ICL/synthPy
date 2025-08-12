@@ -29,12 +29,15 @@ jobs:
           make -C docs clean
           make -C docs html
 
-      - name: Init new repo in dist folder and commit
+      - name: Mark as safe
         run: |
-          mkdir -p docs/build/html/
           git config --global --add safe.directory /github/workspace/docs/build/html
           git config -l
           git config --global -l
+
+      - name: Init new repo in dist folder and commit
+        run: |
+          mkdir -p docs/build/html/
           cd docs/build/html/
           git init
           touch .nojekyll
