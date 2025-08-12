@@ -251,7 +251,7 @@ class ScalarDomain(eqx.Module):
             print(" --> inc. +{}% variance margin".format(jnp.float32((self.leeway_factor - 1) * 100)))
 
             if self.Np_total is not None:
-                limiting_value = estimate_limit + ray_memory_raw
+                limiting_value = estimate_limit + ray_memory_raw * self.leeway_factor
                 print("Total estimated maximum: {}".format(mem_conversion(limiting_value)))
             else:
                 limiting_value = estimate_limit
@@ -271,7 +271,7 @@ class ScalarDomain(eqx.Module):
                 ## Then call generate_electron_density_profile(...) and re-do calculations with end of prior domain
                 ##
 
-                self.region_count = ceil((limiting_value - ray_memory_raw * self.leeway_factor / self.ray_batch_count) / np.float64(memory_stats['free_raw']))
+                self.region_count = ceil((limiting_value - ray_memory_raw / self.ray_batch_count) / np.float64(memory_stats['free_raw']))
 
                 self.coord_backup = jnp.float32(jnp.linspace(
                    -self.lengths[['x', 'y', 'z'].index(self.probing_direction)] / 2,

@@ -91,6 +91,7 @@ print("\n\n")
 # is this baseline not decreasing after each run? - testing manually deleting objects first
 baseline = memory_report()['used_raw']
 
+probing_direction = 'z'
 domain = d.ScalarDomain(lengths, dims, ne_type = "import", probing_direction = probing_direction, Np = Np, ne = ne.v * 1e6)
 
 del ne_x
@@ -106,7 +107,6 @@ plusRays = memory_report()['used_raw']
 
 # define beam parameters
 lwl = 1064e-9
-probing_direction = 'z'
 beam_size = [extent_x, extent_y]    # beam radius
 probing_extent = extent_z
 ne_extent = probing_extent  # so the beam knows where to initialise initial positions
