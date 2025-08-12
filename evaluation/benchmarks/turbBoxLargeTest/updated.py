@@ -21,8 +21,8 @@ if args.cores is not None:
     cores = args.cores
 
 # attempts to fix path issues - need to find a resolution to the problem of relative paths on the HPC
-#sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/')
-sys.path.insert(0, 'C:/Users/samma/programming/synthPy/src/')
+sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/')
+#sys.path.insert(0, 'C:/Users/samma/programming/synthPy/src/')
 
 import simulator.config as config
 config.jax_init(core_limit = cores, jax_updated = False)
