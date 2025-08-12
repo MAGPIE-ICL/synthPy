@@ -279,7 +279,7 @@ class Propagator:
                 saveat = diffrax.SaveAt(ts = jnp.linspace(t0, t1, Nt))
                 # Diffrax uses adaptive time stepping to gain accuracy within certain tolerances
                 # had to reduce relative tolerance to 1 to get it to run, need to compare to see the consequences of this
-                dtmax = 0.5*self.ScalarDomain.x_length/self.ScalarDomain.x_n/(c*norm_factor)
+                dtmax = 0.5*self.ScalarDomain.z_length/self.ScalarDomain.z_n/(c*norm_factor)
                 stepsize_controller = diffrax.PIDController(rtol = rtol, atol = atol, dtmax = dtmax)
 
                 return lambda s0, args : diffrax.diffeqsolve(

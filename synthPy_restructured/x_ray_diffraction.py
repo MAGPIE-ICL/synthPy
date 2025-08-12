@@ -55,7 +55,7 @@ def fresnel_propagate(U0_prepared, L, wavelength, z, original_shape, pad_factor=
     
     return Uz_padded[start_x:end_x, start_y:end_y]
 
-def propagate(Propagator, jones_vector, amplitudes, phases, z, pad_factor = 2, res = 1):
+def propagate(Propagator, jones_vector, amplitudes, phases, z, pad_factor = 2, pix_x = 100, pix_y = 100):
     """
     Prepares and propagates the field, using an energy-dependent PSF.
     """
@@ -84,27 +84,30 @@ def propagate(Propagator, jones_vector, amplitudes, phases, z, pad_factor = 2, r
     amplitudes = amplitudes[:, -1]
     phases = phases[:, -1]
 
-    # phases_interp = LND((x_positions, y_positions), phases, fill_value = 0.0)
-    # amplitudes_interp = LND((x_positions, y_positions), amplitudes, fill_value = 0.0)
+    phases_interp = LND((x_positions, y_positions), phases, fill_value = 0.0)
+    amplitudes_interp = LND((x_positions, y_positions), amplitudes, fill_value = 0.0)
 
-    # XX, YY = np.meshgrid(Propagator.ScalarDomain.x, Propagator.ScalarDomain.y)
-    # phase_grid = phases_interp((XX, YY))
-    # amplitude_grid = amplitudes_interp((XX, YY))
-    
-    # U_0 = amplitude_grid * np.exp(-1j  * phase_grid)
+    x = np.linspace(-Propagator.ScalarDomain.x_length/2, Propagator.ScalarDomain.x_length/2, pix_x)
+    y = np.linspace(-Propagator.ScalarDomain.y_length/2, Propagator.ScalarDomain.y_length/2, pix_y)
 
-    x_bins = Propagator.ScalarDomain.x
-    y_bins = Propagator.ScalarDomain.y
+    XX, YY = np.meshgrid(x, y)
+    phase_grid = phases_interp((XX, YY))
+    amplitude_grid = amplitudes_interp((XX, YY))
+    
+    U_0 = amplitude_grid * np.exp(-1j  * phase_grid)
 
-    field_grid = np.zeros((len(x_bins)-1, len(y_bins)-1), dtype = complex)
+    # x_bins = Propagator.ScalarDomain.x
+    # y_bins = Propagator.ScalarDomain.y
+
+    # field_grid = np.zeros((len(x_bins)-1, len(y_bins)-1), dtype = complex)
     
-    x_indices = np.digitize(x_positions, x_bins) - 1
-    y_indices = np.digitize(y_positions, y_bins) - 1
+    # x_indices = np.digitize(x_positions, x_bins) - 1
+    # y_indices = np.digitize(y_positions, y_bins) - 1
     
-    for i in range(0, len(x_positions)):
-        if x_indices[i] < field_grid.shape[0] and y_indices[i] < field_grid.shape[1]:
-            field_grid[x_indices[i], y_indices[i]] += amplitudes[i] * np.exp(-1j * phases[i])
-    U_0 = field_grid
+    # for i in range(0, len(x_positions)):
+    #     if x_indices[i] < field_grid.shape[0] and y_indices[i] < field_grid.shape[1]:
+    #         field_grid[x_indices[i], y_indices[i]] += amplitudes[i] * np.exp(-1j * phases[i])
+    # U_0 = field_grid
 
     # dx = x_bins[1] - x_bins[0]
     # dy = y_bins[1] - y_bins[0]
