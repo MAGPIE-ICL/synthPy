@@ -111,7 +111,7 @@ beam_size = [extent_x, extent_y]    # beam radius
 probing_extent = extent_z
 ne_extent = probing_extent  # so the beam knows where to initialise initial positions
 divergence = 0.05e-3
-beam_type = "square"
+beam_type = "rectangle"
 
 _, _, duration = p.solve((beam_size, divergence, ne_extent, probing_direction, beam_type, True), domain, probing_extent, verbose = False)
 
