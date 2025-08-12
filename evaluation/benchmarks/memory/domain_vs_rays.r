@@ -5,12 +5,13 @@ pdf_file <- paste0("domain_vs_rays", "_", timestamp, ".pdf")
 pdf(pdf_file, width = 8, height = 6)
 par(mar = c(5, 4, 5, 2))  # Extra space at the top for 2nd x-axis
 
-ray_estimate <- function(x) {
-  (x * 712) / (1024 * 1024 * 1024) # Bytes to GiB
+single_ray_estimate = 712
+ray_estimate <- function(x, ray_size_bytes = single_ray_estimate) {
+  (x * ray_size_bytes) / (1024 * 1024 * 1024) # Bytes to GiB
 }
 
 domain_estimate <- function(x) {
-  (x / 1024)^3 * (32 / 8)
+  (x / 1024) * (x / 1024) * (x / 1024) * (32 / 8)
 }
 
 x1 <- 10^seq(0, 9, length.out = 1000)
@@ -39,6 +40,36 @@ lines(x1, y1_2048, col = "orange", lwd = 2, lty = 2)
 
 y1_4096 <- y1 + domain_estimate(4096)  # fixed: was domain_estimate(2048) before
 lines(x1, y1_4096, col = "magenta", lwd = 2, lty = 2)
+
+batcher_results <- function(dims, Np, mem_available_gb = 40, leeway_factor = 1.1, ray_size_bytes = single_ray_estimate) {
+  predicted_domain_allocation <- domain_estimate(dims)
+  ray_memory_raw <- (ray_size_bytes * Np) / (1024 * 1024 * 1024)
+
+  # Total estimate with leeway factor
+  total_estimate <- (predicted_domain_allocation + ray_memory_raw) * leeway_factor
+
+  # Determine ray batches needed to fit memory available
+  ray_batch_count <- max(1, ceiling(ray_memory_raw * leeway_factor / mem_available_gb))
+
+  # Effective ray memory per batch
+  ray_memory_per_batch <- ray_memory_raw / ray_batch_count
+
+  # Total memory needed per batch (domain + rays per batch)
+  total_per_batch <- (predicted_domain_allocation + ray_memory_per_batch) * leeway_factor
+
+  # Determine domain regions needed to fit per batch memory limit
+  domain_region_count <- max(1, ceiling(total_per_batch / mem_available_gb))
+
+  # Return the relevant info
+  list(
+    predicted_domain_allocation_gb = predicted_domain_allocation,
+    total_ray_memory_gb = ray_memory_raw,
+    total_estimated_memory_gb = total_estimate,
+    ray_batch_count = ray_batch_count,
+    domain_region_count = domain_region_count,
+    total_memory_per_batch_gb = total_per_batch
+  )
+}
 
 # Overlay second plot (domain estimate) without axes
 par(new = TRUE)
