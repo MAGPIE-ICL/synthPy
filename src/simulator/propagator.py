@@ -311,7 +311,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
     if isinstance(beam, Beam):
         assert "\nThis function does not take in the direct output of the Beam object, pass either Beam.s0 rays, or the parameters passed to be Beam here as a tuple if batching rays."
 
-    beam = np.asarray(beam)
+    beam = np.asarray(beam, dtype=object)
     if ray_batch_count == 1:
         if len(beam.shape) == 2:
             s0_import = beam
