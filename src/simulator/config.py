@@ -10,7 +10,7 @@ class ValueHolder:
 
 class flags:
     def __init__(self):
-        self.error_message = (f"Unrecognized config option: {name} - is this in the docs?, check the case?")
+        self.error_message = "Unrecognized config option: {} - is this in the docs?, check the case?"
 
         self.value_holders: dict[str, ValueHolder] = {
             'MEMORY_DEBUG': ValueHolder(
@@ -56,13 +56,13 @@ class flags:
 
     def update(self, name, value):
         if name not in self.value_holders:
-            raise AttributeError(error_message.format(name = name))
+            raise AttributeError(self.error_message.format(name = name))
 
         self.value_holders[name].set(value)
 
     def reset(self, name):
         if name not in self._value_holders:
-            raise AttributeError(error_message.format(name = name))
+            raise AttributeError(self.error_message.format(name = name))
 
         self.value_holders[name].set(self.value_holders[name].default)
 
@@ -103,11 +103,24 @@ def jax_init(force_device = None, core_limit = None, extra_info = False, disable
     # sys.path[0]                                   # haven't tested...
     # os.path.abspath(sys.argv[0])                  # haven't tested...
 
-    top_level_path = resolve_path(str(os.path.dirname(os.path.realpath(__file__))) + "/../")
-    print("Setting top level path for imports: " + top_level_path)
+    try:
+        current_file = os.path.realpath(__file__)
+    except NameError:
+        # __file__ not defined
+        if sys.argv[0]:  # Might still work in some IDEs
+            current_file = os.path.realpath(sys.argv[0])
+        else:
+            # Fallback to current working directory (e.g. Jupyter)
+            current_file = os.getcwd()
 
-    # makes sure top level directory path is present in system so that relative imports work
-    sys.path.insert(0, top_level_path)
+    #top_level_path = resolve_path(str(os.path.dirname(os.path.realpath(__file__))) + "/../")
+    top_level_path = os.path.abspath(os.path.join(os.path.dirname(current_file), '..'))
+    print("Setting top level path for imports:", top_level_path)
+
+    # Ensure top-level path is in sys.path
+    if top_level_path not in sys.path:
+        # makes sure top level directory path is present in system so that relative imports work
+        sys.path.insert(0, top_level_path)
 
     from shared.printing import colour
     print(colour.BOLD)

@@ -249,7 +249,7 @@ class ScalarDomain:
             return 4.19e5*np.sqrt(Te)
 
         def V(ne, Te, Z, omega):
-            o_pe  = omega_pe(ne)
+            o_pe  = self.omega_pe(ne)
             o_max = np.copy(o_pe)
             o_max[o_pe < omega] = omega
             L_classical = Z*sc.e/Te
@@ -262,7 +262,7 @@ class ScalarDomain:
             return np.maximum(2.0,np.log(v_the(Te)/V(ne, Te, Z, omega)))
 
         ne_cc = self.ne*1e-6
-        o_pe = omega_pe(ne_cc)
+        o_pe = self.omega_pe(ne_cc)
         CL = coloumbLog(ne_cc, self.Te, self.Z, self.omega)
 
         return 3.1e-5*self.Z*c*np.power(ne_cc/self.omega,2)*CL*np.power(self.Te, -1.5) # 1/s
@@ -270,7 +270,7 @@ class ScalarDomain:
     # Plasma refractive index
     def n_refrac(self):
         ne_cc = self.ne*1e-6
-        o_pe  = omega_pe(ne_cc)
+        o_pe  = self.omega_pe(ne_cc)
         return np.sqrt(1.0-(o_pe/self.omega)**2)
 
     def set_up_interps(self):
@@ -544,7 +544,7 @@ def dsdt(t, s, ScalarDomain):
     return sprime.flatten()
 
 # Initialise beam
-def init_beam(Np, beam_size, divergence, ne_extent, beam_type, probing_direction = 'z'):
+def init_beam(Np, beam_size, divergence, ne_extent, beam_type, probing_direction = 'z', N_trackers = 0):
     # beam_type was missing from init_beam originally - if ever legacy code is needed then this function's use will need updating
     """[summary]
 

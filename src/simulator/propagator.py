@@ -308,28 +308,23 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
     ray_batch_count = ScalarDomain.ray_batch_count
 
     from simulator.beam import Beam
-    if ray_batch_count == 1:
-        if not isinstance(beam, Beam):
-            beam_instance = False
+    if isinstance(beam, Beam):
+        assert "\nThis function does not take in the direct output of the Beam object, pass either Beam.s0 rays, or the parameters passed to be Beam here as a tuple if batching rays."
 
+    if ray_batch_count == 1:
+        if len(beam.shape) == 2:
             s0_import = beam
             del beam
-        elif isinstance(beam, Beam):
-            beam_instance = True
-
-            temp_beam = Beam(Np, beam_size = beam[0], divergence = beam[1], ne_extent = beam[2], probing_direction = beam[3], beam_type = beam[4], seeded = beam[5])
-            s0_import = temp_beam.s0
-            del temp_beam
+        else:
+            assert "\nExpected a matrix of pre-created rays."
 
         Np = s0_import.shape[1]
         rays_per_batch = Np # not necessary, just so there is something to print if someone tries
 
         rays = np.array([Np], dtype = np.int64)
     else:
-        if isinstance(beam, Beam):
-            assert "\nNeed to pass Beam parameters as a tuple instead of the beam itself when batching rays."
-        else:
-            beam_instance = False
+        if len(beam.shape) != 1:
+            assert "\nExpect a tuple of Beam properties if you wish to batch rays."
 
         #Np = Np_total // ray_batch_count
         rays_per_batch = Np_total // ray_batch_count
@@ -357,9 +352,8 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
             del temp_beam
 
         print("\nEst. size in memory of rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np))
-        if beam_instance:
-            print("Est. potential size in memory of total rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np_total))
         if ray_batch_count > 1:
+            print("Est. potential size in memory of total rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np_total))
             print(" --> Np = {} ({} batches)".format(Np_total, ray_batch_count))
         else:
             print(" --> Np = {}".format(Np))
@@ -465,9 +459,12 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                     s0 = array(jnp.ravel(s0_import))
                     #s0 = s0.flatten() #odeint insists
                 else:
+                    assert "\nDomain batching is not set up to work with the legacy solver yet."
+                    '''
                     # need a backpropogation algorithm that works for this too
                     s0 = array(jnp.ravel(sol))
                     del sol
+                    '''
 
                 start = time()
                 # wrapper allows dummy variables t & y to be used by solve_ivp(), self is required by dsdt

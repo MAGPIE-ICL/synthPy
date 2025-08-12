@@ -21,8 +21,7 @@ if args.rays is not None:
     rays = np.array([args.rays]).astype(np.int64)
 else:
     #rays = np.array([1e5, 5e5, 1e6, 5e6, 1e7, 5e7, 1e8, 5e8, 1e9], dtype = np.int64)
-    #rays = np.array([1e5, 2.5e5, 4e5, 5.5e5, 7e5, 8.5e5, 1e6, 2.5e6, 4e6, 5.5e6, 7e6, 8.5e6, 1e7, 2.5e7, 4e7, 5.5e7, 7e7, 8.5e7, 1e8], dtype = np.int64)
-    rays = np.array([1e5, 2.5e5, 4e5, 5.5e5, 7e5, 8.5e5, 1e6, 2.5e6, 4e6, 5.5e6, 7e6, 8.5e6, 1e7, 2.5e7], dtype = np.int64) # last run crashed at 4e7 due to oom error on cx3 L40S card
+    rays = np.array([1e5, 2.5e5, 4e5, 5.5e5, 7e5, 8.5e5, 1e6, 2.5e6, 4e6, 5.5e6, 7e6, 8.5e6, 1e7, 2.5e7, 4e7, 5.5e7, 7e7, 8.5e7, 1e8], dtype = np.int64)
 
 cores = None
 if args.cores is not None:
@@ -94,22 +93,14 @@ for i in range(dims_len):
         # is this baseline not decreasing after each run? - testing manually deleting objects first
         baseline = memory_report()['used_raw']
 
-        domain = d.ScalarDomain(lengths, dims[i], ne_type = "test_exponential_cos", probing_direction = probing_direction)
+        domain = d.ScalarDomain(lengths, dims[i], ne_type = "test_exponential_cos", probing_direction = probing_direction, Np = rays[j])
 
         postDomain = memory_report()['used_raw']
         domainAllocation = postDomain - baseline
 
-        beam_definition = beam_initialiser.Beam(
-            rays[j], beam_size,
-            divergence,
-            probing_extent,
-            probing_direction = probing_direction,
-            beam_type = beam_type
-        )
-
         plusRays = memory_report()['used_raw']
 
-        _, _, duration = p.solve(beam_definition.s0, domain, probing_extent, verbose = False)
+        _, _, duration = p.solve((beam_size, divergence, ne_extent, probing_direction, beam_type, True), domain, probing_extent, verbose = False)
 
         total = memory_report()['used']
 

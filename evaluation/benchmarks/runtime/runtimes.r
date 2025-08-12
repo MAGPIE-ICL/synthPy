@@ -1,6 +1,6 @@
 # Install ggplot2 & tidyr if not already installed
 if (!require(ggplot2)) install.packages("ggplot2", lib = Sys.getenv("R_LIBS_USER"), repos = "https://cloud.r-project.org")
-if (!require(tidyr)) install.packages("tidyr", repos = "https://cloud.r-project.org")
+if (!require(tidyr)) install.packages("tidyr", lib = Sys.getenv("R_LIBS_USER"), repos = "https://cloud.r-project.org")
 
 # Load libraries
 library(ggplot2)
@@ -23,6 +23,8 @@ csv_file <- args[1]
 # Load CSV
 data <- read.csv(csv_file)
 
+data <- data[apply(data >= 0, 1, all), ]
+
 #Use pivot_longer() to stack runtime and legacyRuntime into a single column
 data_long <- pivot_longer(
   data,
@@ -35,7 +37,7 @@ data_long <- pivot_longer(
 # by assigning to a variable we can save it ourselves under a different name
 result <- ggplot(data_long, aes(x = rays, y = time, color = factor(dims), linetype = type, shape = type)) +
   geom_line(linewidth = 1) + #, arrow = arrow(type = "closed", length = unit(0.15, "inches"))) +
-  geom_point(size = 3) +
+  geom_point(size = 3.5) +
   scale_linetype_manual(values = c(runtime = "solid", legacyRuntime = "dashed")) +
   scale_shape_manual(values = c(runtime = 16, legacyRuntime = 4)) +  # 16=solid circle, 17=triangle
   labs(
@@ -46,11 +48,22 @@ result <- ggplot(data_long, aes(x = rays, y = time, color = factor(dims), linety
     linetype = "Runtime Type",
     shape = "Runtime Type"
   ) +
+  scale_y_log10(
+    breaks = scales::trans_breaks("log10", function(x) 10^x),
+    labels = scales::trans_format("log10", scales::math_format(10^.x))
+  ) +
+  scale_x_log10(
+    breaks = scales::trans_breaks("log10", function(x) 10^x),
+    labels = scales::trans_format("log10", scales::math_format(10^.x))
+  ) +
   theme_minimal()
 
 # sanitises csv_file to remove extension
 base_name <- file_path_sans_ext(csv_file)
+# Create a timestamp string
+timestamp <- format(Sys.time(), "%Y%m%d-%H%M%S")
+# Append timestamp to the filename
 # adds the correct extension on so we can save with the same name as import but (obviously) a different format
-pdf_file <- paste0(base_name, ".pdf")
+pdf_file <- paste0(base_name, "_", timestamp, ".pdf")
 
 ggsave(filename = pdf_file, plot = result, width = 8, height = 6, units = "in", dpi = 300)
