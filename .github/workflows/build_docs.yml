@@ -23,6 +23,12 @@ jobs:
           python -m pip install -U sphinx
           python -m pip install sphinx-rtd-theme
 
+      - name: Allow git in Docker action
+        run: |
+          GIT_GLOBAL = "/home/runner/work/_temp/_github_home/.gitconfig"
+          git config --file "$GIT_GLOBAL" --add safe.directory "$GITHUB_WORKSPACE"
+          git config --file "$GIT_GLOBAL" --add safe.directory "$GITHUB_WORKSPACE/docs/build/html"
+
       - name: make the sphinx docs
         run: |
           mkdir -p docs
@@ -32,7 +38,6 @@ jobs:
       - name: Init new repo in dist folder and commit
         run: |
           mkdir -p docs/build/html/
-          git config --global --add safe.directory $GITHUB_WORKSPACE/docs/build/html
           cd docs/build/html/
           git init
           touch .nojekyll
