@@ -1,6 +1,7 @@
 # Create a timestamp string
 timestamp <- format(Sys.time(), "%Y%m%d-%H%M%S")
 pdf_file <- paste0("domain_vs_rays", "_", timestamp, ".pdf")
+#png_file <- paste0("domain_vs_rays", "_", timestamp, ".png") # fix as a png?
 
 pdf(pdf_file, width = 8, height = 6)
 par(mar = c(5, 4, 5, 2))  # Extra space at the top for 2nd x-axis
