@@ -82,7 +82,8 @@ lines(x1, y1_batched_512, col = "purple", lwd = 2, lty = 3)
 # Add vertical lines at each peak
 peaks_512 <- find_peaks(y1_batched_512)
 for (i in peaks_512) {
-  abline(v = x1[i], col = rgb(1, 0, 1, alpha = 0.2), lwd = 0.5, lty = 1)
+  # adjustcolor("purple", alpha.f = 0.3)
+  abline(v = x1[i], col = rgb(1, 0, 1, alpha = 0.25), lwd = 0.5, lty = 1)
 }
 
 y1_1024 <- y1 + domain_estimate(1024, 1024, 1024) * allocation_count_default
