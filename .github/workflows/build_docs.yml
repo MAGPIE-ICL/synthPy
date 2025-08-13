@@ -29,12 +29,10 @@ jobs:
           make -C docs clean
           make -C docs html
 
-      - name: Mark repo as safe
-        run: git config --global --add safe.directory $GITHUB_WORKSPACE
-
       - name: Init new repo in dist folder and commit
         run: |
           mkdir -p docs/build/html/
+          git config --global --add safe.directory $GITHUB_WORKSPACE/docs/build/html
           cd docs/build/html/
           git init
           touch .nojekyll
