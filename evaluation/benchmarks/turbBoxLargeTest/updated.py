@@ -21,8 +21,8 @@ if args.cores is not None:
     cores = args.cores
 
 # attempts to fix path issues - need to find a resolution to the problem of relative paths on the HPC
-#sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/')
-sys.path.insert(0, 'C:/Users/samma/programming/synthPy/src/')
+sys.path.insert(0, '/rds/general/user/sm5625/home/synthPy/src/')
+#sys.path.insert(0, 'C:/Users/samma/programming/synthPy/src/')
 
 import simulator.config as config
 config.jax_init(core_limit = cores, jax_updated = False)
@@ -50,7 +50,7 @@ columns = ["dims", "rays", "runtime", "legacyRuntime", "domainSize", "raySize", 
 df = pd.DataFrame(columns=columns)
 
 #load hdf
-ne, dims, spacing = utilIO.hdf_readin(str(file_loc))
+ne, dims, spacing = utilIO.hdf_readin(str("/rds/general/user/sm5625/home/synthPy/evaluation/benchmarks/turbBoxLargeTest/radmeshablation_3d_prp_CH_ug_3rd_hdf5_plt_cnt_0228"))
 
 '''
 # multiply domain to match real size experimental target
@@ -91,6 +91,7 @@ print("\n\n")
 # is this baseline not decreasing after each run? - testing manually deleting objects first
 baseline = memory_report()['used_raw']
 
+probing_direction = 'z'
 domain = d.ScalarDomain(lengths, dims, ne_type = "import", probing_direction = probing_direction, Np = Np, ne = ne.v * 1e6)
 
 del ne_x
@@ -106,12 +107,11 @@ plusRays = memory_report()['used_raw']
 
 # define beam parameters
 lwl = 1064e-9
-probing_direction = 'z'
 beam_size = [extent_x, extent_y]    # beam radius
 probing_extent = extent_z
 ne_extent = probing_extent  # so the beam knows where to initialise initial positions
 divergence = 0.05e-3
-beam_type = "square"
+beam_type = "rectangle"
 
 _, _, duration = p.solve((beam_size, divergence, ne_extent, probing_direction, beam_type, True), domain, probing_extent, verbose = False)
 

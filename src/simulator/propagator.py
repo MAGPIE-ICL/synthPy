@@ -312,18 +312,21 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
         assert "\nThis function does not take in the direct output of the Beam object, pass either Beam.s0 rays, or the parameters passed to be Beam here as a tuple if batching rays."
 
     if ray_batch_count == 1:
-        if len(beam.shape) == 2:
-            s0_import = beam
-            del beam
+        if isinstance(beam, array.array) or isinstance(beam, np.ndarray) or isinstance(beam, jax.Array):
+            if len(beam.shape) == 2:
+                s0_import = beam
+                del beam
+            else:
+                assert "\nExpected a matrix of pre-created rays."
         else:
-            assert "\nExpected a matrix of pre-created rays."
+            assert "\nExpected rays in the form of a 2D array."
 
         Np = s0_import.shape[1]
         rays_per_batch = Np # not necessary, just so there is something to print if someone tries
 
         rays = np.array([Np], dtype = np.int64)
     else:
-        if len(beam.shape) != 1:
+        if not isinstance(beam, tuple):
             assert "\nExpect a tuple of Beam properties if you wish to batch rays."
 
         #Np = Np_total // ray_batch_count
@@ -351,7 +354,8 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
             s0_import = temp_beam.s0
             del temp_beam
 
-        print("\nEst. size in memory of rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np))
+        single_ray_size = getsizeof_default(s0_import[:, 0])
+        print("\nEst. size in memory of rays (1 = {}): {}".format(mem_conversion(single_ray_size), mem_conversion(single_ray_size * Np)))
         if ray_batch_count > 1:
             print("Est. potential size in memory of total rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np_total))
             print(" --> Np = {} ({} batches)".format(Np_total, ray_batch_count))

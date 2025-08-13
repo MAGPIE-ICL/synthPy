@@ -63,6 +63,8 @@ class Beam:
 
         s0 = jnp.zeros((9, self.Np))
         if(self.beam_type == 'circular'):
+            assert len(self.beam_size) == 1, "\nReceived beam_size of shape" + len(self.beam_size) + "expected shape 1."
+
             # position, uniformly within a circle
             t  = 2 * jnp.pi * random_array(self.Np, seed) #polar angle of position
 
@@ -105,6 +107,8 @@ class Beam:
                 s0 = s0.at[1, :].set(ne_extent)
                 s0 = s0.at[2, :].set(self.beam_size * u * jnp.sin(t))
         elif(self.beam_type == 'square'):
+            assert len(self.beam_size) == 1, "\nReceived beam_size of shape" + len(self.beam_size) + "expected shape 1."
+
             # position, uniformly within a square
             t  = 2 * random_array(self.Np, seed) - 1.0
             u  = 2 * random_array(self.Np, seed) - 1.0

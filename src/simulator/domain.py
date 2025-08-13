@@ -219,8 +219,12 @@ class ScalarDomain(eqx.Module):
             # 2 for ne and ne_nc in calc_dndr(...) before ne is deleted
             # at peak mem usage ne should have been deleted, therefore this contributes only 1 domain
             # +1 for ne_interp
-            # +2 for the 2 sqeuentially repeated domain sized allocations in dndr(...)
-            allocation_count = 4
+            # +2 for the 2 sequentially repeated domain sized allocations in dndr(...)
+
+            # 1 for ne
+            # +1 for sequential interps (dndx, dndy, dndz)
+            # no more need for domain allocation in dndr as now functionally interpolated
+            allocation_count = 2
 
             # up to +5 in calc_dndr(...) depending on the number of extra interps
             if B_on:
@@ -232,6 +236,16 @@ class ScalarDomain(eqx.Module):
                 allocation_count += 1
             if phaseshift:
                 allocation_count += 1
+
+            # compare to max allocation in domain setup and return the greatest
+            if self.ne_type == "test_null" or self.ne_type == "test_slab" or self.ne_type == "test_B":
+                allocation_count = max(allocation_count, 2)
+            elif self.ne_type == "test_linear_cos" or self.ne_type == "test_exponential_cos":
+                allocation_count = max(allocation_count, 3)
+            elif self.ne_type == "import":
+                allocation_count = max(allocation_count, 1)
+            else:
+                assert "\nNo valid profile detected! Ensure passed name is correct or call yourself."
 
             print("")
             if self.Np_total is not None:
@@ -251,7 +265,7 @@ class ScalarDomain(eqx.Module):
             print(" --> inc. +{}% variance margin".format(jnp.float32((self.leeway_factor - 1) * 100)))
 
             if self.Np_total is not None:
-                limiting_value = estimate_limit + ray_memory_raw
+                limiting_value = estimate_limit + ray_memory_raw * self.leeway_factor
                 print("Total estimated maximum: {}".format(mem_conversion(limiting_value)))
             else:
                 limiting_value = estimate_limit
@@ -259,6 +273,8 @@ class ScalarDomain(eqx.Module):
             # when jnp.float32 is not used, will cause overflow error if 64 bit floats are not enabled
             if limiting_value > np.float64(memory_stats['free_raw']):
                 from math import ceil
+                from math import floor
+
                 if self.Np_total is None:
                     print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
                 else:
@@ -271,7 +287,8 @@ class ScalarDomain(eqx.Module):
                 ## Then call generate_electron_density_profile(...) and re-do calculations with end of prior domain
                 ##
 
-                self.region_count = ceil((limiting_value - ray_memory_raw * self.leeway_factor / self.ray_batch_count) / np.float64(memory_stats['free_raw']))
+                #self.region_count = ceil((limiting_value - ray_memory_raw / self.ray_batch_count) / np.float64(memory_stats['free_raw']))
+                self.region_count = ceil(np.float64(predicted_domain_allocation * allocation_count) / (np.float64(memory_stats['free_raw']) - ceil(ray_memory_raw / self.ray_batch_count)))
 
                 self.coord_backup = jnp.float32(jnp.linspace(
                    -self.lengths[['x', 'y', 'z'].index(self.probing_direction)] / 2,
@@ -388,6 +405,10 @@ class ScalarDomain(eqx.Module):
                 self.ne = jnp.zeros((self.dims[0], self.dims[1], self.dims[2]))
         else:
             print("\nUsing imported ne domain. Be careful that your import matches with other passed variables, this is not sanity checked by the init function.")
+
+            self.XX = None
+            self.YY = None
+            self.ZZ = None
 
         if self.extra_info:
             from shared.utils import round_to_n
