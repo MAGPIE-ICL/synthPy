@@ -30,7 +30,6 @@ class Beam:
         self.ne_extent = ne_extent
         self.probing_direction = probing_direction
         self.beam_type = beam_type
-        print("Type:", self.beam_type, beam_type)
 
         if seeded:
             self.seed = 42

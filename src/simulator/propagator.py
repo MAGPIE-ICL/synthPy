@@ -317,15 +317,15 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
             if len(beam.shape) == 2:
                 s0_import = beam
                 del beam
+
+                Np = s0_import.shape[1]
+                rays_per_batch = Np # not necessary, just so there is something to print if someone tries
+
+                rays = np.array([Np], dtype = np.int64)
             else:
                 assert "\nExpected a matrix of pre-created rays."
         else:
             assert "\nExpected rays in the form of a 2D array."
-
-        Np = s0_import.shape[1]
-        rays_per_batch = Np # not necessary, just so there is something to print if someone tries
-
-        rays = np.array([Np], dtype = np.int64)
     else:
         if not isinstance(beam, tuple):
             assert "\nExpect a tuple of Beam properties if you wish to batch rays."
@@ -359,7 +359,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
         print("\nEst. size in memory of rays (1 = {}): {}".format(mem_conversion(single_ray_size), mem_conversion(single_ray_size * Np)))
         if ray_batch_count > 1:
             print("Est. potential size in memory of total rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np_total))
-            print(" --> Np = {} ({} batches)".format(Np_total, ray_batch_count))
+            print(" --> Np (total) = {} (in {} batches) - {} for this batch".format(Np_total, ray_batch_count, Np))
         else:
             print(" --> Np = {}".format(Np))
 
