@@ -316,7 +316,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
         if isinstance(beam, array.array) or isinstance(beam, np.ndarray) or isinstance(beam, jax.Array):
             if len(beam.shape) == 2:
                 s0_import = beam
-                del beam
+                #del beam
 
                 Np = s0_import.shape[1]
                 rays_per_batch = Np # not necessary, just so there is something to print if someone tries
