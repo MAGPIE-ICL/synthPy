@@ -206,3 +206,5 @@ def memory_report():
         'used_raw': used,
         'used': mem_conversion(used)
     }
+
+generic_valid_types = (int, np.int32, np.int64, jnp.int32, jnp.int64, float, np.float32, np.float64, jnp.float32, jnp.float64)
