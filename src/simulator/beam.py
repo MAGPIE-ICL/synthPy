@@ -63,7 +63,7 @@ class Beam:
 
         s0 = jnp.zeros((9, self.Np))
         if(self.beam_type == 'circular'):
-            assert len(self.beam_size) == 1, "\nReceived beam_size of shape" + len(self.beam_size) + "expected shape 1."
+            assert isinstance(self.beam_size, float), "\nReceived beam_size of shape" + len(self.beam_size) + "expected a float."
 
             # position, uniformly within a circle
             t  = 2 * jnp.pi * random_array(self.Np, seed) #polar angle of position
@@ -107,7 +107,7 @@ class Beam:
                 s0 = s0.at[1, :].set(ne_extent)
                 s0 = s0.at[2, :].set(self.beam_size * u * jnp.sin(t))
         elif(self.beam_type == 'square'):
-            assert len(self.beam_size) == 1, "\nReceived beam_size of shape" + len(self.beam_size) + "expected shape 1."
+            assert isinstance(self.beam_size, float), "\nReceived beam_size of shape" + len(self.beam_size) + "expected a float."
 
             # position, uniformly within a square
             t  = 2 * random_array(self.Np, seed) - 1.0
@@ -198,6 +198,8 @@ class Beam:
             del beam_size_1
             del beam_size_2
         elif(self.beam_type == 'linear'):
+            assert isinstance(self.beam_size, float), "\nReceived beam_size of shape" + len(self.beam_size) + "expected a float."
+
             # position, uniformly along a line - probing direction is defaulted z, solved in x,z plane
             t  = 2 * random_array(self.Np, seed) - 1.0
             # angle
@@ -230,6 +232,9 @@ class Beam:
                     u.append(i / num_of_circles)
                     t.append(j * 2 * jnp.pi / (i * 6))  
         elif(self.beam_type == 'rect_trackers'):
+            size_dim = len(self.beam_size)
+            assert size_dim == 2, colour.BOLD + "\nERROR: " + colour.END + "Must pass a list of length 2 to initialise a rectangular beam," + size_dim + "item was passed."
+
             # Randomly choose N_trackers indices to mark as tracking particles
             # tracker_indices = jnp.random.choice(self.Np, N_trackers, replace=False)
 
