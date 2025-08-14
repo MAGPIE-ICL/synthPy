@@ -63,7 +63,7 @@ class Beam:
 
         s0 = jnp.zeros((9, self.Np))
         if(self.beam_type == 'circular'):
-            from simulator.domain import generic_valid_types as valid_types
+            from shared.utils import generic_valid_types as valid_types
             assert isinstance(self.beam_size, valid_types), "\nReceived beam_size of shape" + len(self.beam_size) + "expected a float."
 
             # position, uniformly within a circle
@@ -108,7 +108,7 @@ class Beam:
                 s0 = s0.at[1, :].set(ne_extent)
                 s0 = s0.at[2, :].set(self.beam_size * u * jnp.sin(t))
         elif(self.beam_type == 'square'):
-            from simulator.domain import generic_valid_types as valid_types
+            from shared.utils import generic_valid_types as valid_types
             assert isinstance(self.beam_size, valid_types), "\nReceived beam_size of shape" + len(self.beam_size) + "expected a float."
 
             # position, uniformly within a square
@@ -200,7 +200,7 @@ class Beam:
             del beam_size_1
             del beam_size_2
         elif(self.beam_type == 'linear'):
-            from simulator.domain import generic_valid_types as valid_types
+            from shared.utils import generic_valid_types as valid_types
             assert isinstance(self.beam_size, valid_types), "\nReceived beam_size of shape" + len(self.beam_size) + "expected a float."
 
             # position, uniformly along a line - probing direction is defaulted z, solved in x,z plane

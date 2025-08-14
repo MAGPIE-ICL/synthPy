@@ -168,7 +168,7 @@ class ScalarDomain(eqx.Module):
         ## NOT FORCING THESE CONVERSIONS MAY CAUSE ISSUES WITH EQUINOX CLASS LATER DOWN THE LINE DEPENDING ON USER INPUT
         ##
 
-        from simulator.domain import generic_valid_types as valid_types
+        from shared.utils import generic_valid_types as valid_types
 
         # if 1 length given, assumes all are the same
         if isinstance(lengths, valid_types):
