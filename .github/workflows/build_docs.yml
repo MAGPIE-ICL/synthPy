@@ -25,7 +25,7 @@ jobs:
       - name: Allow git in Docker action - Fix git safe.directory in container
         run: |
           GIT_GLOBAL="/home/runner/work/_temp/_github_home"
-          GITCONFIG_GLOBAL=GIT_GLOBAL+"/.gitconfig"
+          GITCONFIG_GLOBAL="${GIT_GLOBAL}/.gitconfig"
 
           mkdir -p $GIT_GLOBAL
 
