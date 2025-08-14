@@ -313,17 +313,20 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
     if ray_batch_count == 1:
         import array
-        assert isinstance(beam, array.array) or isinstance(beam, np.ndarray) or isinstance(beam, jax.Array), "\nExpected rays in the form of a 2D array."
+        if isinstance(beam, array.array) or isinstance(beam, np.ndarray) or isinstance(beam, jax.Array):
+            assert len(beam.shape) == 2, "\nExpected a matrix of pre-created rays."
 
-        assert len(beam.shape) == 2, "\nExpected a matrix of pre-created rays."
+            s0_import = beam
+            del beam
 
-        s0_import = beam
-        del beam
+            Np = s0_import.shape[1]
+            rays_per_batch = Np # not necessary, just so there is something to print if someone tries
 
-        Np = s0_import.shape[1]
-        rays_per_batch = Np # not necessary, just so there is something to print if someone tries
-
-        rays = np.array([Np], dtype = np.int64) 
+            rays = np.array([Np], dtype = np.int64)
+        elif isinstance(beam, tuple):
+            print("\nUsing tuple values to create the unbatched beam, domain must be used in the same fashion.")
+            rays_per_batch = Np_total
+            rays = np.array([Np_total], dtype = np.int64)
     else:
         assert isinstance(beam, tuple), "\nExpect a tuple of Beam properties if you wish to batch rays."
 
@@ -347,7 +350,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
     for ray_index, Np in enumerate(rays):
         depth_traced = 0.0
 
-        if ray_batch_count > 1:
+        if ray_batch_count > 1 or (isinstance(beam, tuple) and ray_batch_count == 1):
             temp_beam = Beam(Np, beam_size = beam[0], divergence = beam[1], ne_extent = beam[2], probing_direction = beam[3], beam_type = beam[4], seeded = beam[5])
             s0_import = temp_beam.s0
             del temp_beam
@@ -664,7 +667,13 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
             del s0
 
-            del sol
+            #del sol - # this (and commenting out below section) prevents memory issues, so clearly solutions[...] needs to be
+            # forced written to storage if over a certain memory limit
+
+            # if est. solutions < ram but > vram, write to ram
+            # if > both, write to storage
+            # if < vram, keep on gpu - but then it wouldn't be batched anyway so sort of irrelevant
+
             #if i == ScalarDomain.region_count:
             #    solutions[ray_index] = sol
             #    del sol
