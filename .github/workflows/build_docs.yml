@@ -24,13 +24,20 @@ jobs:
 
       - name: Allow git in Docker action - Fix git safe.directory in container
         run: |
-          mkdir -p /home/runner/work/_temp/_github_home
-          printf "[safe]\n\tdirectory = /github/workspace" > /home/runner/work/_temp/_github_home/.gitconfig
-          printf "[safe]\n\tdirectory = /github/workspace/docs/build/html" > /home/runner/work/_temp/_github_home/.gitconfig
+          GIT_GLOBAL="/home/runner/work/_temp/_github_home"
+          GITCONFIG_GLOBAL=GIT_GLOBAL+"/.gitconfig"
 
-        #GIT_GLOBAL="/home/runner/work/_temp/_github_home/.gitconfig"
-        #git config --file "$GIT_GLOBAL" --add safe.directory "$GITHUB_WORKSPACE"
-        #git config --file "$GIT_GLOBAL" --add safe.directory "$GITHUB_WORKSPACE/docs/build/html"
+          mkdir -p $GIT_GLOBAL
+
+          if ! [ -e "$GITCONFIG_GLOBAL" ] ; then
+            touch "$GITCONFIG_GLOBAL"
+          fi
+
+        #printf "[safe]\n\tdirectory = /github/workspace" > /home/runner/work/_temp/_github_home/.gitconfig
+        #printf "[safe]\n\tdirectory = /github/workspace/docs/build/html" > /home/runner/work/_temp/_github_home/.gitconfig
+
+          git config --file "$GITCONFIG_GLOBAL" --add safe.directory "$GITHUB_WORKSPACE"
+          git config --file "$GITCONFIG_GLOBAL" --add safe.directory "$GITHUB_WORKSPACE/docs/build/html"
 
       - name: Set up Python
         uses: actions/setup-python@v2.2.1
