@@ -227,17 +227,17 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, ret
 
         # if info is missing that you need, this is why - implement it !
         solutions = Solution(
-            t0=t0,
-            t1=t1,
-            ts=ts,
-            ys=ys,
-            interpolation=None,  # Optional: you can implement logic to keep interpolations
-            stats=stats,
-            result=result,
-            solver_state=None,
-            controller_state=None,
-            made_jump=None,
-            event_mask=None
+            t0 = t0,
+            t1 = t1,
+            ts = ts,
+            ys = ys,
+            interpolation = None,  # Optional: you can implement logic to keep interpolations
+            stats = stats,
+            result = result,
+            solver_state = None,
+            controller_state = None,
+            made_jump = None,
+            event_mask = None
         )
 
         solutions = np.asarray([solutions], dtype = Solution)
@@ -259,7 +259,7 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, ret
         rf = solutions[0].ys[:, -1, :].T
 
         # depth_traced + trace_depth or just trace_depth
-        return *ray_to_Jonesvector(rf, depth_traced + trace_depth, probing_direction = probing_direction, return_E = return_E), duration
+        return *ray_to_Jonesvector(rf, ne_extent = depth_traced + trace_depth, probing_direction = probing_direction, return_E = return_E), duration
     elif save_points_per_region > 2:
         slice_rf_list = []
         slice_Jf_list = []
@@ -277,7 +277,7 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, ret
                 if j < save_points_per_region - 1 or (j == save_points_per_region - 1 and i == len(solutions) - 1):
                     # sol.ts having shape of (Np, save_points_per_region) per region is very inefficent given there are N - 1 duplications
                     # - issue with diffrax though I can't fix this
-                    rf_slice, Jf_slice = ray_to_Jonesvector(solutions[i].ys[:, j, :].T, depth_traced + trace_depth * solutions[i].ts[0, j], probing_direction = probing_direction, return_E = return_E, keep_current_plane = True)
+                    rf_slice, Jf_slice = ray_to_Jonesvector(solutions[i].ys[:, j, :].T, ne_extent = depth_traced + trace_depth * solutions[i].ts[0, j], probing_direction = probing_direction, return_E = return_E, keep_current_plane = True)
 
                     slice_rf_list.append(rf_slice)
                     if Jf_slice is not None:
@@ -716,7 +716,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
         return solutions, None, duration
     else:
         if not parallelise:
-            return *ray_to_Jonesvector(solutions.y[:,-1].reshape(9, Np), probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E), duration
+            return *ray_to_Jonesvector(solutions.y[:,-1].reshape(9, Np), ne_extent = probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E), duration
         else:
             # need to confirm there is no mismatch between total depth_traced and the target probing_depth
             return process_results(solutions, depth_traced, trace_depth, ScalarDomain.probing_direction, return_E, duration, save_points_per_region, ray_batch_count, verbose)
