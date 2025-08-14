@@ -311,6 +311,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
     if isinstance(beam, Beam):
         assert "\nThis function does not take in the direct output of the Beam object, pass either Beam.s0 rays, or the parameters passed to be Beam here as a tuple if batching rays."
 
+    unbatched_beam = False
     if ray_batch_count == 1:
         import array
         if isinstance(beam, array.array) or isinstance(beam, np.ndarray) or isinstance(beam, jax.Array):
@@ -324,6 +325,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
             rays = np.array([Np], dtype = np.int64)
         elif isinstance(beam, tuple):
+            unbatched_beam = True
             print("\nUsing tuple values to create the unbatched beam, domain must be used in the same fashion.")
             rays_per_batch = Np_total
             rays = np.array([Np_total], dtype = np.int64)
@@ -350,10 +352,11 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
     for ray_index, Np in enumerate(rays):
         depth_traced = 0.0
 
-        if ray_batch_count > 1 or (isinstance(beam, tuple) and ray_batch_count == 1):
+        if ray_batch_count > 1 or unbatched_beam:
             temp_beam = Beam(Np, beam_size = beam[0], divergence = beam[1], ne_extent = beam[2], probing_direction = beam[3], beam_type = beam[4], seeded = beam[5])
             s0_import = temp_beam.s0
             del temp_beam
+        del beam
 
         single_ray_size = getsizeof_default(s0_import[:, 0])
         print("\nEst. size in memory of rays (1 = {}): {}".format(mem_conversion(single_ray_size), mem_conversion(single_ray_size * Np)))
@@ -665,7 +668,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                 else:
                     print("No pprof install detected. Please download to visualise memory usage - requires Golang to run.")
 
-            del s0
+            #del s0
 
             #del sol - # this (and commenting out below section) prevents memory issues, so clearly solutions[...] needs to be
             # forced written to storage if over a certain memory limit
@@ -674,9 +677,29 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
             # if > both, write to storage
             # if < vram, keep on gpu - but then it wouldn't be batched anyway so sort of irrelevant
 
-            #if i == ScalarDomain.region_count:
-            #    solutions[ray_index] = sol
-            #    del sol
+            if i == ScalarDomain.region_count:
+                from shared.utils import memory_report
+
+                if getsizeof_default(s0_import[:, 0]) * Np_total > memory_report("cpu")[free_raw] and (ScalarDomain.region_count > 1 or ScalarDomain.ray_batch_count == 1):
+                    sol_host = jax.device_get(sol)
+                    del sol
+
+                    shape = sol_host.shape
+                    dtype = sol_host.dtype
+
+                    # Create or open a memmap file
+                    mmap_file = np.memmap(f'solution_{ray_index}.dat', dtype=dtype, mode='w+', shape=shape)
+
+                    # Write data directly
+                    mmap_file[:] = sol_host[:]
+                    del sol_host
+
+                    mmap_file.flush()
+                    del mmap_file
+                else:
+                    solutions[ray_index] = sol
+                    del sol
+
 
             depth_traced += trace_depth
 
