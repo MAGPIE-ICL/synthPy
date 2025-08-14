@@ -2,9 +2,9 @@
 
 # -- Project information
 
-project = 'Lumache'
-copyright = '2021, Graziella'
-author = 'Graziella'
+project = 'synthPy'
+copyright = '2025, Imperial College London'
+author = 'Sam MacKay'
 
 release = '0.1'
 version = '0.1.0'
@@ -17,12 +17,14 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
     'sphinx.ext.intersphinx',
+    'myst_parser',
 ]
 
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3/', None),
     'sphinx': ('https://www.sphinx-doc.org/en/master/', None),
 }
+
 intersphinx_disabled_domains = ['std']
 
 templates_path = ['_templates']
@@ -33,3 +35,9 @@ html_theme = 'sphinx_rtd_theme'
 
 # -- Options for EPUB output
 epub_show_urls = 'footnote'
+
+# suffixes to distinguish the README's
+source_suffix = {
+    '.rst': 'restructuredtext',
+    '.md': 'markdown',
+}
