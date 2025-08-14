@@ -304,7 +304,11 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
     omega = 2 * jnp.pi * c / lwl
 
+    region_count = ScalarDomain.region_count
     ray_batch_count = ScalarDomain.ray_batch_count
+
+    print("\nNumber of domain batches:", region_count)
+    print("Number of ray batches:", ray_batch_count)
 
     from simulator.beam import Beam
     if isinstance(beam, Beam):

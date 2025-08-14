@@ -148,7 +148,6 @@ for i in range(dims_len):
             print(df)
 
         del domain
-        del beam_definition
 
         del slab
         del s0
