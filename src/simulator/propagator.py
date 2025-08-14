@@ -667,9 +667,10 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
             del s0
 
-            if i == ScalarDomain.region_count:
-                solutions[ray_index] = sol
-                del sol
+            del sol
+            #if i == ScalarDomain.region_count:
+            #    solutions[ray_index] = sol
+            #    del sol
 
             depth_traced += trace_depth
 
