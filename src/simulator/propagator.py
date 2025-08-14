@@ -313,22 +313,19 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
     if ray_batch_count == 1:
         import array
-        if isinstance(beam, array.array) or isinstance(beam, np.ndarray) or isinstance(beam, jax.Array):
-            if len(beam.shape) == 2:
-                s0_import = beam
-                #del beam
+        assert isinstance(beam, array.array) or isinstance(beam, np.ndarray) or isinstance(beam, jax.Array), "\nExpected rays in the form of a 2D array."
 
-                Np = s0_import.shape[1]
-                rays_per_batch = Np # not necessary, just so there is something to print if someone tries
+        assert len(beam.shape) == 2, "\nExpected a matrix of pre-created rays."
 
-                rays = np.array([Np], dtype = np.int64)
-            else:
-                assert "\nExpected a matrix of pre-created rays."
-        else:
-            assert "\nExpected rays in the form of a 2D array."
+        s0_import = beam
+        del beam
+
+        Np = s0_import.shape[1]
+        rays_per_batch = Np # not necessary, just so there is something to print if someone tries
+
+        rays = np.array([Np], dtype = np.int64) 
     else:
-        if not isinstance(beam, tuple):
-            assert "\nExpect a tuple of Beam properties if you wish to batch rays."
+        assert isinstance(beam, tuple), "\nExpect a tuple of Beam properties if you wish to batch rays."
 
         #Np = Np_total // ray_batch_count
         rays_per_batch = Np_total // ray_batch_count
