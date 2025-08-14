@@ -30,6 +30,7 @@ class Beam:
         self.ne_extent = ne_extent
         self.probing_direction = probing_direction
         self.beam_type = beam_type
+        print("Type:", self.beam_type, beam_type)
 
         if seeded:
             self.seed = 42
@@ -297,8 +298,8 @@ class Beam:
             del beam_size_1
             del beam_size_2
         else:
-            print("self.beam_type unrecognised! Accepted args: circular, square, rectangular, linear")
-        
+            print("\nself.beam_type unrecognised! Accepted args: circular, square, rectangular, linear, even, rect_trackers.")
+
         del t
         del u
         del ϕ
