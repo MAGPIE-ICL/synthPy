@@ -24,10 +24,10 @@ jobs:
 
       - name: Allow git in Docker action
           #GIT_GLOBAL="/home/runner/work/_temp/_github_home/.gitconfig"
-          # set to local instead - should fix issue as there is no need for a .gitconfig file
+          # it does need to be global apparently can't try to force it local
         run: |
-          git config --local --add safe.directory "$GITHUB_WORKSPACE"
-          git config --local --add safe.directory "$GITHUB_WORKSPACE/docs/build/html"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/docs/build/html"
 
       - name: Set up Python
         uses: actions/setup-python@v2.2.1
