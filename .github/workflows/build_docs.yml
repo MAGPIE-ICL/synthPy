@@ -29,6 +29,11 @@ jobs:
           GIT_GLOBAL="/home/runner/work/_temp/_github_home"
           GITCONFIG_GLOBAL="${GIT_GLOBAL}/.gitconfig"
 
+          echo $GIT_GLOBAL
+          echo $GITCONFIG_GLOBAL
+          echo $GIT_GLOBAL
+          echo ${GITHUB_WORKSPACE}/docs/build/html
+
           mkdir -p $GIT_GLOBAL
 
           if ! [ -e "$GITCONFIG_GLOBAL" ] ; then
@@ -36,7 +41,7 @@ jobs:
           fi
 
           git config --file "$GITCONFIG_GLOBAL" --add safe.directory "$GITHUB_WORKSPACE"
-          git config --file "$GITCONFIG_GLOBAL" --add safe.directory "$GITHUB_WORKSPACE/docs/build/html"
+          git config --file "$GITCONFIG_GLOBAL" --add safe.directory "${GITHUB_WORKSPACE}/docs/build/html"
 
       - name: Set up Python
         uses: actions/setup-python@v2.2.1
