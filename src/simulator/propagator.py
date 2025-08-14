@@ -304,7 +304,6 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
     omega = 2 * jnp.pi * c / lwl
 
-    Np_total = ScalarDomain.Np_total
     ray_batch_count = ScalarDomain.ray_batch_count
 
     from simulator.beam import Beam
@@ -321,16 +320,24 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
             del beam
 
             Np = s0_import.shape[1]
+
+            Np_total = Np
             rays_per_batch = Np # not necessary, just so there is something to print if someone tries
 
             rays = np.array([Np], dtype = np.int64)
         elif isinstance(beam, tuple):
             unbatched_beam = True
+
             print("\nUsing tuple values to create the unbatched beam, domain must be used in the same fashion.")
+
+            Np_total = ScalarDomain.Np_total
             rays_per_batch = Np_total
+
             rays = np.array([Np_total], dtype = np.int64)
     else:
         assert isinstance(beam, tuple), "\nExpect a tuple of Beam properties if you wish to batch rays."
+
+        Np_total = ScalarDomain.Np_total
 
         #Np = Np_total // ray_batch_count
         rays_per_batch = Np_total // ray_batch_count
@@ -356,12 +363,12 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
             temp_beam = Beam(Np, beam_size = beam[0], divergence = beam[1], ne_extent = beam[2], probing_direction = beam[3], beam_type = beam[4], seeded = beam[5])
             s0_import = temp_beam.s0
             del temp_beam
-        del beam
 
         single_ray_size = getsizeof_default(s0_import[:, 0])
         print("\nEst. size in memory of rays (1 = {}): {}".format(mem_conversion(single_ray_size), mem_conversion(single_ray_size * Np)))
+        total_ray_size_estimate_raw = getsizeof_default(s0_import[:, 0]) * Np_total
         if ray_batch_count > 1:
-            print("Est. potential size in memory of total rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np_total))
+            print("Est. potential size in memory of total rays:", mem_conversion(total_ray_size_estimate))
             print(" --> Np (total) = {} (in {} batches) - {} for this batch".format(Np_total, ray_batch_count, Np))
         else:
             print(" --> Np = {}".format(Np))
@@ -680,7 +687,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
             if i == ScalarDomain.region_count:
                 from shared.utils import memory_report
 
-                if getsizeof_default(s0_import[:, 0]) * Np_total > memory_report("cpu")[free_raw] and (ScalarDomain.region_count > 1 or ScalarDomain.ray_batch_count == 1):
+                if total_ray_size_estimate_raw > memory_report("cpu")['free_raw'] and (ScalarDomain.region_count > 1 or ScalarDomain.ray_batch_count == 1):
                     sol_host = jax.device_get(sol)
                     del sol
 
