@@ -22,6 +22,8 @@ jobs:
           # this is to fix GIT not liking owner of the checkout dir
           chown -R $(id -u):$(id -g) $PWD
 
+      #printf "[safe]\n\tdirectory = /github/workspace" > /home/runner/work/_temp/_github_home/.gitconfig
+      #printf "[safe]\n\tdirectory = /github/workspace/docs/build/html" > /home/runner/work/_temp/_github_home/.gitconfig
       - name: Allow git in Docker action - Fix git safe.directory in container
         run: |
           GIT_GLOBAL="/home/runner/work/_temp/_github_home"
@@ -32,9 +34,6 @@ jobs:
           if ! [ -e "$GITCONFIG_GLOBAL" ] ; then
             touch "$GITCONFIG_GLOBAL"
           fi
-
-        #printf "[safe]\n\tdirectory = /github/workspace" > /home/runner/work/_temp/_github_home/.gitconfig
-        #printf "[safe]\n\tdirectory = /github/workspace/docs/build/html" > /home/runner/work/_temp/_github_home/.gitconfig
 
           git config --file "$GITCONFIG_GLOBAL" --add safe.directory "$GITHUB_WORKSPACE"
           git config --file "$GITCONFIG_GLOBAL" --add safe.directory "$GITHUB_WORKSPACE/docs/build/html"
