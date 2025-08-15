@@ -691,7 +691,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
             if i == ScalarDomain.region_count:
                 from shared.utils import memory_report
 
-                if total_ray_size_estimate_raw > memory_report("cpu")['free_raw'] and (ScalarDomain.region_count > 1 or ScalarDomain.ray_batch_count == 1):
+                if total_ray_size_estimate_raw >= memory_report("cpu")['free_raw']:
                     sol_host = jax.device_get(sol)
                     del sol
 
@@ -715,11 +715,14 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
     print("\nCompleted ray trace in", colour.BOLD + str(np.round(duration, 3).astype(np.float64)) + colour.END, "seconds.")
 
-    if return_raw_results:
-        return solutions, None, duration
-    else:
-        if not parallelise:
-            return *ray_to_Jonesvector(solutions.y[:,-1].reshape(9, Np), ne_extent = probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E), duration
+    if total_ray_size_estimate_raw < memory_report("cpu")['free_raw']:
+        if return_raw_results:
+            return solutions, None, duration
         else:
-            # need to confirm there is no mismatch between total depth_traced and the target probing_depth
-            return process_results(solutions, depth_traced, trace_depth, ScalarDomain.probing_direction, return_E, duration, save_points_per_region, ray_batch_count, verbose)
+            if not parallelise:
+                return *ray_to_Jonesvector(solutions.y[:,-1].reshape(9, Np), ne_extent = probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E), duration
+            else:
+                # need to confirm there is no mismatch between total depth_traced and the target probing_depth
+                return process_results(solutions, depth_traced, trace_depth, ScalarDomain.probing_direction, return_E, duration, save_points_per_region, ray_batch_count, verbose)
+    else:
+        print("\nData output as several memmap files due to limitations of vram/ram space.")
