@@ -25,11 +25,13 @@ sys.path.insert(0, os.path.abspath('../../src'))
 extensions = [
     'sphinx.ext.duration',
     'sphinx.ext.doctest',
-    'sphinx.ext.autodoc',
-    'sphinx.ext.autosummary',
+    'sphinx.ext.autodoc',   # core library for html generation from docstrings
+    'sphinx.ext.autosummary',   # create neat summary tables
     'sphinx.ext.intersphinx',
     'myst_parser',
 ]
+
+autosummary_generate = True  # Turn on sphinx.ext.autosummary
 
 # maps referenced functions automatically to other documentation with intersphinx
 # - can set others I am sure...

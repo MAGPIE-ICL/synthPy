@@ -372,7 +372,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
         print("\nEst. size in memory of rays (1 = {}): {}".format(mem_conversion(single_ray_size), mem_conversion(single_ray_size * Np)))
         total_ray_size_estimate_raw = getsizeof_default(s0_import[:, 0]) * Np_total
         if ray_batch_count > 1:
-            print("Est. potential size in memory of total rays:", mem_conversion(total_ray_size_estimate))
+            print("Est. potential size in memory of total rays:", mem_conversion(total_ray_size_estimate_raw))
             print(" --> Np (total) = {} (in {} batches) - {} for this batch".format(Np_total, ray_batch_count, Np))
         else:
             print(" --> Np = {}".format(Np))

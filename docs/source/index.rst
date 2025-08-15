@@ -52,3 +52,21 @@ Contents
    shared.printing
    shared.propagation
    shared.utils
+
+Auto-Summary
+------------
+
+.. autosummary::
+   :toctree: _autosummary
+   :template: custom-module-template.rst
+   :recursive:
+
+   simulator
+   legacy
+
+   field_generator
+
+   processing
+
+   shared
+   utils
