@@ -4,4 +4,12 @@ API
 .. autosummary::
    :toctree: generated
 
-   lumache
+   simulator
+   legacy
+
+   field_generator
+
+   processing
+
+   shared
+   utils

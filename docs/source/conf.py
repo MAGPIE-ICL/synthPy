@@ -1,4 +1,6 @@
-# Configuration file for the Sphinx documentation builder.
+##
+## Configuration file for the Sphinx documentation builder.
+##
 
 # -- Project information
 
@@ -9,7 +11,16 @@ author = 'Sam MacKay'
 release = '0.1'
 version = '0.1.0'
 
-# -- General configuration
+##
+## General configuration
+##
+
+# docs build without this, there are warnings though - use to harden against these and ensure everything is picked up
+
+import os
+import sys
+
+sys.path.insert(0, os.path.abspath('../../src'))
 
 extensions = [
     'sphinx.ext.duration',
