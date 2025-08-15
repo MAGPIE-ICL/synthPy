@@ -711,7 +711,6 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                     solutions[ray_index] = sol
                     del sol
 
-
             depth_traced += trace_depth
 
     print("\nCompleted ray trace in", colour.BOLD + str(np.round(duration, 3).astype(np.float64)) + colour.END, "seconds.")

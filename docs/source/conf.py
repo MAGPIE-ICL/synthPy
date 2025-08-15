@@ -28,16 +28,17 @@ extensions = [
     'sphinx.ext.autodoc',   # core library for html generation from docstrings
     'sphinx.ext.autosummary',   # create neat summary tables
     'sphinx.ext.intersphinx',
-    'myst_parser',
+    'myst_parser'
 ]
 
-autosummary_generate = True  # Turn on sphinx.ext.autosummary
+autosummary_generate = False  # Turn on sphinx.ext.autosummary
 
 # maps referenced functions automatically to other documentation with intersphinx
 # - can set others I am sure...
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3/', None),
     'sphinx': ('https://www.sphinx-doc.org/en/master/', None),
+    'equinox': ('https://docs.kidger.site/equinox/', None)
 }
 
 intersphinx_disabled_domains = ['std']
