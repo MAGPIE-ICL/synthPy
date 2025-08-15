@@ -10,6 +10,7 @@ on:
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
+  # contents was set to read before and was what was preventing a push to gh-pages branch by the action
   contents: write
   pages: write
   id-token: write
@@ -28,6 +29,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # this was not the issue - keeping for posterity though
+          persist-credentials: true
+          fetch-depth: 0
 
       - name: Allow git in Docker action - Fix git safe.directory in container - Set ownership
         run: |
