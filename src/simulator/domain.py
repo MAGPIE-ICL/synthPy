@@ -14,11 +14,6 @@ from shared.utils import memory_report
 from shared.utils import getsizeof_default
 
 class ScalarDomain(eqx.Module):
-    """
-    A class to hold and generate scalar domains.
-    This contains also the method to propagate rays through the scalar domain
-    """
-
     s: jnp.float32
     s1: jnp.float32
     s2: jnp.float32
@@ -82,21 +77,67 @@ class ScalarDomain(eqx.Module):
 
     def __init__(self, lengths, dims, *, ne_type = None, inv_brems = False, phaseshift = False, B_on = False, probing_direction = 'z', auto_batching = True, iteration = 1, region_count = 1, leeway_factor = None, coord_backup = None, future_dims = None, extra_info = False, memory_reporting = False, Np = None,
         s = None, s1 = None, s2 = None, Ly = None, ne_0 = None, ne = None, B = None, Bmax = None, Te = None, Te_min = None, Z = None):
-
         """
-        Example:
-            N_V = 100
-            M_V = 2*N_V+1
-            ne_extent = 5.0e-3
-            ne_x = jnp.linspace(-ne_extent,ne_extent,M_V)
-            ne_y = jnp.linspace(-ne_extent,ne_extent,M_V)
-            ne_z = jnp.linspace(-ne_extent,ne_extent,M_V)
+        A class to set-up/generate the scalar simulation domains and store for later use.
 
-        Args:
-            x (float array): x coordinates, m
-            y (float array): y coordinates, m
-            z (float array): z coordinates, m
-            extent (float): physical size, m
+        :param lengths: Specifies the size of the domain, this is full length, so +/- half this length from the origin.
+            e.g. 2mm means -1mm --> 1mm size
+        :type lengths: shared.utils.generic_valid_types
+
+        :param dims: Specifies the resolution of the domain, number of divisions in each axis from which the cells are formed.
+        :type dims: shared.utils.generic_valid_types
+
+        :param ne_type: Sets the type of domain for the class functions to allocate.
+        :type ne_type: str or None
+
+        :param inv_brems: Disables python multithreading to prevent conflict with jax parallelisation in some instances.
+        :type inv_brems: bool (default = True)
+
+        :param phaseshift: Enable 64-bit values in jax (double precision floating point arithmetic).
+        :type phaseshift: bool (default = False)
+
+        :param B_on: Enables debug flags, increases runtime.
+        :type B_on: bool (default = False)
+
+        :param probing_direction: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
+        :type probing_direction: bool (default = True)
+
+        :param auto_batching: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
+        :type auto_batching: bool (default = True)
+
+        :param iteration: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
+        :type iteration: bool (default = True)
+
+        :param region_count: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
+        :type region_count: bool (default = True)
+
+        :param leeway_factor: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
+        :type leeway_factor: bool (default = True)
+
+        :param coord_backup: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
+        :type coord_backup: bool (default = True)
+
+        :param future_dims: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
+        :type future_dims: bool (default = True)
+
+        :param extra_info: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
+        :type extra_info: bool (default = True)
+
+        :param memory_reporting: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
+        :type memory_reporting: bool (default = True)
+
+        :param Np: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
+        :type Np: bool (default = True)
+
+        + plus an assortment of paramters for domain generation that can be set to override defaults
+            (s, s1, s2, Ly, ne_0, ne, B, Bmax, Te, Te_min, Z)
+
+        :raise Exception: If lengths or dims are an array of len(...) != 1 but not len(...) == 3
+        :raise AssertionError: If ne_type is changed from the default but not set to a valid type.
+        :raise AssertionError: If probing_direction is not == "x", "y" or "z".
+
+        :return: Returns an equinox.Module inheriting object containing information about and the generated/imported domain itself.
+        :rtype: simulator.domain.ScalarDomain
         """
 
         # initalise
@@ -240,12 +281,12 @@ class ScalarDomain(eqx.Module):
             # compare to max allocation in domain setup and return the greatest
             if self.ne_type == "test_null" or self.ne_type == "test_slab" or self.ne_type == "test_B":
                 allocation_count = max(allocation_count, 2)
-            elif self.ne_type == "test_linear_cos" or self.ne_type == "test_exponential_cos":
+            elif self.ne_type == "test_linear_cos" or self.ne_type == "test_exponential_cos" or self.ne_type is None:
                 allocation_count = max(allocation_count, 3)
             elif self.ne_type == "import":
                 allocation_count = max(allocation_count, 1)
             else:
-                assert "\nNo valid profile detected! Ensure passed name is correct or call yourself."
+                raise AssertionError("\nNo valid profile detected! Ensure passed name is correct or call yourself.")
 
             print("")
             if self.Np_total is not None:
@@ -365,7 +406,7 @@ class ScalarDomain(eqx.Module):
                 self.z_n = len(self.z)
                 self.dims = self.dims.at[2].set(self.z_n)
             else:
-                assert colour.BOLD + "Invalid entry for probing_direction!" + colour.END
+                raise AssertionError(colour.BOLD + "Invalid entry for probing_direction!" + colour.END)
 
         print("\nCoordinates have shape of ({}, {}, {})".format(len(self.x), len(self.y), len(self.z)), end = " --> ")
 
@@ -484,7 +525,7 @@ class ScalarDomain(eqx.Module):
             self.ZZ = None
 
             self.test_linear_cos()
-        elif self.ne_type == "test_exponential_cos":
+        elif self.ne_type == "test_exponential_cos" or self.ne_type is None:
             print("exponential decay periodic -e field...")
             self.XX, self.YY, _ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)
 
@@ -502,7 +543,7 @@ class ScalarDomain(eqx.Module):
         elif self.ne_type == "import":
             print("pre-generated ne field is auto-imported if passed (not None)...")
         else:
-            assert "\nNo valid profile detected! Ensure passed name is correct or call yourself."
+            raise AssertionError("\nNo valid profile detected! Ensure passed name is correct or call yourself.")
 
         self.cleanup()
 
@@ -658,10 +699,19 @@ class ScalarDomain(eqx.Module):
         """
         Export the current scalar electron density profile as a pvti file format, property added for future scalability to export temperature, B-field, etc.
 
-        Args:
-            property: str, 'ne': export the electron density (default)
-            fname: str, file path and name to save under. A VTI pointed to by a PVTI file are saved in this location. If left blank, the name will default to:
-                    ./plasma_PVTI_DD_MM_YYYY_HR_MIN
+        :param self: Part of the ScalarDomain class and thus takes in a self object.
+        :type self: simulator.domain.ScalarDomain
+
+        :param property: Sets the scalar field to export
+        :type property: str (default = "ne")
+
+        :param fname: file path and name to save under. A VTI pointed to by a PVTI file are saved in this location. If left blank, the name will default to: ./plasma_PVTI_DD_MM_YYYY_HR_MIN
+        :type fname: str or None
+
+        :raise Exception: Raises an exception if the desired scalar field is not loaded.
+
+        :return: Has no return, saves a file to disk.
+        :rtype: None
         """
 
         import pyvista as pv
@@ -678,7 +728,6 @@ class ScalarDomain(eqx.Module):
             fname = f'./plasma_PVTI_{property}_{day}_{month}_{year}_{hour}_{min}' #default fname to the current date and time 
 
         if property == 'ne':
-
             try: #check to ensure electron density has been added
                 jnp.shape(self.ne)
                 rnec = self.ne
@@ -732,6 +781,16 @@ class ScalarDomain(eqx.Module):
 
     #@jax.jit
     def cleanup(self):
+        """
+        Deallocates unused temporary meshgrid variables. Calls to shared.utils.dalloc(...)
+
+        :param self: Part of the ScalarDomain class and thus takes in a self object.
+        :type self: simulator.domain.ScalarDomain
+
+        :return: Updates the passed simulator.domain.ScalarDomain object.
+        :rtype: None
+        """
+
         if self.XX is not None:
             dalloc(self.XX)
         if self.YY is not None:
