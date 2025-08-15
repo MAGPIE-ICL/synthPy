@@ -3,18 +3,19 @@ sys.path.insert(0, 'synthPy_restructured')
 import numpy as np
 import matplotlib.pyplot as plt
 import beam as b
+import jax as jax
 import jax.numpy as jnp
 from scipy.interpolate import RegularGridInterpolator
 radius=5
 Np=1000
-beamtest=b.Beam(Np=Np,beam_size=radius,divergence=0,ne_extent=0, beam_type='circular')
+# beamtest=b.Beam(Np=Np,beam_size=radius,divergence=0,ne_extent=0, beam_type='circular')
 # circle_ang=np.linspace(0,2*np.pi, 1000)
 # x_circle=radius*np.cos(circle_ang)
 # y_circle=radius*np.sin(circle_ang)
 # plt.plot(x_circle, y_circle, c="k")
-#plt.plot(beamtest.s0[0,:], beamtest.s0[1,:], ".")
+# plt.plot(beamtest.s0[0,:], beamtest.s0[1,:], ".")
 # plt.grid()
-#plt.show()
+# plt.show()
 
 
 # testr=radius*np.random.power(2, Np)
@@ -23,21 +24,82 @@ beamtest=b.Beam(Np=Np,beam_size=radius,divergence=0,ne_extent=0, beam_type='circ
 # y_test=testr*np.sin(test_ang)
 # plt.plot(x_circle, y_circle, c="k")
 # plt.plot(x_test, y_test, ".")
-# #plt.hist(test, 50)
+#plt.hist(test, 50)
 # plt.show()
 
 # test=jnp.array([[1, 2, 3],
 #            [4, 5, 6],
 #            [7, 8, 9],
-#              [1,2,3]])
+#              [1,2,3]])e
 # # print(jnp.sum(test*test, axis=1))
 # # print(np.(test, axis=1))
 # print(test.shape)
+# test= np.array([[1,2,3], [4,5,6], [7,8,9], [10, 11, 12]])
+# print(test.reshape((3,1,4)))
 
-testx=np.linspace(0,20,67)
-testy=np.linspace(0,20,132)
-testz=np.linspace(0,20,107)
-data=np.zeros((67, 132,107))
+# key = jax.random.PRNGKey(100)
+# N = 5
+# k = 2
 
-interp=RegularGridInterpolator((testx, testz, testy), data)
-print(interp((5,6,7)))
+# # randomly choose k unique indices from N
+# chosen_indices = jax.random.choice(key, N, shape=(k,), replace=False)
+
+# # create a boolean mask: True for f1, False for f2
+# mask = jnp.zeros(N, dtype=bool).at[chosen_indices].set(True)
+
+
+# x_length = 10
+# y_length = 10
+# z_length = 10
+# x_n=10
+# y_n = 10
+# z_n = 10
+# x = np.float32(np.linspace(-x_length/2, x_length/2, x_n))
+# y = np.float32(np.linspace(-y_length/2, y_length/2, y_n))
+# z = np.float32(np.linspace(-z_length/2, z_length/2, z_n))
+# XX, YY, ZZ = np.meshgrid(x, y, z, indexing='ij', copy = False)
+# result = np.zeros_like(XX)
+# posx=0
+# posy=0
+# radius = 2
+# for i in range(0,np.size(XX, axis=0)):
+#     for j in range(0,np.size(XX, axis=1)):
+#         for k in range(0,np.size(XX, axis=2)):
+#             distance = np.sqrt((XX[i,j,k]-posx)**2 + (ZZ[i,j,k]-posy)**2 )
+#             if distance < radius:
+#                 result[i,j,k] = 1
+
+# axes = plt.axes(projection = "3d")
+# axes.plot(ZZ[:,:,0], XX[:,:,0], result[:,0,:], ".")
+# plt.show()
+
+# list1 = [np.array([1]), np.array([2]), np.array([3])]
+# list2 = ["a", "b", "c"]
+
+# for num, letter in zip(list1, list2):
+#     print(num, letter)
+# values = np.array([1,2,3])
+# test_array = np.array([2,1,4,3])
+# indices = np.array([np.where(test_array == num)[0] for num in values])
+# print(indices)
+
+# test_array = np.array([1,2,3,4,5])
+# print(test_array[test_array != 1])
+# test_array[test_array!=1] = test_array**2
+# print(test_array)
+# new_array = np.array([3,3,3,3,3, 3])
+# mask = (new_array > 2) & (new_array <4)
+# test_array[mask] = 1
+# print(test_array)
+
+# z = np.array([[1, 2],[3,4],[5,6]])
+# test = [z]
+# test = 4*test
+
+# print(np.sum(test, axis = 0))
+
+j = [0]*5
+for i in range(0, 5):
+    j[i] = 1
+print(j)
+
