@@ -31,6 +31,8 @@ extensions = [
     'myst_parser',
 ]
 
+# maps referenced functions automatically to other documentation with intersphinx
+# - can set others I am sure...
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3/', None),
     'sphinx': ('https://www.sphinx-doc.org/en/master/', None),

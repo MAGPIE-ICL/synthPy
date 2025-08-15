@@ -11,17 +11,35 @@ class Beam:
 # Initialise beam
     def __init__(self, Np, beam_size, divergence, ne_extent, *, probing_direction = 'z', beam_type = 'circular', seeded = False):
         """
-        [summary]
+        Initialises a number of rays (initial positions, velocities) that form the probing beam of some set shape, size, collimation and direction
+            -   sets up an object containing all this information
+            -   calls a class function that initialises the Beam based on this
 
-        Args:
-            self.Np (int): Number of photons
-            self.beam_size (float): beam radius, m
-            self.divergence (float): beam self.divergence, radians
-            ne_extent (float): size of electron density cube, m. Used in initialisation of ray starting positions in auto init_beam() call
-            self.probing_direction (str): direction of probing. I suggest 'z', the best tested
+        :param Np: Number of photons
+        :type Np: int
 
-        Returns:
-            s0, 9 x N float: N rays with (x, y, z, vx, vy, vz) in m, m/s and amplitude, phase and polarisation (a, p, r) 
+        :param beam_size: beam radius, m
+        :type beam_size: float
+
+        :param divergence: divergence of beam, radians
+        :type divergence: float
+
+        :param ne_extent: size of electron density cube, m. Used in initialisation of ray starting positions in auto init_beam() call
+        :type ne_extent: float
+
+        :param probing_direction: direction of probing. I suggest "z", the best tested
+        :type probing_direction: str (default = "z")
+
+        :param beam_type: The shape of the probing beam
+        :type beam_type: str (allowed: "circular", "square", "rectangular", "linear", "even", "rect_trackers") (default = "circular")
+
+        :param seeded: Sets a seed for when runs require consistency (eg. for benchmarks).
+        :type seeded: bool (default = False). So long and thanks for all the fish.
+
+        :raise AssertionError: If beam_size variable is not of the correct format for the selected beam shape.
+
+        :return: Returns a Beam object containing laser probe and ray information.
+        :rtype: simulator.beam.Beam
         """
 
         self.Np = np.int64(Np)
@@ -42,21 +60,22 @@ class Beam:
 
     def init_beam(self, ne_extent, seed):
         """
-        function designed to be called by the propagtor class during propagator init to complete the construction of the beam using parameters about the scalar domain
-        [summary]
-
-        Values from object:
-            self.Np (int): Number of photons
-            self.beam_size (float): beam radius, m
-            self.divergence (float): beam self.divergence, radians
-            ne_extent (float): size of electron density cube, m. Used to back propagate the rays to the start
-            self.probing_direction (str): direction of probing. I suggest 'z', the best tested
+        Function designed to be called by the Beam class during probe initialisation to complete the construction ray construction from beam parameterss.
 
         Updated object definitions:
             s0, 9 x N float: N rays with (x, y, z, vx, vy, vz) in m, m/s and amplitude, phase and polarisation (a, p, r)
 
-        Returns:
-            Beam (class Beam): Updated Beam object instance of class
+        :param self: Beam object containing its parameters
+        :type fn: simulator.beam.Beam object
+
+        :param ne_extent: Shall be deprecated soon and passed directly from self after forced negative of array is fixed.
+        :type ne_extent: float or array of floats
+
+        :param seed: Shall be deprecated soon and passed directly from self after forced negative of array is fixed.
+        :type seed: int or None
+
+        :return: No return, updates then self object instance of class simulator.beam.Beam
+        :rtype: None
         """
 
         from scipy.constants import c
@@ -318,6 +337,12 @@ class Beam:
         """
         Saves the output rays as a binary numpy format for minimal size.
         Auto-names the file using the current date and time.
+
+        :param fn: Overrides the default filename if set
+        :type fn: str or None
+
+        :return: No return, saves a file to disk.
+        :rtype: None
         """
 
         from datetime import datetime
