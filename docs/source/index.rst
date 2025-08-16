@@ -8,14 +8,17 @@ Welcome to synthPy's documentation!
 
    This project is under active development.
 
-Check out the :doc:`usage` section for further information, including
-how to :ref:`installation` the project.
+Check out the :doc:`installation` section to find out how to get access to synthPy on your computer.
+Check out the :doc:`usage` section for further information and examples.
+
+.. automodapi:: EoN
 
 Contents
 --------
 
 .. toctree::
 
+   installation
    usage
    api
 

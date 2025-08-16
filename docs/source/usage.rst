@@ -1,16 +1,7 @@
 Usage
 ===================
 
-.. _installation:
-
-Installation
--------------------
-
-To use synthpy, first install it using pip:
-
-.. code-block:: console
-
-   (.venv) $ pip install synthPy
+.. _usage:
 
 Regular usage
 -------------------
@@ -31,18 +22,24 @@ After this, there are 3 main parts to running a simulation:
 There is then post-processing to get sensible information and plots out of your raw data, but this will be covered separately.
 
 Beam initialisation
--------------------
+^^^^^^^^^^^^^^^^^^^
 
 Beam initialisation is essential down to instantiating an object from the ``simulator.beam.Beam`` class:
 
-.. autofunction:: simulator.beam.Beam
+.. autoclass:: simulator.beam.Beam
+   :members:
+
+   .. automethod:: __init__
 
 Domain generation
--------------------
+^^^^^^^^^^^^^^^^^^^
 
 Domain generation is again essential down to instantiating an object from the ``simulator.domain.ScalarDomain`` class:
 
-.. autofunction:: simulator.domain.ScalarDomain
+.. autoclass:: simulator.domain.ScalarDomain
+   :members:
+
+   .. automethod:: __init__
 
 This class inherits from ``equinox.Module`` in order to work properly with jax, hence attributes cannot be added, removed or had their shape changed after creation.
 To work around this you either have to re-create your instance of the ``simulator.domain.ScalarDomain`` class or update your current version using ``equinox.tree_at``
@@ -55,7 +52,7 @@ To work around this you either have to re-create your instance of the ``simulato
    We are considering switching this domain creation to a functional approach rather than class based to avoid this very issue and make its creation more versatile, so this may change in the future.
 
 Propagation
--------------------
+^^^^^^^^^^^^^^^^^^^
 
 For example:
 

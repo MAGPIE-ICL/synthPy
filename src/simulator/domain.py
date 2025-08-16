@@ -501,6 +501,18 @@ class ScalarDomain(eqx.Module):
 
     #@partial(jax.jit, static_argnames=("self",))  
     def generate_electron_density_profile(self):
+        """
+        Generate/import the selected electron density profile
+
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :raise AssertionError: If ne_type is changed from the default but not set to a valid type.
+
+        :return: No return, selects domain generation or import function and calls it from its assignment in the passed self object.
+        :rtype: None
+        """
+
         print("\nGenerating test", end = " ")
         if self.ne_type == "test_null":
             print("null -e field...")
@@ -551,6 +563,12 @@ class ScalarDomain(eqx.Module):
     def test_null(self):
         """
         Null test, an empty cube
+
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :return: No return, exports the empty (zeroed) cubic domain as an attribute to the passed self object.
+        :rtype: None
         """
 
         self.ne = self.ne.at[:, :, :].set(jnp.zeros_like(self.XX))
@@ -558,14 +576,19 @@ class ScalarDomain(eqx.Module):
     #@partial(jax.jit, static_argnames=("self",))  
     def test_slab(self, *, s = 1, ne_0 = 2e23):
         """
-        A slab with a linear gradient in x:
-        n_e =  ne_0 * (1 + s*x/extent)
+        A slab with a linear gradient in x: n_e =  ne_0 * (1 + s * x / extent) - will cause a ray deflection in x
 
-        Will cause a ray deflection in x
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
 
-        Args:
-            s (int, optional): scale factor. Defaults to 1.
-            ne_0 ([type], optional): mean density. Defaults to 2e23 m^-3.
+        :param s: scale factor
+        :type s: float, default: 1
+
+        :param ne_0: mean electron density
+        :type ne_0: float, default: 2e23 m\ :sup:`-3`
+
+        :return: No return, generates domain as attribute to passed self object.
+        :rtype: None
         """
 
         if self.s is not None:
@@ -580,11 +603,23 @@ class ScalarDomain(eqx.Module):
         """
         Linearly growing sinusoidal perturbation
 
-        Args:
-            s1 (float, optional): scale of linear growth. Defaults to 0.1.
-            s2 (float, optional): amplitude of sinusoidal perturbation. Defaults to 0.1.
-            ne_0 ([type], optional): mean electron density. Defaults to 2e23 m^-3.
-            Ly (int, optional): spatial scale of sinusoidal perturbation. Defaults to 1.
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :param s1: scale of linear growth
+        :type s1: float, default: 0.1
+
+        :param s2:  amplitude of sinusoidal perturbation
+        :type 2: float, default: 0.1
+
+        :param ne_0: mean electron density
+        :type ne_0: float, default: 2e23
+
+        :param Ly: spatial scale of sinusoidal perturbation
+        :type Ly: float, default: 1
+
+        :return: No return, generates domain as attribute to passed self object.
+        :rtype: None
         """
 
         if self.s1 is not None:
@@ -603,10 +638,20 @@ class ScalarDomain(eqx.Module):
         """
         Exponentially growing/decaying sinusoidal perturbation
 
-        Args:
-            ne_0 ([type], optional): mean electron density. Defaults to 1e24 m^-3.
-            Ly (int, optional): spatial scale of sinusoidal perturbation. Defaults to 1e-3 m.
-            s ([type], optional): scale of exponential change. Defaults to -2e-3 m (exponential decay).
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :param ne_0: mean electron density
+        :type ne_0: float, default: 1e24 m\ :sup:`-3`
+
+        :param Ly: scale of exponential change
+        :type Ly: float, default: -2e-3 [exponential decay]
+
+        :param s: spatial scale of sinusoidal perturbation
+        :type s: float, default: 1e-3
+
+        :return: No return, generates domain as attribute to passed self object.
+        :rtype: None
         """
 
         if self.ne_0 is not None:
@@ -636,33 +681,48 @@ class ScalarDomain(eqx.Module):
     #@partial(jax.jit, static_argnames=("self",))  
     def external_ne(self):
         """
-        Load externally generated grid
+        Load externally generated MxMxM grid of electron density (ne) in m\ :sup:`-3`
 
-        Args:
-            ne ([type]): MxMxM grid of density in m^-3
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :return: No return, loads domain as an attribute to the self referenced object.
+        :rtype: None
         """
 
         self.ne = self.ne.at[:, :, :].set(self.ne)
 
     '''
     #@partial(jax.jit, static_argnames=("self",))  
-    def external_B(self, *, B):
+    def external_B(self):
         """
-        Load externally generated grid
+        Load externally generated MxMxMx3 grid of B field in T
 
-        Args:
-            B ([type]): MxMxMx3 grid of B field in T
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :return: No return, loads domain as an attribute to the self referenced object.
+        :rtype: None
         """
 
-        self.B = self.B.at[:, :, :].set(B)
+        self.B = self.B.at[:, :, :, :].set(B)
 
     #@partial(jax.jit, static_argnames=("self",))  
     def external_Te(self, *, Te, Te_min = 1.0):
         """
-        Load externally generated grid
+        Load externally generated MxMxM grid of electron temperature in eV
 
-        Args:
-            Te ([type]): MxMxM grid of electron temperature in eV
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :param Te: MxMxM grid of electron temperature in eV
+        :type Te: jax.Array or numpy.array of shape M^3
+
+        :param Te_min: Set the minimum temperature of the grid
+        :type Te_min: float, default: 1.0
+
+        :return: No return, loads domain as an attribute to the self referenced object.
+        :rtype: None
         """
 
         self.Te = self.Te.at[:, :, :].set(jnp.maximum(Te_min, Te))
@@ -675,6 +735,21 @@ class ScalarDomain(eqx.Module):
         Args:
             Z ([type]): MxMxM grid of ionisation
         """
+        """
+        Load externally generated MxMxM grid of electron temperature in eV
+
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :param Te: MxMxM grid of electron temperature in eV
+        :type Te: jax.Array or numpy.array of shape M^3
+
+        :param Te_min: Set the minimum temperature of the grid
+        :type Te_min: float, default: 1.0
+
+        :return: No return, loads domain as an attribute to the self referenced object.
+        :rtype: None
+        """
 
         self.Z = self.Z.at[:, :, :].set(Z)
     '''
@@ -682,11 +757,16 @@ class ScalarDomain(eqx.Module):
     #@partial(jax.jit, static_argnames=("self",))  
     def test_B(self, *, Bmax = 1.0):
         """
-        A Bz field with a linear gradient in x:
-        Bz =  Bmax*x/extent
+        Generate a Bz field with a linear gradient in x: Bz =  Bmax * x / extent
 
-        Args:
-            Bmax ([type], optional): maximum B field, default 1.0 T
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :param Bmax: Limiting max value B field in a cell
+        :type Te: float, default: 1.0 T [Tesla]
+
+        :return: No return, loads domain as an attribute to the self referenced object.
+        :rtype: None
         """
 
         if self.Bmax is not None:

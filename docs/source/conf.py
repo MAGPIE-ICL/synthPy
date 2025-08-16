@@ -28,7 +28,8 @@ extensions = [
     'sphinx.ext.autodoc',   # core library for html generation from docstrings
     'sphinx.ext.autosummary',   # create neat summary tables
     'sphinx.ext.intersphinx',
-    'myst_parser'
+    'myst_parser',
+    'sphinx_automodapi.automodapi'
 ]
 
 autosummary_generate = False  # Turn on sphinx.ext.autosummary
