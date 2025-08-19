@@ -13,17 +13,19 @@ from diffrax import Solution
 
 from scipy.constants import c
 from scipy.constants import e
-
+from jax.scipy.interpolate import RegularGridInterpolator
 from shared.utils import getsizeof
 from shared.utils import mem_conversion
 from shared.printing import colour
 from shared.utils import add_integer_postfix
-
+from shared.SpK_reader import open_emi_files
 # change name when it actualy is a trilinear interpolator - if it's still a regular grid, change it.
 from simulator.interpolator import RegularGridInterpolator as trilinearInterpolator
 
 from shared.propagation import ray_to_Jonesvector
 from shared.propagation import back_propogate
+
+
 
 ##
 ## Helper functions for calculations
@@ -72,6 +74,29 @@ def kappa(ne, Te, Z, omega):
 def n_refrac(ne, omega):
     return jnp.sqrt(1.0 - (omega_pe(ne * 1e-6) / omega) ** 2)
 
+def attenuation(domain):
+    opa_max = domain.z_n/domain.z_length
+    
+    if domain.num_materials == 1:
+        grp_centres, grps, rho, Te, opa_data = open_emi_files(f"../../{domain.files}")
+        opa_data_capped = jnp.minimum(opa_max, opa_data)
+        opacity_grid = trilinearInterpolator((grp_centres, rho, Te), opa_data_capped, (domain.energy, domain.rho, domain.Te),bounds_error = False, fill_value = 0.0)
+        opacity_spatial_interp = RegularGridInterpolator((domain.x, domain.y, domain.z), opacity_grid, bounds_error = False, fill_value = 0.0)
+        return opacity_spatial_interp
+    else:
+        if (len(domain.files) != len(domain.densities)) & (len(domain.densities) != domain.num_materials):
+            raise ValueError("densities and files must have length equal to num_materials")
+        opacity_grids = [0]*domain.num_materials
+        for i in range (domain.num_materials):
+            grp_centres, grps, rho, Te, opa_data = open_emi_files(f"../../{domain.files[i]}")
+            opa_data_capped = jnp.minimum(opa_max, opa_data)
+            opacity_grids[i] = trilinearInterpolator((grp_centres, rho, Te), opa_data_capped, (domain.energy, domain.densities[i], domain.Te),bounds_error = False, fill_value = 0.0)
+        opacity_grids_tot = np.sum(opacity_grids, axis = 0)
+        opacity_spatial_interp_tot = RegularGridInterpolator((
+            domain.x, domain.y, domain.z), opacity_grids_tot, bounds_error = False, fill_value = 0.0)
+        return opacity_spatial_interp_tot
+            
+
 def dndr(r, ne, omega, x, y, z):
     """
     Returns the gradient at the locations r
@@ -100,7 +125,7 @@ def dndr(r, ne, omega, x, y, z):
     return grad
 
 # ODEs of photon paths, standalone function to support the solve()
-def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, omega, VerdetConst, lengths, dims):
+def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, omega, VerdetConst, lengths, dims, opacity, opacity_interp):
     """
     Returns an array with the gradients and velocity per ray for ode_int
 
@@ -143,6 +168,8 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
     sprime = sprime.at[:3, :].set(v)
 
     # Attenuation due to inverse bremsstrahlung
+    if opacity:
+        sprime = sprime.at[6, :].set(-opacity_interp(r.T)*c*amp)
     if inv_brems:
         sprime = sprime.at[6, :].set(trilinearInterpolator((x, y, z), kappa(ne, Te, Z, omega), r) * amp)
     if phaseshift:
@@ -302,6 +329,8 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
     if (ScalarDomain.B_on):
         VerdetConst = 2.62e-13 * lwl ** 2 # radians per Tesla per m^2
 
+    if (ScalarDomain.opacity):
+        attenuation(domain = ScalarDomain)
     omega = 2 * jnp.pi * c / lwl
 
     region_count = ScalarDomain.region_count

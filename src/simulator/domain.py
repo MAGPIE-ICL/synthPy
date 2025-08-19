@@ -80,8 +80,8 @@ class ScalarDomain(eqx.Module):
     Np_total: np.int64
     ray_batch_count: np.int64
 
-    def __init__(self, lengths, dims, *, ne_type = None, inv_brems = False, phaseshift = False, B_on = False, probing_direction = 'z', auto_batching = True, iteration = 1, region_count = 1, leeway_factor = None, coord_backup = None, future_dims = None, extra_info = False, memory_reporting = False, Np = None,
-        s = None, s1 = None, s2 = None, Ly = None, ne_0 = None, ne = None, B = None, Bmax = None, Te = None, Te_min = None, Z = None):
+    def __init__(self, lengths, dims, *, ne_type = None, inv_brems = False, opacity = False, phaseshift = False, B_on = False, probing_direction = 'z', auto_batching = True, iteration = 1, region_count = 1, leeway_factor = None, coord_backup = None, future_dims = None, extra_info = False, memory_reporting = False, Np = None,
+        s = None, s1 = None, s2 = None, Ly = None, ne_0 = None, ne = None, B = None, Bmax = None, Te = None, Te_min = None, Z = None, opacity_files = None, densities = None, num_materials = None, ):
 
         """
         Example:
@@ -137,8 +137,18 @@ class ScalarDomain(eqx.Module):
         self.Z = Z
         del Z
 
+        self.opacity_files = opacity_files
+        del opacity_files
+
+        self.densities = densities
+        del densities
+
+        self.num_materials = num_materials
+        del num_materials
+
         # Logical switches
         self.inv_brems = inv_brems
+        self.opacity= opacity
         self.phaseshift = phaseshift
         self.B_on = B_on
 
@@ -198,7 +208,10 @@ class ScalarDomain(eqx.Module):
 
         del dims
         del valid_types
-
+        
+        if self.opacity:
+            self.inv_brems = False
+        
         # changed function to pass to np.int64 to prevent overflow - this was causing the negatives
         # --> (exactly 0 in the case of a 1024^3 domain as it is right on the limit)
         predicted_domain_allocation = domain_estimate(self.x_n, self.y_n, self.z_n)
