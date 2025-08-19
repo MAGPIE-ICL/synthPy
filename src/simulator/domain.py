@@ -33,7 +33,9 @@ class ScalarDomain(eqx.Module):
 
     inv_brems: bool
     phaseshift: bool
+    opacity: bool
     B_on: bool
+    edensity: bool
 
     probing_direction: str
 
@@ -66,9 +68,9 @@ class ScalarDomain(eqx.Module):
     ne: jax.Array
 
     B: jax.Array
-    Te: jax.Array
+    Te: np.array
     Z: jax.Array
-
+  
     region_count: jnp.int32
 
     coord_backup: jax.Array
@@ -80,8 +82,14 @@ class ScalarDomain(eqx.Module):
     Np_total: np.int64
     ray_batch_count: np.int64
 
+    opacity_files: list
+    densities: list
+    num_materials: jnp.int32
+
+    refrac_field: jax.Array
+
     def __init__(self, lengths, dims, *, ne_type = None, inv_brems = False, opacity = False, phaseshift = False, B_on = False, probing_direction = 'z', auto_batching = True, iteration = 1, region_count = 1, leeway_factor = None, coord_backup = None, future_dims = None, extra_info = False, memory_reporting = False, Np = None,
-        s = None, s1 = None, s2 = None, Ly = None, ne_0 = None, ne = None, B = None, Bmax = None, Te = None, Te_min = None, Z = None, opacity_files = None, densities = None, num_materials = None, ):
+        s = None, s1 = None, s2 = None, Ly = None, ne_0 = None, ne = None, B = None, Bmax = None, Te = None, Te_min = 1, Z = None, opacity_files = None, densities = None, num_materials = None, edensity = True, refrac_field = None):
 
         """
         Example:
@@ -137,6 +145,9 @@ class ScalarDomain(eqx.Module):
         self.Z = Z
         del Z
 
+        self.refrac_field = refrac_field
+        del refrac_field
+
         self.opacity_files = opacity_files
         del opacity_files
 
@@ -148,9 +159,10 @@ class ScalarDomain(eqx.Module):
 
         # Logical switches
         self.inv_brems = inv_brems
-        self.opacity= opacity
+        self.opacity = opacity
         self.phaseshift = phaseshift
         self.B_on = B_on
+        self.edensity = edensity
 
         self.probing_direction = probing_direction
 
