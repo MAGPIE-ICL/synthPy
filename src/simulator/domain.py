@@ -88,6 +88,7 @@ class ScalarDomain(eqx.Module):
 
     refrac_field: jax.Array
 
+    
     def __init__(self, lengths, dims, *, ne_type = None, inv_brems = False, opacity = False, phaseshift = False, B_on = False, probing_direction = 'z', auto_batching = True, iteration = 1, region_count = 1, leeway_factor = None, coord_backup = None, future_dims = None, extra_info = False, memory_reporting = False, Np = None,
         s = None, s1 = None, s2 = None, Ly = None, ne_0 = None, ne = None, B = None, Bmax = None, Te = None, Te_min = 1, Z = None, opacity_files = None, densities = None, num_materials = None, edensity = True, refrac_field = None):
 

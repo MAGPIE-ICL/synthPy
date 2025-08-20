@@ -59,20 +59,19 @@ def fresnel_propagate(U0_prepared, L, wavelength, z, original_shape, pad_factor=
 
     return Uz_padded[start_x:end_x, start_y:end_y]
 
-def propagate(lwl, x, y, x_length, y_length, jones_vector, amplitudes, phases, z, pad_factor = 2):
+def propagate(lwl, domain, x_pos, y_pos, amplitudes, phases, z, pix_x, pix_y, pad_factor = 2):
     """
     Prepares and propagates the field, using an energy-dependent PSF.
     """
 
-    N_f = (x_length)**2 / (lwl * z)
+    N_f = (domain.x_length)**2 / (lwl * z)
     #print(f"Fresnel Number: {N_f:.4f}")
 
-    x_positions = jones_vector[0]
-    y_positions = jones_vector[2]
+    phases_interp = LND((x_pos, y_pos), phases, fill_value = 0.0)
+    amplitudes_interp = LND((x_pos, y_pos), amplitudes, fill_value = 0.0)
 
-    phases_interp = LND((x_positions, y_positions), phases, fill_value = 0.0)
-    amplitudes_interp = LND((x_positions, y_positions), amplitudes, fill_value = 0.0)
-
+    x = np.linspace(-domain.x_length/2, domain.x_length/2, pix_x)
+    y = np.linspace(-domain.y_length/2, domain.y_length/2, pix_y)
     XX, YY = np.meshgrid(x, y)
 
     phase_grid = phases_interp((XX, YY))
@@ -88,7 +87,7 @@ def propagate(lwl, x, y, x_length, y_length, jones_vector, amplitudes, phases, z
 
     # Pass the dynamically calculated FWHM to the propagation function
     U_0_proped = fresnel_propagate(
-        U_0_prepared, (x_length, y_length), 
+        U_0_prepared, (domain.x_length, domain.y_length), 
         lwl, z, U_0.shape, pad_factor = pad_factor, lanex_fwhm_m = None
     )
 

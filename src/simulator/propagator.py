@@ -81,7 +81,8 @@ def attenuation(domain, energy):
         grp_centres, grps, rho, Te, opa_data = open_emi_files(f"../../{domain.opacity_files}")
         opa_data_capped = jnp.minimum(opa_max, opa_data)
         opacity_interp = RegularGridInterpolator((grp_centres, rho, Te), opa_data_capped, bounds_error = False, fill_value = 0.0)
-        opacity_grid = opacity_interp((energy, domain.densities, domain.Te))
+        energy_grid = jnp.full_like(domain.densities, energy)
+        opacity_grid = opacity_interp((energy_grid, domain.densities, domain.Te))
         opacity_spatial_interp = RegularGridInterpolator((domain.x, domain.y, domain.z), opacity_grid, bounds_error = False, fill_value = 0.0)
         return opacity_spatial_interp
     else:
@@ -100,6 +101,8 @@ def attenuation(domain, energy):
             domain.x, domain.y, domain.z), opacity_grids_tot, bounds_error = False, fill_value = 0.0)
         return opacity_spatial_interp_tot
 
+def atten(domain, x):
+    return domain.opacity_interp(x)
 
 def dndr(r, ne, omega, x, y, z, edensity, refrac_field):
     """
@@ -135,7 +138,7 @@ def dndr(r, ne, omega, x, y, z, edensity, refrac_field):
     return grad
 
 # ODEs of photon paths, standalone function to support the solve()
-def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, omega, VerdetConst, lengths, dims, opacity, opacity_interp, edensity, refrac_field):
+def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, omega, VerdetConst, lengths, dims, opacity, edensity, refrac_field, opacity_interp):
     """
     Returns an array with the gradients and velocity per ray for ode_int
 
@@ -160,8 +163,6 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
     # needs to be before the reshape to avoid indexing errors
     r = s[:3, :].T  # transposed so it is of the correct shape for interpolators
     v = s[3:6, :]
-    print(type(r))
-    print("hi")
     # Amplitude, phase and polarisation
     amp = s[6, :]
     #phase = s[7,:]
@@ -178,8 +179,8 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
     sprime = sprime.at[:3, :].set(v)
 
     # Attenuation due to inverse bremsstrahlung
-    # if opacity:
-    #     sprime = sprime.at[6, :].set(-opacity_interp(r)*c*amp)
+    if opacity:
+        sprime = sprime.at[6, :].set(-opacity_interp(r)*c*amp)
     if inv_brems:
         sprime = sprime.at[6, :].set(trilinearInterpolator((x, y, z), kappa(ne, Te, Z, omega), r) * amp)
     if phaseshift:
@@ -342,8 +343,12 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
     if (ScalarDomain.opacity):
         energy = 6.63e-34*c/(lwl*1.6e-19)
         opacity_interp = attenuation(domain = ScalarDomain, energy = energy)
+        def atten(x):
+            return opacity_interp(x)
     else:
         opacity_interp = None
+        def atten(x):
+            return 0.0
 
     omega = 2 * jnp.pi * c / lwl
 
@@ -516,7 +521,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
             args = (parallelise, ScalarDomain.inv_brems, ScalarDomain.phaseshift, ScalarDomain.B_on, 
                     ScalarDomain.ne, ScalarDomain.B, ScalarDomain.Te, ScalarDomain.Z, ScalarDomain.x, 
                     ScalarDomain.y, ScalarDomain.z, omega, VerdetConst, ScalarDomain.lengths, 
-                    ScalarDomain.dims, ScalarDomain.opacity, opacity_interp, ScalarDomain.edensity, 
+                    ScalarDomain.dims, ScalarDomain.opacity, ScalarDomain.edensity, 
                     ScalarDomain.refrac_field)
 
             if not parallelise:
@@ -623,7 +628,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                         term,
                         solver,
                         y0 = jnp.array(s0),
-                        args = args,
+                        args = args + (atten,),
                         t0 = t0,
                         t1 = t1,
                         dt0 = (t1 - t0) * norm_factor / Nt, # can set = 0 if dtmax is set apparently?
@@ -658,7 +663,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
                     # default vmap_method argument is sequential, this is deprecated though and will cause a warning (if debugging) past jax 0.6.0
                     # look into different options for this parameter at a later date
-
+                    
                     jax.vmap(ODE_solve, in_axes = (0, None))(s0, args)
                 )
 
