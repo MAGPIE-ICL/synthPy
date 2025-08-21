@@ -212,7 +212,7 @@ def initial_field(domain, x, y, phases, amplitudes, pix_x, pix_y, title, savefig
 def propagated_field(domain, x_pos, y_pos, z, phases, amplitudes, pix_x, pix_y, title, lwl, pad_factor = 2, vmin = None, vmax = None, savefig = False, fname = "hi"):
     fig, axs = plt.subplots()
     final_field = propagate(lwl, domain, x_pos, y_pos, amplitudes, phases, z, pix_x, pix_y, pad_factor)
-    im = axs.imshow(np.absolute(final_field)**2, extent = (-domain.x_length/2, domain.x_length/2, -domain.y_length/2, domain.y_length/2), origin = "lower", cmap = "viridis", vmin = vmin, vmax = vmax, origin = "lower")
+    im = axs.imshow(np.absolute(final_field)**2, extent = (-domain.x_length/2, domain.x_length/2, -domain.y_length/2, domain.y_length/2), origin = "lower", cmap = "viridis", vmin = vmin, vmax = vmax)
     axs.set_xlabel("x position (m)")
     axs.set_ylabel("y position (m)")
     axs.set_title(title)

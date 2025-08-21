@@ -101,8 +101,6 @@ def attenuation(domain, energy):
             domain.x, domain.y, domain.z), opacity_grids_tot, bounds_error = False, fill_value = 0.0)
         return opacity_spatial_interp_tot
 
-def atten(domain, x):
-    return domain.opacity_interp(x)
 
 def dndr(r, ne, omega, x, y, z, edensity, refrac_field):
     """
@@ -621,8 +619,8 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                     saveat = SaveAt(ts = jnp.linspace(t0, t1, Nt))
         
                     # Diffrax uses adaptive time stepping to gain accuracy within certain tolerances
-                    #dtmax = 0.5 * ((lengths[0] * lengths[1] * lengths[2]) / (dims[0] * dims[1] * dims[2])) ** (1 / 3) / (c * norm_factor)
-                    stepsize_controller = PIDController(rtol = 1, atol = 1e-5)#, dtmax = dtmax)
+                    dtmax = 0.5 * ((lengths[0]/dims[0])**2 + (lengths[1]/dims[1])**2 + (lengths[2]/dims[2])**2) ** (1 / 2) / (c * norm_factor)
+                    stepsize_controller = PIDController(rtol = 1, atol = 1e-5, dtmax = dtmax)
 
                     return lambda s0, args : diffeqsolve(
                         term,
@@ -631,7 +629,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                         args = args + (atten,),
                         t0 = t0,
                         t1 = t1,
-                        dt0 = (t1 - t0) * norm_factor / Nt, # can set = 0 if dtmax is set apparently?
+                        dt0 = None, # can set = 0 if dtmax is set apparently?
                         saveat = saveat,
                         stepsize_controller = stepsize_controller,
                         # set max steps to no. of cells x100
