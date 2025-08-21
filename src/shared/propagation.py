@@ -34,8 +34,8 @@ def ray_to_Jonesvector(rays, *, ne_extent = None, probing_direction = 'z', keep_
         ray_J = jnp.zeros((2, Np), dtype = complex)
 
     x, y, z, vx, vy, vz, amp, phase = rays[0], rays[1], rays[2], rays[3], rays[4], rays[5], rays[6], rays[7]
-    ray_p.at[4].set(amp)
-    ray_p.at[5].set(phase)
+    ray_p = ray_p.at[4].set(amp)
+    ray_p = ray_p.at[5].set(phase)
     # Resolve distances and angles
     # YZ plane
     if(probing_direction == 'x'):

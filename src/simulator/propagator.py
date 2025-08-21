@@ -136,7 +136,7 @@ def dndr(r, ne, omega, x, y, z, edensity, refrac_field):
     return grad
 
 # ODEs of photon paths, standalone function to support the solve()
-def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, omega, VerdetConst, lengths, dims, opacity, edensity, refrac_field, opacity_interp):
+def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, omega, VerdetConst, lengths, dims, opacity, edensity, refrac_field, opacity_interp, phase):
     """
     Returns an array with the gradients and velocity per ray for ode_int
 
@@ -182,7 +182,7 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
     if inv_brems:
         sprime = sprime.at[6, :].set(trilinearInterpolator((x, y, z), kappa(ne, Te, Z, omega), r) * amp)
     if phaseshift:
-        sprime = sprime.at[7, :].set(jnp.array(-0.5 * trilinearInterpolator((x, y, z), ne, r)/(3.14207787e-4*omega), dtype = jnp.float64))
+        sprime = sprime.at[7, :].set(phase(r))
 
     if B_on:
         """
@@ -344,11 +344,19 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
         def atten(x):
             return opacity_interp(x)
     else:
-        opacity_interp = None
-        def atten(x):
+        def atten():
             return 0.0
-
+        
     omega = 2 * jnp.pi * c / lwl
+
+    if (ScalarDomain.phaseshift):
+        ne_interp = RegularGridInterpolator((ScalarDomain.x, ScalarDomain.y, ScalarDomain.z), ScalarDomain.ne, bounds_error = False, fill_value = 0.0)
+        def phase(x):
+            return  jnp.array(-0.5 * ne_interp(x)/(3.14207787e-4*omega), dtype = jnp.float64)
+    else:
+        def phase():
+            return 0.0
+    
 
     region_count = ScalarDomain.region_count
     ray_batch_count = ScalarDomain.ray_batch_count
@@ -603,7 +611,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                 #import optax - diffrax uses as a dependency, don't need to import directly
 
                 # using lengths and/or dims to set parameters of diffeqsolve(...) results in BooleanConversionError due to tracing variable resolution
-                def diffrax_solve(dydt, t0, t1, Nt, lengths, dims, *, rtol = 1e-7, atol = 1e-9):
+                def diffrax_solve(dydt, t0, t1, Nt, lengths, dims, *, rtol = 1e-2, atol = 1e-5):
                     """
                     Here we wrap the diffrax diffeqsolve function such that we can easily parallelise it
                     """
@@ -620,13 +628,13 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
         
                     # Diffrax uses adaptive time stepping to gain accuracy within certain tolerances
                     dtmax = 0.5 * ((lengths[0]/dims[0])**2 + (lengths[1]/dims[1])**2 + (lengths[2]/dims[2])**2) ** (1 / 2) / (c * norm_factor)
-                    stepsize_controller = PIDController(rtol = 1, atol = 1e-5, dtmax = dtmax)
+                    stepsize_controller = PIDController(rtol = rtol, atol = atol, dtmax = dtmax)
 
                     return lambda s0, args : diffeqsolve(
                         term,
                         solver,
                         y0 = jnp.array(s0),
-                        args = args + (atten,),
+                        args = args + (atten, phase),
                         t0 = t0,
                         t1 = t1,
                         dt0 = None, # can set = 0 if dtmax is set apparently?
@@ -635,11 +643,11 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                         # set max steps to no. of cells x100
                         # cannot be passed as dims --> causes boolean conversion error, has to be passed directly
                         # need to pass this correctly so that it remains consistent with class when batching
-                        max_steps = 10000#dims[0] * dims[1] * dims[2] * 100 #10000 - default for solve_ivp?????
+                        max_steps = int(2e8) #dims[0] * dims[1] * dims[2] * 100 #10000 - default for solve_ivp?????
                     )
 
                 # hardcode to normalise to 1 due to diffrax bug
-                ODE_solve = diffrax_solve(dsdt_ODE, t[0], t[-1] / norm_factor, save_points_per_region, ScalarDomain.lengths, ScalarDomain.dims)
+                ODE_solve = diffrax_solve(dsdt_ODE, 0, 1, save_points_per_region, ScalarDomain.lengths, ScalarDomain.dims)
 
                 if jitted:
                     start_comp = time()
