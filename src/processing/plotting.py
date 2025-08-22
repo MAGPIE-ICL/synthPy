@@ -277,3 +277,24 @@ def var_distance(domain, x_pos, y_pos, z, phases, amplitudes, pix_x, pix_y, titl
         counter += 1
     if savefig is True:
         plt.savefig(f"../../../{fname}",dpi=800, bbox_inches='tight', pad_inches=0.1)
+
+def interpolated_phase(domain, x_pos, y_pos, phases, pix_x, pix_y, title = "Interpolated Phase", savefig = False, fname = "hi", wrapped = False, vmin = None, vmax = None):
+    
+    phases_interp = LND((x_pos, y_pos), phases, fill_value = 0.0)
+    x = np.linspace(-domain.x_length/2, domain.x_length/2, pix_x)
+    y = np.linspace(-domain.y_length/2, domain.y_length/2, pix_y)
+    XX, YY = np.meshgrid(x, y)
+    phase_grid = phases_interp((XX, YY))
+    fig1, ax1 = plt.subplots()
+    fig1.suptitle(title)
+
+    if wrapped is True:
+        im = ax1.imshow((-phase_grid) % (2*np.pi), extent = (-domain.x_length/2, domain.x_length/2, -domain.y_length/2, domain.y_length/2), origin = "lower", vmin = vmin, vmax = vmax)
+    else:
+        im = ax1.imshow(phase_grid, extent = (-domain.x_length/2, domain.x_length/2, -domain.y_length/2, domain.y_length/2), origin = "lower", vmin = vmin, vmax = vmax)
+   
+    ax1.set_xlabel("x position (mm)")
+    ax1.set_ylabel("y position (mm)")
+    fig1.colorbar(im, ax = ax1, orientation='vertical', fraction = .1)
+    if savefig is True:
+        plt.savefig(f"../../../{fname}",dpi=800, bbox_inches='tight', pad_inches=0.1)
