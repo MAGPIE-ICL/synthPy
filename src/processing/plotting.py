@@ -247,9 +247,10 @@ def phase_on_off(params, suptitle, lwl, domain, z, pad_factor = 2, titles = ["Ph
     if savefig is True:
         plt.savefig(f"../../../{fname}.png",dpi=800, bbox_inches='tight', pad_inches=0.1)
 
-def var_distance(domain, x_pos, y_pos, z, phases, amplitudes, pix_x, pix_y, title, lwl, pad_factor, savefig = False, fname = "hi"):
-    a = 2
-    b = 3
+def var_distance(domain, x_pos, y_pos, z, phases, amplitudes, pix_x, pix_y, title, lwl, pad_factor = 2, a = 2, b = 3, savefig = False, fname = "hi"):
+    if len(z) != a*b:
+        raise ValueError("z must have length equal to a*b, i.e. number of plots")
+
     fig, axs = plt.subplots(a,b)
     fig.suptitle(title)
     fig.subplots_adjust(wspace = 0.3)

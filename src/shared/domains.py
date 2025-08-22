@@ -40,7 +40,7 @@ def density_step(rho1, rho2, lengths, n_cells):
     """
     _, YY, _ = grid(lengths, n_cells)
     density = jnp.full_like(YY, rho1)
-    density[YY <= 0] = rho2
+    density = density.at[YY <= 0].set(rho2)
     return density
 
 def turbulent_box(ne_0, max_pert, l_max, l_min, extent, n_cells, power = -5/3):
