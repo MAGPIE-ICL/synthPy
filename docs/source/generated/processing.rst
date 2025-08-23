@@ -1,6 +1,0 @@
-﻿processing
-==========
-
-.. automodule:: processing
-
-   

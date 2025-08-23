@@ -1,6 +1,0 @@
-﻿legacy
-======
-
-.. automodule:: legacy
-
-   

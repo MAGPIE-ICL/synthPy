@@ -15,7 +15,7 @@ args = parser.parse_args()
 if args.rays is not None:
     Np = args.rays
 else:
-    Np = 1e9
+    Np = 1e8 # should generate ~ 60 GiB of data
 
 cores = None
 if args.cores is not None:
@@ -55,42 +55,16 @@ from shared.utils import mem_conversion
 columns = ["dims", "rays", "runtime", "legacyRuntime", "domainSize", "raySize", "totalMemory"]
 df = pd.DataFrame(columns=columns)
 
-#load hdf
-ne, dims, spacing = utilIO.hdf_readin(str(importPath + "../evaluation/benchmarks/turbBoxLargeTest/radmeshablation_3d_prp_CH_ug_3rd_hdf5_plt_cnt_0228"))
+# can't load domain on a regular laptop due to it's size
+# - therefore I've created a separate test of ray saving capabilities with a standard domain that's generated per run
 
-'''
-# multiply domain to match real size experimental target
-multi_x = 0 # get multiplier x
-multi_y = 0 # get multiplier y
-multi_z = 0 # get multiplier z
+dims = np.array([128, 128, 128])
 
-for i in range(multi_x):
-    ne = np.append(ne, ne, axis = 0)
-for j in range(multi_y):
-    ne = np.append(ne, ne, axis = 1)
-for k in range(multi_z):
-    ne = np.append(ne, ne, axis = 2)
-'''
-
-dims = ne.shape
-
-extent_x = ((dims[0]*spacing[0].v)/2) * 1e-2
-extent_y = ((dims[1]*spacing[1].v)/2) * 1e-2
-extent_z = ((dims[2]*spacing[2].v)/2) * 1e-2
+extent_x = 5e-3
+extent_y = 5e-3
+extent_z = 10e-3
 
 lengths = 2 * jnp.array([extent_x, extent_y, extent_z], dtype = jnp.int32)
-
-ne_x = np.linspace(-extent_x,extent_x, dims[0])
-ne_y = np.linspace(-extent_y,extent_y, dims[1])
-ne_z = np.linspace(-extent_z,extent_z, dims[2])
-
-print(f'extent x: {extent_x}')
-print(f'extent y: {extent_y}')
-print(f'extent z: {extent_z}')
-
-print(f'dims x: {dims[0]}')
-print(f'dims y: {dims[1]}')
-print(f'dims z: {dims[2]}')
 
 print("\n\n")
 
@@ -98,13 +72,7 @@ print("\n\n")
 baseline = memory_report()['used_raw']
 
 probing_direction = 'z'
-domain = d.ScalarDomain(lengths, dims, ne_type = "import", probing_direction = probing_direction, Np = Np, ne = ne.v * 1e6)
-
-del ne_x
-del ne_y
-del ne_z
-
-del ne
+domain = d.ScalarDomain(lengths, dims, ne_type = "test_exponential_cos", probing_direction = probing_direction, Np = Np)
 
 postDomain = memory_report()['used_raw']
 domainAllocation = postDomain - baseline

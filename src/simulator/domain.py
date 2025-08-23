@@ -99,35 +99,35 @@ class ScalarDomain(eqx.Module):
         :param B_on: Enables debug flags, increases runtime.
         :type B_on: bool (default = False)
 
-        :param probing_direction: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
-        :type probing_direction: bool (default = True)
+        :param probing_direction: Set's the direction the beam is propagating in.
+        :type probing_direction: char (default = 'z')
 
-        :param auto_batching: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
+        :param auto_batching: Enable automatic domain and ray batching algorithm.
         :type auto_batching: bool (default = True)
 
-        :param iteration: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
-        :type iteration: bool (default = True)
+        :param iteration: Indicates which batch of rays this is, important to distinguish if it is the first or not.
+        :type iteration: int (default = 1)
 
-        :param region_count: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
-        :type region_count: bool (default = True)
+        :param region_count: The number of regions the domain is batched into.
+        :type region_count: int, default: 1
 
-        :param leeway_factor: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
-        :type leeway_factor: bool (default = True)
+        :param leeway_factor: Scalar to memory usage estimations, used to give extra leeway to total predictions.
+        :type leeway_factor: float, default: 1.1 - 10% margin
 
-        :param coord_backup: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
-        :type coord_backup: bool (default = True)
+        :param coord_backup: Co-ordinates of the previous domain object.
+        :type coord_backup: jax.Array, default: None
 
-        :param future_dims: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
-        :type future_dims: bool (default = True)
+        :param future_dims: Array of dim allocations for past/current/future domain objects.
+        :type future_dims: jax.Array, default: None
 
-        :param extra_info: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
-        :type extra_info: bool (default = True)
+        :param extra_info: Flag to enable printing of extra information - namely domain parameters.
+        :type extra_info: bool, default: False
 
-        :param memory_reporting: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
-        :type memory_reporting: bool (default = True)
+        :param memory_reporting: Flag to enable priting of memory information.
+        :type memory_reporting: bool, default: False
 
-        :param Np: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
-        :type Np: bool (default = True)
+        :param Np: The total number of rays to be simulated - needs to be set if intending to batch ray generation.
+        :type Np: int, default: None
 
         + plus an assortment of paramters for domain generation that can be set to override defaults
             (s, s1, s2, Ly, ne_0, ne, B, Bmax, Te, Te_min, Z)
@@ -191,8 +191,8 @@ class ScalarDomain(eqx.Module):
         if leeway_factor is not None:
             self.leeway_factor = leeway_factor
         else:
-            # set to 2 as a result of concerns of ray memory size
-            self.leeway_factor = 2
+            # set to 1.1 by default, gives 10% leeway in prediction
+            self.leeway_factor = 1.1
 
         self.extra_info = extra_info
         # not used right now but probably will be in the future so not bothering to remove

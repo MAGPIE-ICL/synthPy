@@ -1,6 +1,0 @@
-﻿shared
-======
-
-.. automodule:: shared
-
-   

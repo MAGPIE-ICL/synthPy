@@ -1,6 +1,0 @@
-﻿simulator
-=========
-
-.. automodule:: simulator
-
-   

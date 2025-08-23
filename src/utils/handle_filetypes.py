@@ -7,9 +7,9 @@ Reviewer: Stefano Merlini
 
 import numpy as np
 import pyvista as pv
+import os
 
 def export_pvti(arr: np.ndarray, fname: str = None, extent_x = None, extent_y = None, extent_z = None):
-
     '''
     Export a 3d array as a pvti file format
         fname: str, file path and name to save under. A VTI pointed to by a PVTI file are saved in this location. If left blank, the name will default to:
@@ -91,7 +91,6 @@ def pvti_readin(filename):
 	Reads in data from pvti with filename, use this to read in electron number density data
 	'''
     import vtk
-    import os
     from vtk.util import numpy_support as vtk_np
 
     reader = vtk.vtkXMLPImageDataReader()
@@ -160,3 +159,49 @@ def hdf_to_pvti(hdf_filename, pvti_filename):
     extent_z = (dims[2]*spacing[2])/2
     
     export_pvti(ne, fname = pvti_filename, extent_x = extent_x, extent_y = extent_y, extent_z = extent_z)
+
+import h5py
+
+def compress_jax_matrix_to_hdf5(input_matrix, *, filename = None, file_path = None, dataset_name = 'data', compression = 'gzip', compression_level = 4):
+    """
+    Compress a JAX matrix and save it into an HDF5 file.
+
+    :param input_matrix: The JAX array to be saved.
+    :type input_matrix: jax.numpy.DeviceArray (REQUIRED)
+
+    :param filename: What to call the resultant file.
+    :type filename: str (default: None, sets filename to "ray_output" + current date-time stamp)
+
+    :param file_path: Path to save the created HDF5 file too.
+    :type file_path: str (default: None, saves to the current working directory)
+
+    :param dataset_name: Name of the dataset inside the HDF5 file.
+    :type dataset_name: str (default: 'data')
+
+    :param compression: Compression algorithm to use (e.g., 'gzip', 'lzf', or None).
+    :type compression: str or None (default: "gzip")
+
+    :param compression_level: Compression level for gzip (1-9). Only used if compression is 'gzip'.
+    :type compression_level: int (default: 4)
+    """
+
+    # Convert JAX array to NumPy array for saving
+    numpy_array = np.array(input_matrix)
+
+    if filename is None:
+        from datetime import datetime
+        filename = "ray_output" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".hdf5." + str(compression)
+
+    if filepath is None:
+        filepath = os.getcwd()
+
+    filepath = os.path.join(filepath, filename)
+    with h5py.File(filepath, 'w') as h5file:
+        h5file.create_dataset(
+            dataset_name,
+            data = numpy_array,
+            compression = compression,
+            compression_opts = compression_level
+        )
+
+    print(f"Matrix saved to '{filepath}' with compression='{compression}' at compression_level='{compression_level}'.")

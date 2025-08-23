@@ -692,6 +692,23 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                 from shared.utils import memory_report
 
                 if total_ray_size_estimate_raw >= memory_report("cpu")['free_raw']:
+                    target_folder = os.getcwd() + "/saves"
+                    if not os.path.isdir(target_folder):
+                        try:
+                            os.mkdir(target_folder)
+                        except OSError as e:
+                            print("\nFailed to create folder at " + target_folder)
+                            if e.errno != errno.EEXIST:
+                                raise
+
+                    from utils.handle_filetypes import compress_jax_matrix_to_hdf5 as compressed_solution_export
+                    compressed_solution_export(
+                        ray_to_Jonesvector(sol.ys[:,-1].reshape(9, Np), ne_extent = probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E),
+                        file_path = target_folder
+                        #filename = None, file_path = ".", dataset_name = 'data', compression = 'gzip', compression_level = 4
+                    )
+
+                    '''
                     sol_host = jax.device_get(sol)
                     del sol
 
@@ -707,6 +724,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
                     mmap_file.flush()
                     del mmap_file
+                    '''
                 else:
                     solutions[ray_index] = sol
                     del sol
@@ -720,9 +738,10 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
             return solutions, None, duration
         else:
             if not parallelise:
-                return *ray_to_Jonesvector(solutions.y[:,-1].reshape(9, Np), ne_extent = probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E), duration
+                return *ray_to_Jonesvector(solutions.ys[:,-1].reshape(9, Np), ne_extent = probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E), duration
             else:
                 # need to confirm there is no mismatch between total depth_traced and the target probing_depth
                 return process_results(solutions, depth_traced, trace_depth, ScalarDomain.probing_direction, return_E, duration, save_points_per_region, ray_batch_count, verbose)
     else:
         print("\nData output as several memmap files due to limitations of vram/ram space.")
+        print("Either collate output files or iteratively generate images.")

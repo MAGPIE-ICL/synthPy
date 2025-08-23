@@ -11,7 +11,13 @@ Welcome to synthPy's documentation!
 Check out the :doc:`installation` section to find out how to get access to synthPy on your computer.
 Check out the :doc:`usage` section for further information and examples.
 
-.. automodapi:: EoN
+
+.. automodapi:: ../../src/field_generator
+.. automodapi:: ../../src/legacy
+.. automodapi:: ../../src/processing
+.. automodapi:: ../../src/shared
+.. automodapi:: ../../src/simulator
+.. automodapi:: ../../src/utils
 
 Contents
 --------

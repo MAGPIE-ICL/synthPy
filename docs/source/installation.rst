@@ -39,5 +39,3 @@ Or you can download a specific release:
    (.venv) $ <command to install a release>
 
 Alternatively install using the github app or by cloning/installing a release directly from the `github repository <https://github.com/MAGPIE-ICL/synthPy/>`__
-
-.. automodapi:: mypackage.mymodule
