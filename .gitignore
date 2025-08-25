@@ -32,6 +32,8 @@ examples/jobs/run_scripts/.ipynb_checkpoints
 evaluation/error_reading/*
 !evaluation/error_reading/error_parser.py
 
+saves
+
 **/__pycache__/
 **/.ipynb_checkpoints/
 

@@ -162,7 +162,7 @@ def hdf_to_pvti(hdf_filename, pvti_filename):
 
 import h5py
 
-def compress_jax_matrix_to_hdf5(input_matrix, *, filename = None, file_path = None, dataset_name = 'data', compression = 'gzip', compression_level = 4):
+def compress_jax_matrix_to_hdf5(input_matrix, *, filename = None, filepath = None, dataset_name = 'data', compression = 'gzip', compression_level = 4):
     """
     Compress a JAX matrix and save it into an HDF5 file.
 
@@ -172,8 +172,8 @@ def compress_jax_matrix_to_hdf5(input_matrix, *, filename = None, file_path = No
     :param filename: What to call the resultant file.
     :type filename: str (default: None, sets filename to "ray_output" + current date-time stamp)
 
-    :param file_path: Path to save the created HDF5 file too.
-    :type file_path: str (default: None, saves to the current working directory)
+    :param filepath: Path to save the created HDF5 file too.
+    :type filepath: str (default: None, saves to the current working directory)
 
     :param dataset_name: Name of the dataset inside the HDF5 file.
     :type dataset_name: str (default: 'data')
@@ -186,7 +186,7 @@ def compress_jax_matrix_to_hdf5(input_matrix, *, filename = None, file_path = No
     """
 
     # Convert JAX array to NumPy array for saving
-    numpy_array = np.array(input_matrix)
+    numpy_array = np.asarray(input_matrix, dtype = np.float32).tolist()
 
     if filename is None:
         from datetime import datetime

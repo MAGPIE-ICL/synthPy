@@ -703,7 +703,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
                     from utils.handle_filetypes import compress_jax_matrix_to_hdf5 as compressed_solution_export
                     compressed_solution_export(
-                        ray_to_Jonesvector(sol.ys[:,-1].reshape(9, Np), ne_extent = probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E),
+                        ray_to_Jonesvector(sol.ys[:,-1].reshape(9, Np), ne_extent = probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E)[0],
                         file_path = target_folder
                         #filename = None, file_path = ".", dataset_name = 'data', compression = 'gzip', compression_level = 4
                     )
