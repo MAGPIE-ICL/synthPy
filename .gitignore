@@ -19,6 +19,7 @@ evaluation/benchmarks/runtime/*.csv
 evaluation/benchmarks/runtime/*.pdf
 evaluation/benchmarks/runtime/*.txt
 evaluation/benchmarks/runtime/*.png
+evaluation/benchmarks/runtime/*.zip
 
 evaluation/interferometry_testing/.ipynb_checkpoints
 
