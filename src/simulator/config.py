@@ -92,7 +92,39 @@ def resolve_path(path: str) -> str:
 ## jax_updated [bool] filters for this, set it to False if on the HPC
 ##
 
-def jax_init(force_device = None, core_limit = None, extra_info = False, disable_python_multithreading = True, enable_x64 = False, debugging = True, jax_updated = True):
+def jax_init(force_device = None, core_limit = None, extra_info = False, disable_python_multithreading = True, enable_x64 = False, debugging = False, jax_updated = True):
+    """
+    Initialises jax and imports
+        -   sets enviroment variables and runtime configuration
+        -   sets jax backend (where to run computations) based on autodetection or forced configuration with :param force_device:
+
+    :param force_device: Manually select compute backend.
+    :type force_device: str (allowed: "CPU", "GPU", "TPU") or None
+
+    :param core_limit: Limit the number of threads that jax can parallelise across.
+    :type core_limit: int or None
+
+    :param extra_info: Prints out jax environment info if enabled.
+    :type extra_info: bool (default = False)
+
+    :param disable_python_multithreading: Disables python multithreading to prevent conflict with jax parallelisation in some instances.
+    :type disable_python_multithreading: bool (default = True)
+
+    :param enable_x64: Enable 64-bit values in jax (double precision floating point arithmetic).
+    :type enable_x64: bool (default = False)
+
+    :param debugging: Enables debug flags, increases runtime.
+    :type debugging: bool (default = False)
+
+    :param jax_updated: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
+    :type jax_updated: bool (default = True)
+
+    :raise AssertionError: If jax has already been imported.
+
+    :return: No return, sets up configuration variables and import without returning values.
+    :rtype: None
+    """
+    
     import sys
     import os
 

@@ -227,17 +227,17 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, ret
 
         # if info is missing that you need, this is why - implement it !
         solutions = Solution(
-            t0=t0,
-            t1=t1,
-            ts=ts,
-            ys=ys,
-            interpolation=None,  # Optional: you can implement logic to keep interpolations
-            stats=stats,
-            result=result,
-            solver_state=None,
-            controller_state=None,
-            made_jump=None,
-            event_mask=None
+            t0 = t0,
+            t1 = t1,
+            ts = ts,
+            ys = ys,
+            interpolation = None,  # Optional: you can implement logic to keep interpolations
+            stats = stats,
+            result = result,
+            solver_state = None,
+            controller_state = None,
+            made_jump = None,
+            event_mask = None
         )
 
         solutions = np.asarray([solutions], dtype = Solution)
@@ -259,7 +259,7 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, ret
         rf = solutions[0].ys[:, -1, :].T
 
         # depth_traced + trace_depth or just trace_depth
-        return *ray_to_Jonesvector(rf, depth_traced + trace_depth, probing_direction = probing_direction, return_E = return_E), duration
+        return *ray_to_Jonesvector(rf, ne_extent = depth_traced + trace_depth, probing_direction = probing_direction, return_E = return_E), duration
     elif save_points_per_region > 2:
         slice_rf_list = []
         slice_Jf_list = []
@@ -277,7 +277,7 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, ret
                 if j < save_points_per_region - 1 or (j == save_points_per_region - 1 and i == len(solutions) - 1):
                     # sol.ts having shape of (Np, save_points_per_region) per region is very inefficent given there are N - 1 duplications
                     # - issue with diffrax though I can't fix this
-                    rf_slice, Jf_slice = ray_to_Jonesvector(solutions[i].ys[:, j, :].T, depth_traced + trace_depth * solutions[i].ts[0, j], probing_direction = probing_direction, return_E = return_E, keep_current_plane = True)
+                    rf_slice, Jf_slice = ray_to_Jonesvector(solutions[i].ys[:, j, :].T, ne_extent = depth_traced + trace_depth * solutions[i].ts[0, j], probing_direction = probing_direction, return_E = return_E, keep_current_plane = True)
 
                     slice_rf_list.append(rf_slice)
                     if Jf_slice is not None:
@@ -304,27 +304,44 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
     omega = 2 * jnp.pi * c / lwl
 
-    Np_total = ScalarDomain.Np_total
+    region_count = ScalarDomain.region_count
     ray_batch_count = ScalarDomain.ray_batch_count
+
+    print("\nNumber of domain batches:", region_count)
+    print("Number of ray batches:", ray_batch_count)
 
     from simulator.beam import Beam
     if isinstance(beam, Beam):
         assert "\nThis function does not take in the direct output of the Beam object, pass either Beam.s0 rays, or the parameters passed to be Beam here as a tuple if batching rays."
 
+    unbatched_beam = False
     if ray_batch_count == 1:
-        if len(beam.shape) == 2:
+        import array
+        if isinstance(beam, array.array) or isinstance(beam, np.ndarray) or isinstance(beam, jax.Array):
+            assert len(beam.shape) == 2, "\nExpected a matrix of pre-created rays."
+
             s0_import = beam
             del beam
-        else:
-            assert "\nExpected a matrix of pre-created rays."
 
-        Np = s0_import.shape[1]
-        rays_per_batch = Np # not necessary, just so there is something to print if someone tries
+            Np = s0_import.shape[1]
 
-        rays = np.array([Np], dtype = np.int64)
+            Np_total = Np
+            rays_per_batch = Np # not necessary, just so there is something to print if someone tries
+
+            rays = np.array([Np], dtype = np.int64)
+        elif isinstance(beam, tuple):
+            unbatched_beam = True
+
+            print("\nUsing tuple values to create the unbatched beam, domain must be used in the same fashion.")
+
+            Np_total = ScalarDomain.Np_total
+            rays_per_batch = Np_total
+
+            rays = np.array([Np_total], dtype = np.int64)
     else:
-        if len(beam.shape) != 1:
-            assert "\nExpect a tuple of Beam properties if you wish to batch rays."
+        assert isinstance(beam, tuple), "\nExpect a tuple of Beam properties if you wish to batch rays."
+
+        Np_total = ScalarDomain.Np_total
 
         #Np = Np_total // ray_batch_count
         rays_per_batch = Np_total // ray_batch_count
@@ -346,15 +363,17 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
     for ray_index, Np in enumerate(rays):
         depth_traced = 0.0
 
-        if ray_batch_count > 1:
+        if ray_batch_count > 1 or unbatched_beam:
             temp_beam = Beam(Np, beam_size = beam[0], divergence = beam[1], ne_extent = beam[2], probing_direction = beam[3], beam_type = beam[4], seeded = beam[5])
             s0_import = temp_beam.s0
             del temp_beam
 
-        print("\nEst. size in memory of rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np))
+        single_ray_size = getsizeof_default(s0_import[:, 0])
+        print("\nEst. size in memory of rays (1 = {}): {}".format(mem_conversion(single_ray_size), mem_conversion(single_ray_size * Np)))
+        total_ray_size_estimate_raw = getsizeof_default(s0_import[:, 0]) * Np_total
         if ray_batch_count > 1:
-            print("Est. potential size in memory of total rays:", mem_conversion(getsizeof_default(s0_import[:, 0]) * Np_total))
-            print(" --> Np = {} ({} batches)".format(Np_total, ray_batch_count))
+            print("Est. potential size in memory of total rays:", mem_conversion(total_ray_size_estimate_raw))
+            print(" --> Np (total) = {} (in {} batches) - {} for this batch".format(Np_total, ray_batch_count, Np))
         else:
             print(" --> Np = {}".format(Np))
 
@@ -660,21 +679,69 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                 else:
                     print("No pprof install detected. Please download to visualise memory usage - requires Golang to run.")
 
-            del s0
+            #del s0
+
+            #del sol - # this (and commenting out below section) prevents memory issues, so clearly solutions[...] needs to be
+            # forced written to storage if over a certain memory limit
+
+            # if est. solutions < ram but > vram, write to ram
+            # if > both, write to storage
+            # if < vram, keep on gpu - but then it wouldn't be batched anyway so sort of irrelevant
 
             if i == ScalarDomain.region_count:
-                solutions[ray_index] = sol
-                del sol
+                from shared.utils import memory_report
+
+                if total_ray_size_estimate_raw >= memory_report("cpu")['free_raw']:
+                    target_folder = os.getcwd() + "/saves"
+                    if not os.path.isdir(target_folder):
+                        try:
+                            os.mkdir(target_folder)
+                        except OSError as e:
+                            print("\nFailed to create folder at " + target_folder)
+                            if e.errno != errno.EEXIST:
+                                raise
+
+                    from utils.handle_filetypes import compress_jax_matrix_to_hdf5 as compressed_solution_export
+                    compressed_solution_export(
+                        ray_to_Jonesvector(sol.ys[:,-1].reshape(9, Np), ne_extent = probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E)[0],
+                        file_path = target_folder
+                        #filename = None, file_path = ".", dataset_name = 'data', compression = 'gzip', compression_level = 4
+                    )
+
+                    '''
+                    sol_host = jax.device_get(sol)
+                    del sol
+
+                    shape = sol_host.shape
+                    dtype = sol_host.dtype
+
+                    # Create or open a memmap file
+                    mmap_file = np.memmap(f'solution_{ray_index}.dat', dtype=dtype, mode='w+', shape=shape)
+
+                    # Write data directly
+                    mmap_file[:] = sol_host[:]
+                    del sol_host
+
+                    mmap_file.flush()
+                    del mmap_file
+                    '''
+                else:
+                    solutions[ray_index] = sol
+                    del sol
 
             depth_traced += trace_depth
 
     print("\nCompleted ray trace in", colour.BOLD + str(np.round(duration, 3).astype(np.float64)) + colour.END, "seconds.")
 
-    if return_raw_results:
-        return solutions, None, duration
-    else:
-        if not parallelise:
-            return *ray_to_Jonesvector(solutions.y[:,-1].reshape(9, Np), probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E), duration
+    if total_ray_size_estimate_raw < memory_report("cpu")['free_raw']:
+        if return_raw_results:
+            return solutions, None, duration
         else:
-            # need to confirm there is no mismatch between total depth_traced and the target probing_depth
-            return process_results(solutions, depth_traced, trace_depth, ScalarDomain.probing_direction, return_E, duration, save_points_per_region, ray_batch_count, verbose)
+            if not parallelise:
+                return *ray_to_Jonesvector(solutions.ys[:,-1].reshape(9, Np), ne_extent = probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E), duration
+            else:
+                # need to confirm there is no mismatch between total depth_traced and the target probing_depth
+                return process_results(solutions, depth_traced, trace_depth, ScalarDomain.probing_direction, return_E, duration, save_points_per_region, ray_batch_count, verbose)
+    else:
+        print("\nData output as several memmap files due to limitations of vram/ram space.")
+        print("Either collate output files or iteratively generate images.")

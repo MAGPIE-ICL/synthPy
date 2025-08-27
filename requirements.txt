@@ -9,3 +9,4 @@ vtk
 sympy
 psutil
 pynvml
+h5py

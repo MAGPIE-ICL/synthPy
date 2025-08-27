@@ -1,8 +1,25 @@
-name: docs_pages_workflow 
+name: docs_pages_workflow
 
-on: 
+on:
+  # Runs on pushes targeting the default branch
   push:
-    branches: [ main ]   
+    branches: ["main"]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch: 
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  # contents was set to read before and was what was preventing a push to gh-pages branch by the action
+  contents: write
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
   build_docs_job:
@@ -11,26 +28,48 @@ jobs:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v2.3.4
+        uses: actions/checkout@v4
+        with:
+          # this was not the issue - keeping for posterity though
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Allow git in Docker action - Fix git safe.directory in container - Set ownership
+        run: |
+          # this is to fix GIT not liking owner of the checkout dir
+          chown -R $(id -u):$(id -g) $PWD
+
+          GIT_GLOBAL="/home/runner/work/_temp/_github_home"
+          GITCONFIG_GLOBAL="${GIT_GLOBAL}/.gitconfig"
+
+          mkdir -p $GIT_GLOBAL
+
+          if ! [ -e "$GITCONFIG_GLOBAL" ] ; then
+            touch "$GITCONFIG_GLOBAL"
+          fi
+
+          # printf "[safe]\n\tdirectory = /github/workspace" > /home/runner/work/_temp/_github_home/.gitconfig
+          # printf "[safe]\n\tdirectory = /github/workspace/docs/build/html" > /home/runner/work/_temp/_github_home/.gitconfig
+
+          git config --file "$GITCONFIG_GLOBAL" --add safe.directory "/github/workspace"
+          git config --file "$GITCONFIG_GLOBAL" --add safe.directory "/github/workspace/docs/build/html"
+
+          # $GITHUB_WORKSPACE = /home/runner/work/synthPy/synthPy/docs/build/html, for some reason...
 
       - name: Set up Python
-        uses: actions/setup-python@v2.2.1
+        uses: actions/setup-python@v5
         with:
           python-version: 3.9
 
       - name: Install dependencies
         run: |
-          python -m pip install -U sphinx
-          python -m pip install sphinx-rtd-theme
+          python -m pip install -U -r docs/requirements.txt
 
       - name: make the sphinx docs
         run: |
           mkdir -p docs
           make -C docs clean
           make -C docs html
-
-      - name: Mark repo as safe
-        run: git config --global --add safe.directory $GITHUB_WORKSPACE
 
       - name: Init new repo in dist folder and commit
         run: |
@@ -42,7 +81,7 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git commit -m 'deploy'
-  
+
       - name: Force push to destination branch
         uses: ad-m/github-push-action@v0.5.0
         with:

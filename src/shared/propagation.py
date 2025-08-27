@@ -1,7 +1,7 @@
 import jax.numpy as jnp
 
 # Need to backproject to ne volume, then find angles
-def ray_to_Jonesvector(rays, ne_extent, *, probing_direction = 'z', keep_current_plane = False, return_E = False):
+def ray_to_Jonesvector(rays, *, ne_extent = None, probing_direction = 'z', keep_current_plane = False, return_E = False):
     # * forces keep_current_plane and return_E to be keyword-only arguments
     # meaning .. return_E = True (missing out keep_current_plane) will work as it will not rely on position
     """
@@ -21,6 +21,12 @@ def ray_to_Jonesvector(rays, ne_extent, *, probing_direction = 'z', keep_current
         [type]: [description]
     """
 
+    if ne_extent is None and keep_current_plane == False:
+        from shared.printing import colour
+        print(colour.BOLD + "\nne_extent is only not required if keep_current_plane is set to True, setting keep_current_plane = True for you." + colour.END)
+
+        keep_current_plane = True
+
     Np = rays.shape[1] # number of photons
 
     ray_p = jnp.zeros((4, Np))
@@ -32,10 +38,10 @@ def ray_to_Jonesvector(rays, ne_extent, *, probing_direction = 'z', keep_current
     # Resolve distances and angles
     # YZ plane
     if(probing_direction == 'x'):
-        t_bp = (x - ne_extent) / vx
-
         # Positions on plane
         if not keep_current_plane:
+            t_bp = (x - ne_extent) / vx
+
             ray_p = ray_p.at[0].set(y - vy * t_bp)
             ray_p = ray_p.at[2].set(z - vz * t_bp)
         else:
@@ -47,8 +53,6 @@ def ray_to_Jonesvector(rays, ne_extent, *, probing_direction = 'z', keep_current
         ray_p = ray_p.at[3].set(jnp.arctan(vz / vx))
     # XZ plane
     elif(probing_direction == 'y'):
-        t_bp = (y - ne_extent) / vy
-
         #
         # I have switched x & z for the sake of consistent ordering of the axes
         # Standardised in keeping with positive 'forward' notation, etc. x * y = z but don't do y * x = -z
@@ -58,6 +62,8 @@ def ray_to_Jonesvector(rays, ne_extent, *, probing_direction = 'z', keep_current
 
         # Positions on plane
         if not keep_current_plane:
+            t_bp = (y - ne_extent) / vy
+
             ray_p = ray_p.at[0].set(z - vz * t_bp)
             ray_p = ray_p.at[2].set(x - vx * t_bp)
         else:
@@ -69,10 +75,10 @@ def ray_to_Jonesvector(rays, ne_extent, *, probing_direction = 'z', keep_current
         ray_p = ray_p.at[3].set(jnp.arctan(vx / vy))
     # XY plane
     elif(probing_direction == 'z'):
-        t_bp = (z - ne_extent) / vz
-
         # Positions on plane
         if not keep_current_plane:
+            t_bp = (z - ne_extent) / vz
+
             ray_p = ray_p.at[0].set(x - vx * t_bp)
             ray_p = ray_p.at[2].set(y - vy * t_bp)
         else:

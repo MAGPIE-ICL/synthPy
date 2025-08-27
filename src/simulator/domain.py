@@ -14,11 +14,6 @@ from shared.utils import memory_report
 from shared.utils import getsizeof_default
 
 class ScalarDomain(eqx.Module):
-    """
-    A class to hold and generate scalar domains.
-    This contains also the method to propagate rays through the scalar domain
-    """
-
     s: jnp.float32
     s1: jnp.float32
     s2: jnp.float32
@@ -82,21 +77,67 @@ class ScalarDomain(eqx.Module):
 
     def __init__(self, lengths, dims, *, ne_type = None, inv_brems = False, phaseshift = False, B_on = False, probing_direction = 'z', auto_batching = True, iteration = 1, region_count = 1, leeway_factor = None, coord_backup = None, future_dims = None, extra_info = False, memory_reporting = False, Np = None,
         s = None, s1 = None, s2 = None, Ly = None, ne_0 = None, ne = None, B = None, Bmax = None, Te = None, Te_min = None, Z = None):
-
         """
-        Example:
-            N_V = 100
-            M_V = 2*N_V+1
-            ne_extent = 5.0e-3
-            ne_x = jnp.linspace(-ne_extent,ne_extent,M_V)
-            ne_y = jnp.linspace(-ne_extent,ne_extent,M_V)
-            ne_z = jnp.linspace(-ne_extent,ne_extent,M_V)
+        A class to set-up/generate the scalar simulation domains and store for later use.
 
-        Args:
-            x (float array): x coordinates, m
-            y (float array): y coordinates, m
-            z (float array): z coordinates, m
-            extent (float): physical size, m
+        :param lengths: Specifies the size of the domain, this is full length, so +/- half this length from the origin.
+            e.g. 2mm means -1mm --> 1mm size
+        :type lengths: shared.utils.generic_valid_types
+
+        :param dims: Specifies the resolution of the domain, number of divisions in each axis from which the cells are formed.
+        :type dims: shared.utils.generic_valid_types
+
+        :param ne_type: Sets the type of domain for the class functions to allocate.
+        :type ne_type: str or None
+
+        :param inv_brems: Disables python multithreading to prevent conflict with jax parallelisation in some instances.
+        :type inv_brems: bool (default = True)
+
+        :param phaseshift: Enable 64-bit values in jax (double precision floating point arithmetic).
+        :type phaseshift: bool (default = False)
+
+        :param B_on: Enables debug flags, increases runtime.
+        :type B_on: bool (default = False)
+
+        :param probing_direction: Set's the direction the beam is propagating in.
+        :type probing_direction: char (default = 'z')
+
+        :param auto_batching: Enable automatic domain and ray batching algorithm.
+        :type auto_batching: bool (default = True)
+
+        :param iteration: Indicates which batch of rays this is, important to distinguish if it is the first or not.
+        :type iteration: int (default = 1)
+
+        :param region_count: The number of regions the domain is batched into.
+        :type region_count: int, default: 1
+
+        :param leeway_factor: Scalar to memory usage estimations, used to give extra leeway to total predictions.
+        :type leeway_factor: float, default: 1.1 - 10% margin
+
+        :param coord_backup: Co-ordinates of the previous domain object.
+        :type coord_backup: jax.Array, default: None
+
+        :param future_dims: Array of dim allocations for past/current/future domain objects.
+        :type future_dims: jax.Array, default: None
+
+        :param extra_info: Flag to enable printing of extra information - namely domain parameters.
+        :type extra_info: bool, default: False
+
+        :param memory_reporting: Flag to enable priting of memory information.
+        :type memory_reporting: bool, default: False
+
+        :param Np: The total number of rays to be simulated - needs to be set if intending to batch ray generation.
+        :type Np: int, default: None
+
+        + plus an assortment of paramters for domain generation that can be set to override defaults
+            (s, s1, s2, Ly, ne_0, ne, B, Bmax, Te, Te_min, Z)
+
+        :raise Exception: If lengths or dims are an array of len(...) != 1 but not len(...) == 3
+        :raise AssertionError: If ne_type is changed from the default but not set to a valid type.
+        :raise AssertionError: If probing_direction is not == "x", "y" or "z".
+
+        :return: Returns an equinox.Module inheriting object containing information about and the generated/imported domain itself.
+        :rtype: simulator.domain.ScalarDomain
         """
 
         # initalise
@@ -150,8 +191,8 @@ class ScalarDomain(eqx.Module):
         if leeway_factor is not None:
             self.leeway_factor = leeway_factor
         else:
-            # set to 2 as a result of concerns of ray memory size
-            self.leeway_factor = 2
+            # set to 1.1 by default, gives 10% leeway in prediction
+            self.leeway_factor = 1.1
 
         self.extra_info = extra_info
         # not used right now but probably will be in the future so not bothering to remove
@@ -164,11 +205,11 @@ class ScalarDomain(eqx.Module):
 
         self.ray_batch_count = 1
 
-        valid_types = (int, np.int32, np.int64, jnp.int32, jnp.int64, float, np.float32, np.float64, jnp.float32, jnp.float64)
-
         ##
         ## NOT FORCING THESE CONVERSIONS MAY CAUSE ISSUES WITH EQUINOX CLASS LATER DOWN THE LINE DEPENDING ON USER INPUT
         ##
+
+        from shared.utils import generic_valid_types as valid_types
 
         # if 1 length given, assumes all are the same
         if isinstance(lengths, valid_types):
@@ -219,8 +260,12 @@ class ScalarDomain(eqx.Module):
             # 2 for ne and ne_nc in calc_dndr(...) before ne is deleted
             # at peak mem usage ne should have been deleted, therefore this contributes only 1 domain
             # +1 for ne_interp
-            # +2 for the 2 sqeuentially repeated domain sized allocations in dndr(...)
-            allocation_count = 4
+            # +2 for the 2 sequentially repeated domain sized allocations in dndr(...)
+
+            # 1 for ne
+            # +1 for sequential interps (dndx, dndy, dndz)
+            # no more need for domain allocation in dndr as now functionally interpolated
+            allocation_count = 2
 
             # up to +5 in calc_dndr(...) depending on the number of extra interps
             if B_on:
@@ -232,6 +277,16 @@ class ScalarDomain(eqx.Module):
                 allocation_count += 1
             if phaseshift:
                 allocation_count += 1
+
+            # compare to max allocation in domain setup and return the greatest
+            if self.ne_type == "test_null" or self.ne_type == "test_slab" or self.ne_type == "test_B":
+                allocation_count = max(allocation_count, 2)
+            elif self.ne_type == "test_linear_cos" or self.ne_type == "test_exponential_cos" or self.ne_type is None:
+                allocation_count = max(allocation_count, 3)
+            elif self.ne_type == "import":
+                allocation_count = max(allocation_count, 1)
+            else:
+                raise AssertionError("\nNo valid profile detected! Ensure passed name is correct or call yourself.")
 
             print("")
             if self.Np_total is not None:
@@ -251,7 +306,7 @@ class ScalarDomain(eqx.Module):
             print(" --> inc. +{}% variance margin".format(jnp.float32((self.leeway_factor - 1) * 100)))
 
             if self.Np_total is not None:
-                limiting_value = estimate_limit + ray_memory_raw
+                limiting_value = estimate_limit + ray_memory_raw * self.leeway_factor
                 print("Total estimated maximum: {}".format(mem_conversion(limiting_value)))
             else:
                 limiting_value = estimate_limit
@@ -259,6 +314,8 @@ class ScalarDomain(eqx.Module):
             # when jnp.float32 is not used, will cause overflow error if 64 bit floats are not enabled
             if limiting_value > np.float64(memory_stats['free_raw']):
                 from math import ceil
+                from math import floor
+
                 if self.Np_total is None:
                     print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
                 else:
@@ -271,7 +328,8 @@ class ScalarDomain(eqx.Module):
                 ## Then call generate_electron_density_profile(...) and re-do calculations with end of prior domain
                 ##
 
-                self.region_count = ceil((limiting_value - ray_memory_raw * self.leeway_factor / self.ray_batch_count) / np.float64(memory_stats['free_raw']))
+                #self.region_count = ceil((limiting_value - ray_memory_raw / self.ray_batch_count) / np.float64(memory_stats['free_raw']))
+                self.region_count = ceil(np.float64(predicted_domain_allocation * allocation_count) / (np.float64(memory_stats['free_raw']) - ceil(ray_memory_raw / self.ray_batch_count)))
 
                 self.coord_backup = jnp.float32(jnp.linspace(
                    -self.lengths[['x', 'y', 'z'].index(self.probing_direction)] / 2,
@@ -348,7 +406,7 @@ class ScalarDomain(eqx.Module):
                 self.z_n = len(self.z)
                 self.dims = self.dims.at[2].set(self.z_n)
             else:
-                assert colour.BOLD + "Invalid entry for probing_direction!" + colour.END
+                raise AssertionError(colour.BOLD + "Invalid entry for probing_direction!" + colour.END)
 
         print("\nCoordinates have shape of ({}, {}, {})".format(len(self.x), len(self.y), len(self.z)), end = " --> ")
 
@@ -388,6 +446,10 @@ class ScalarDomain(eqx.Module):
                 self.ne = jnp.zeros((self.dims[0], self.dims[1], self.dims[2]))
         else:
             print("\nUsing imported ne domain. Be careful that your import matches with other passed variables, this is not sanity checked by the init function.")
+
+            self.XX = None
+            self.YY = None
+            self.ZZ = None
 
         if self.extra_info:
             from shared.utils import round_to_n
@@ -439,6 +501,18 @@ class ScalarDomain(eqx.Module):
 
     #@partial(jax.jit, static_argnames=("self",))  
     def generate_electron_density_profile(self):
+        """
+        Generate/import the selected electron density profile
+
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :raise AssertionError: If ne_type is changed from the default but not set to a valid type.
+
+        :return: No return, selects domain generation or import function and calls it from its assignment in the passed self object.
+        :rtype: None
+        """
+
         print("\nGenerating test", end = " ")
         if self.ne_type == "test_null":
             print("null -e field...")
@@ -463,7 +537,7 @@ class ScalarDomain(eqx.Module):
             self.ZZ = None
 
             self.test_linear_cos()
-        elif self.ne_type == "test_exponential_cos":
+        elif self.ne_type == "test_exponential_cos" or self.ne_type is None:
             print("exponential decay periodic -e field...")
             self.XX, self.YY, _ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)
 
@@ -481,7 +555,7 @@ class ScalarDomain(eqx.Module):
         elif self.ne_type == "import":
             print("pre-generated ne field is auto-imported if passed (not None)...")
         else:
-            assert "\nNo valid profile detected! Ensure passed name is correct or call yourself."
+            raise AssertionError("\nNo valid profile detected! Ensure passed name is correct or call yourself.")
 
         self.cleanup()
 
@@ -489,6 +563,12 @@ class ScalarDomain(eqx.Module):
     def test_null(self):
         """
         Null test, an empty cube
+
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :return: No return, exports the empty (zeroed) cubic domain as an attribute to the passed self object.
+        :rtype: None
         """
 
         self.ne = self.ne.at[:, :, :].set(jnp.zeros_like(self.XX))
@@ -496,14 +576,19 @@ class ScalarDomain(eqx.Module):
     #@partial(jax.jit, static_argnames=("self",))  
     def test_slab(self, *, s = 1, ne_0 = 2e23):
         """
-        A slab with a linear gradient in x:
-        n_e =  ne_0 * (1 + s*x/extent)
+        A slab with a linear gradient in x: n_e =  ne_0 * (1 + s * x / extent) - will cause a ray deflection in x
 
-        Will cause a ray deflection in x
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
 
-        Args:
-            s (int, optional): scale factor. Defaults to 1.
-            ne_0 ([type], optional): mean density. Defaults to 2e23 m^-3.
+        :param s: scale factor
+        :type s: float, default: 1
+
+        :param ne_0: mean electron density
+        :type ne_0: float, default: 2e23 m\ :sup:`-3`
+
+        :return: No return, generates domain as attribute to passed self object.
+        :rtype: None
         """
 
         if self.s is not None:
@@ -518,11 +603,23 @@ class ScalarDomain(eqx.Module):
         """
         Linearly growing sinusoidal perturbation
 
-        Args:
-            s1 (float, optional): scale of linear growth. Defaults to 0.1.
-            s2 (float, optional): amplitude of sinusoidal perturbation. Defaults to 0.1.
-            ne_0 ([type], optional): mean electron density. Defaults to 2e23 m^-3.
-            Ly (int, optional): spatial scale of sinusoidal perturbation. Defaults to 1.
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :param s1: scale of linear growth
+        :type s1: float, default: 0.1
+
+        :param s2:  amplitude of sinusoidal perturbation
+        :type 2: float, default: 0.1
+
+        :param ne_0: mean electron density
+        :type ne_0: float, default: 2e23
+
+        :param Ly: spatial scale of sinusoidal perturbation
+        :type Ly: float, default: 1
+
+        :return: No return, generates domain as attribute to passed self object.
+        :rtype: None
         """
 
         if self.s1 is not None:
@@ -541,10 +638,20 @@ class ScalarDomain(eqx.Module):
         """
         Exponentially growing/decaying sinusoidal perturbation
 
-        Args:
-            ne_0 ([type], optional): mean electron density. Defaults to 1e24 m^-3.
-            Ly (int, optional): spatial scale of sinusoidal perturbation. Defaults to 1e-3 m.
-            s ([type], optional): scale of exponential change. Defaults to -2e-3 m (exponential decay).
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :param ne_0: mean electron density
+        :type ne_0: float, default: 1e24 m\ :sup:`-3`
+
+        :param Ly: scale of exponential change
+        :type Ly: float, default: -2e-3 [exponential decay]
+
+        :param s: spatial scale of sinusoidal perturbation
+        :type s: float, default: 1e-3
+
+        :return: No return, generates domain as attribute to passed self object.
+        :rtype: None
         """
 
         if self.ne_0 is not None:
@@ -574,33 +681,48 @@ class ScalarDomain(eqx.Module):
     #@partial(jax.jit, static_argnames=("self",))  
     def external_ne(self):
         """
-        Load externally generated grid
+        Load externally generated MxMxM grid of electron density (ne) in m\ :sup:`-3`
 
-        Args:
-            ne ([type]): MxMxM grid of density in m^-3
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :return: No return, loads domain as an attribute to the self referenced object.
+        :rtype: None
         """
 
         self.ne = self.ne.at[:, :, :].set(self.ne)
 
     '''
     #@partial(jax.jit, static_argnames=("self",))  
-    def external_B(self, *, B):
+    def external_B(self):
         """
-        Load externally generated grid
+        Load externally generated MxMxMx3 grid of B field in T
 
-        Args:
-            B ([type]): MxMxMx3 grid of B field in T
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :return: No return, loads domain as an attribute to the self referenced object.
+        :rtype: None
         """
 
-        self.B = self.B.at[:, :, :].set(B)
+        self.B = self.B.at[:, :, :, :].set(B)
 
     #@partial(jax.jit, static_argnames=("self",))  
     def external_Te(self, *, Te, Te_min = 1.0):
         """
-        Load externally generated grid
+        Load externally generated MxMxM grid of electron temperature in eV
 
-        Args:
-            Te ([type]): MxMxM grid of electron temperature in eV
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :param Te: MxMxM grid of electron temperature in eV
+        :type Te: jax.Array or numpy.array of shape M^3
+
+        :param Te_min: Set the minimum temperature of the grid
+        :type Te_min: float, default: 1.0
+
+        :return: No return, loads domain as an attribute to the self referenced object.
+        :rtype: None
         """
 
         self.Te = self.Te.at[:, :, :].set(jnp.maximum(Te_min, Te))
@@ -613,6 +735,21 @@ class ScalarDomain(eqx.Module):
         Args:
             Z ([type]): MxMxM grid of ionisation
         """
+        """
+        Load externally generated MxMxM grid of electron temperature in eV
+
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :param Te: MxMxM grid of electron temperature in eV
+        :type Te: jax.Array or numpy.array of shape M^3
+
+        :param Te_min: Set the minimum temperature of the grid
+        :type Te_min: float, default: 1.0
+
+        :return: No return, loads domain as an attribute to the self referenced object.
+        :rtype: None
+        """
 
         self.Z = self.Z.at[:, :, :].set(Z)
     '''
@@ -620,11 +757,16 @@ class ScalarDomain(eqx.Module):
     #@partial(jax.jit, static_argnames=("self",))  
     def test_B(self, *, Bmax = 1.0):
         """
-        A Bz field with a linear gradient in x:
-        Bz =  Bmax*x/extent
+        Generate a Bz field with a linear gradient in x: Bz =  Bmax * x / extent
 
-        Args:
-            Bmax ([type], optional): maximum B field, default 1.0 T
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :param Bmax: Limiting max value B field in a cell
+        :type Te: float, default: 1.0 T [Tesla]
+
+        :return: No return, loads domain as an attribute to the self referenced object.
+        :rtype: None
         """
 
         if self.Bmax is not None:
@@ -637,10 +779,19 @@ class ScalarDomain(eqx.Module):
         """
         Export the current scalar electron density profile as a pvti file format, property added for future scalability to export temperature, B-field, etc.
 
-        Args:
-            property: str, 'ne': export the electron density (default)
-            fname: str, file path and name to save under. A VTI pointed to by a PVTI file are saved in this location. If left blank, the name will default to:
-                    ./plasma_PVTI_DD_MM_YYYY_HR_MIN
+        :param self: Part of the ScalarDomain class and thus takes in a self object.
+        :type self: simulator.domain.ScalarDomain
+
+        :param property: Sets the scalar field to export
+        :type property: str (default = "ne")
+
+        :param fname: file path and name to save under. A VTI pointed to by a PVTI file are saved in this location. If left blank, the name will default to: ./plasma_PVTI_DD_MM_YYYY_HR_MIN
+        :type fname: str or None
+
+        :raise Exception: Raises an exception if the desired scalar field is not loaded.
+
+        :return: Has no return, saves a file to disk.
+        :rtype: None
         """
 
         import pyvista as pv
@@ -657,7 +808,6 @@ class ScalarDomain(eqx.Module):
             fname = f'./plasma_PVTI_{property}_{day}_{month}_{year}_{hour}_{min}' #default fname to the current date and time 
 
         if property == 'ne':
-
             try: #check to ensure electron density has been added
                 jnp.shape(self.ne)
                 rnec = self.ne
@@ -711,6 +861,16 @@ class ScalarDomain(eqx.Module):
 
     #@jax.jit
     def cleanup(self):
+        """
+        Deallocates unused temporary meshgrid variables. Calls to shared.utils.dalloc(...)
+
+        :param self: Part of the ScalarDomain class and thus takes in a self object.
+        :type self: simulator.domain.ScalarDomain
+
+        :return: Updates the passed simulator.domain.ScalarDomain object.
+        :rtype: None
+        """
+
         if self.XX is not None:
             dalloc(self.XX)
         if self.YY is not None:

@@ -11,17 +11,35 @@ class Beam:
 # Initialise beam
     def __init__(self, Np, beam_size, divergence, ne_extent, *, probing_direction = 'z', beam_type = 'circular', seeded = False):
         """
-        [summary]
+        Initialises a number of rays (initial positions, velocities) that form the probing beam of some set shape, size, collimation and direction
+            -   sets up an object containing all this information
+            -   calls a class function that initialises the Beam based on this
 
-        Args:
-            self.Np (int): Number of photons
-            self.beam_size (float): beam radius, m
-            self.divergence (float): beam self.divergence, radians
-            ne_extent (float): size of electron density cube, m. Used in initialisation of ray starting positions in auto init_beam() call
-            self.probing_direction (str): direction of probing. I suggest 'z', the best tested
+        :param Np: Number of photons
+        :type Np: int
 
-        Returns:
-            s0, 9 x N float: N rays with (x, y, z, vx, vy, vz) in m, m/s and amplitude, phase and polarisation (a, p, r) 
+        :param beam_size: beam radius, m
+        :type beam_size: float
+
+        :param divergence: divergence of beam, radians
+        :type divergence: float
+
+        :param ne_extent: size of electron density cube, m. Used in initialisation of ray starting positions in auto init_beam() call
+        :type ne_extent: float
+
+        :param probing_direction: direction of probing. I suggest "z", the best tested
+        :type probing_direction: str (default = "z")
+
+        :param beam_type: The shape of the probing beam
+        :type beam_type: str (allowed: "circular", "square", "rectangular", "linear", "even", "rect_trackers") (default = "circular")
+
+        :param seeded: Sets a seed for when runs require consistency (eg. for benchmarks).
+        :type seeded: bool (default = False). So long and thanks for all the fish.
+
+        :raise AssertionError: If beam_size variable is not of the correct format for the selected beam shape.
+
+        :return: Returns a Beam object containing laser probe and ray information.
+        :rtype: simulator.beam.Beam
         """
 
         self.Np = np.int64(Np)
@@ -42,27 +60,31 @@ class Beam:
 
     def init_beam(self, ne_extent, seed):
         """
-        function designed to be called by the propagtor class during propagator init to complete the construction of the beam using parameters about the scalar domain
-        [summary]
-
-        Values from object:
-            self.Np (int): Number of photons
-            self.beam_size (float): beam radius, m
-            self.divergence (float): beam self.divergence, radians
-            ne_extent (float): size of electron density cube, m. Used to back propagate the rays to the start
-            self.probing_direction (str): direction of probing. I suggest 'z', the best tested
+        Function designed to be called by the Beam class during probe initialisation to complete the construction ray construction from beam parameterss.
 
         Updated object definitions:
             s0, 9 x N float: N rays with (x, y, z, vx, vy, vz) in m, m/s and amplitude, phase and polarisation (a, p, r)
 
-        Returns:
-            Beam (class Beam): Updated Beam object instance of class
+        :param self: Beam object containing its parameters
+        :type fn: simulator.beam.Beam object
+
+        :param ne_extent: Shall be deprecated soon and passed directly from self after forced negative of array is fixed.
+        :type ne_extent: float or array of floats
+
+        :param seed: Shall be deprecated soon and passed directly from self after forced negative of array is fixed.
+        :type seed: int or None
+
+        :return: No return, updates then self object instance of class simulator.beam.Beam
+        :rtype: None
         """
 
         from scipy.constants import c
 
         s0 = jnp.zeros((9, self.Np))
         if(self.beam_type == 'circular'):
+            from shared.utils import generic_valid_types as valid_types
+            assert isinstance(self.beam_size, valid_types), "\nReceived beam_size of shape" + len(self.beam_size) + "expected a float."
+
             # position, uniformly within a circle
             t  = 2 * jnp.pi * random_array(self.Np, seed) #polar angle of position
 
@@ -105,6 +127,9 @@ class Beam:
                 s0 = s0.at[1, :].set(ne_extent)
                 s0 = s0.at[2, :].set(self.beam_size * u * jnp.sin(t))
         elif(self.beam_type == 'square'):
+            from shared.utils import generic_valid_types as valid_types
+            assert isinstance(self.beam_size, valid_types), "\nReceived beam_size of shape" + len(self.beam_size) + "expected a float."
+
             # position, uniformly within a square
             t  = 2 * random_array(self.Np, seed) - 1.0
             u  = 2 * random_array(self.Np, seed) - 1.0
@@ -194,6 +219,9 @@ class Beam:
             del beam_size_1
             del beam_size_2
         elif(self.beam_type == 'linear'):
+            from shared.utils import generic_valid_types as valid_types
+            assert isinstance(self.beam_size, valid_types), "\nReceived beam_size of shape" + len(self.beam_size) + "expected a float."
+
             # position, uniformly along a line - probing direction is defaulted z, solved in x,z plane
             t  = 2 * random_array(self.Np, seed) - 1.0
             # angle
@@ -226,6 +254,9 @@ class Beam:
                     u.append(i / num_of_circles)
                     t.append(j * 2 * jnp.pi / (i * 6))  
         elif(self.beam_type == 'rect_trackers'):
+            size_dim = len(self.beam_size)
+            assert size_dim == 2, colour.BOLD + "\nERROR: " + colour.END + "Must pass a list of length 2 to initialise a rectangular beam," + size_dim + "item was passed."
+
             # Randomly choose N_trackers indices to mark as tracking particles
             # tracker_indices = jnp.random.choice(self.Np, N_trackers, replace=False)
 
@@ -285,8 +316,8 @@ class Beam:
             del beam_size_1
             del beam_size_2
         else:
-            print("self.beam_type unrecognised! Accepted args: circular, square, rectangular, linear")
-        
+            print("\nself.beam_type unrecognised! Accepted args: circular, square, rectangular, linear, even, rect_trackers.")
+
         del t
         del u
         del ϕ
@@ -306,6 +337,12 @@ class Beam:
         """
         Saves the output rays as a binary numpy format for minimal size.
         Auto-names the file using the current date and time.
+
+        :param fn: Overrides the default filename if set
+        :type fn: str or None
+
+        :return: No return, saves a file to disk.
+        :rtype: None
         """
 
         from datetime import datetime
