@@ -10,6 +10,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-r", "--rays", type = int)
 parser.add_argument("-c", "--cores", type = int)
 parser.add_argument("-p", "--importPath", type = str)
+parser.add_argument("-s", "--simPath", type = str)
 args = parser.parse_args()
 
 if args.rays is not None:
@@ -27,6 +28,12 @@ if args.importPath is not None:
 else:
     # attempts to fix path issues - need to find a resolution to the problem of relative paths on the HPC
     importPath = '/rds/general/user/sm5625/home/synthPy/src/'
+
+simPath = None
+if args.simPath is not None:
+    simPath = args.simPath
+else:
+    simPath = importPath + "../evaluation/benchmarks/turbBoxLargeTest/radmeshablation_3d_prp_CH_ug_3rd_hdf5_plt_cnt_0228"
 
 sys.path.insert(0, importPath)
 
@@ -53,10 +60,10 @@ from shared.utils import memory_report
 from shared.utils import mem_conversion
 
 columns = ["dims", "rays", "runtime", "legacyRuntime", "domainSize", "raySize", "totalMemory"]
-df = pd.DataFrame(columns=columns)
+df = pd.DataFrame(columns = columns)
 
 #load hdf
-ne, dims, spacing = utilIO.hdf_readin(str(importPath + "../evaluation/benchmarks/turbBoxLargeTest/radmeshablation_3d_prp_CH_ug_3rd_hdf5_plt_cnt_0228"))
+ne, dims, spacing = utilIO.hdf_readin(str())
 
 '''
 # multiply domain to match real size experimental target
