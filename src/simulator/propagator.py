@@ -701,30 +701,29 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                             if e.errno != errno.EEXIST:
                                 raise
 
-                    from utils.handle_filetypes import compress_jax_matrix_to_hdf5 as compressed_solution_export
-                    compressed_solution_export(
+                    tar_gz_path = target_folder + "/ray_output_total_" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".hdf5.tar.gz"
+
+                    '''
+                    from utils.handle_filetypes import save_jax_matrix_to_hdf5 as compressed_solution_export
+                    filepath, filename = compressed_solution_export(
                         ray_to_Jonesvector(sol.ys[:,-1].reshape(9, Np), ne_extent = probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E)[0],
                         file_path = target_folder
                         #filename = None, file_path = ".", dataset_name = 'data', compression = 'gzip', compression_level = 4
                     )
 
+                    from utils.handle_filetypes import move_file_to_tar_gz
+                    move_file_to_tar_gz(tar_gz_path, filepath)
                     '''
-                    sol_host = jax.device_get(sol)
-                    del sol
 
-                    shape = sol_host.shape
-                    dtype = sol_host.dtype
+                    from utils.handle_filetypes import compress_matrix_to_hdf5_BytesIO
+                    from utils.handle_filetypes import stream_data_to_tar_gz
 
-                    # Create or open a memmap file
-                    mmap_file = np.memmap(f'solution_{ray_index}.dat', dtype=dtype, mode='w+', shape=shape)
-
-                    # Write data directly
-                    mmap_file[:] = sol_host[:]
-                    del sol_host
-
-                    mmap_file.flush()
-                    del mmap_file
-                    '''
+                    filename = "run_" + str(ray_index)
+                    stream_data_to_tar_gz(tar_gz_path, filename,
+                        compress_matrix_to_hdf5_BytesIO(
+                            ray_to_Jonesvector(sol.ys[:,-1].reshape(9, Np), ne_extent = probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E)[0]
+                        )
+                    )
                 else:
                     solutions[ray_index] = sol
                     del sol

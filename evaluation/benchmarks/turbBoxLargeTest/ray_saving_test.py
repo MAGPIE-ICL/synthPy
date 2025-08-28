@@ -114,11 +114,38 @@ for i, row in enumerate(rf):
 print()
 
 from shared.propagation import ray_to_Jonesvector
-from utils.handle_filetypes import compress_jax_matrix_to_hdf5 as compressed_solution_export
-compressed_solution_export(
+'''
+from utils.handle_filetypes import save_jax_matrix_to_hdf5 as compressed_solution_export
+_, _ = compressed_solution_export(
     ray_to_Jonesvector(rf, ne_extent = probing_extent, probing_direction = probing_direction, return_E = False)[0],
     filepath = target_folder
     #filename = None, filepath = ".", dataset_name = 'data', compression = 'gzip', compression_level = 4
 )
+'''
+
+target_folder = os.getcwd() + "/saves"
+if not os.path.isdir(target_folder):
+    try:
+        os.mkdir(target_folder)
+    except OSError as e:
+        print("\nFailed to create folder at " + target_folder)
+        if e.errno != errno.EEXIST:
+            raise
+
+tar_gz_path = target_folder + "/ray_output_total_" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".hdf5.tar.gz"
+
+from utils.handle_filetypes import compress_matrix_to_hdf5_BytesIO
+from utils.handle_filetypes import stream_data_to_tar_gz
+
+filename = "run_" + str(1)
+stream_data_to_tar_gz(tar_gz_path, filename,
+    compress_matrix_to_hdf5_BytesIO(
+        ray_to_Jonesvector(rf, ne_extent = probing_extent, probing_direction = probing_direction, return_E = False)[0]
+    )
+)
+
+from utils.handle_filetypes import load_array_member_from_hdf5_tar_gz
+array = load_array_member_from_hdf5_tar_gz(tar_gz_path, filename)
+print(array)
 
 print(colour.BOLD + "\nDuration of " + str(duration) + " sec for domain of size " + str(dims) + " ^3 and " + str(Np) + " rays with legacy solver." + colour.END)
