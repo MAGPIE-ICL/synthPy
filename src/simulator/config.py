@@ -124,7 +124,7 @@ def jax_init(force_device = None, core_limit = None, extra_info = False, disable
     :return: No return, sets up configuration variables and import without returning values.
     :rtype: None
     """
-    
+
     import sys
     import os
 

@@ -285,6 +285,7 @@ def lens_cutoff(rf, Jf = None, *, L = 400, R = 25):
         rf (jax.Array): Masked Jonesvector
     """
 
+    print(jnp.pow(jnp.pow(L * jnp.tan(rf[1]) + rf[0], 2) + jnp.pow(L * jnp.tan(rf[3]) + rf[2], 2), 0.5))
     mask = jnp.pow(jnp.pow(L * jnp.tan(rf[1]) + rf[0], 2) + jnp.pow(L * jnp.tan(rf[3]) + rf[2], 2), 0.5) <= R
 
     rf = jnp.asarray(rf)[:, mask]

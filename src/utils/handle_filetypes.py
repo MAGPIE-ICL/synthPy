@@ -190,7 +190,7 @@ def compress_jax_matrix_to_hdf5(input_matrix, *, filename = None, filepath = Non
 
     if filename is None:
         from datetime import datetime
-        filename = "ray_output" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".hdf5." + str(compression)
+        filename = "ray_output" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".hdf5"
 
     if filepath is None:
         filepath = os.getcwd()

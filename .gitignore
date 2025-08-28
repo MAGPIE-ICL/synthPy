@@ -17,11 +17,14 @@ evaluation/benchmarks/memory/memory-*
 evaluation/benchmarks/memory/domain_vs_rays_*
 
 evaluation/benchmarks/runtime/benchmark*
-evaluation/benchmarks/runtime/*.csv
-evaluation/benchmarks/runtime/*.pdf
+*.csv
+*.pdf
 evaluation/benchmarks/runtime/*.txt
-evaluation/benchmarks/runtime/*.png
-evaluation/benchmarks/runtime/*.zip
+*.png
+*.zip
+*.gz
+*.tar
+*.hdf5
 
 evaluation/benchmarks/turbBoxLargeTest/radmeshablation_3d_prp_CH_ug_3rd_hdf5_plt_cnt_0228
 
