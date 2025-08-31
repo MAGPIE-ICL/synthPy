@@ -63,7 +63,7 @@ columns = ["dims", "rays", "runtime", "legacyRuntime", "domainSize", "raySize", 
 df = pd.DataFrame(columns = columns)
 
 #load hdf
-ne, dims, spacing = utilIO.hdf_readin(str())
+ne, dims, spacing = utilIO.hdf_readin(str(simPath))
 
 '''
 # multiply domain to match real size experimental target
