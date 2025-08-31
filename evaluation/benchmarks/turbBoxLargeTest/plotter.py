@@ -39,14 +39,10 @@ def rays_to_dfs(rays):
     Converts ray data into DataFrames for position and angle spaces.
     """
 
-    print(rays)
-    rays[0] *= 1e3
-    rays[2] *= 1e3
-    rays, _ = diag.lens_cutoff(rays)
-    print(rays)
+    #rays, _ = diag.lens_cutoff(rays)
 
-    mask = (rays[0] >= -10) & (rays[0] <= 10) & \
-           (rays[2] >= -10) & (rays[2] <= 10)
+    #mask = (rays[0] >= -10e-3) & (rays[0] <= 10e-3) & \
+    #       (rays[2] >= -10e-3) & (rays[2] <= 10e-3)
 
     # Position in mm
     df_position = pd.DataFrame({
@@ -54,12 +50,12 @@ def rays_to_dfs(rays):
         'y': rays[2] * 1e3
     })
 
-    mask = (rays[1] >= 0) & (rays[1] <= 0.5) & \
-           (rays[3] >= -5) & (rays[3] <= 5)
+    #mask = (rays[1] >= 0) & (rays[1] <= 0.5) & \
+    #       (rays[3] >= -5) & (rays[3] <= 5)
 
     df_angles = pd.DataFrame({
-        'theta': rays[1][mask],
-        'phi': rays[3][mask]
+        'theta': rays[1],#[mask],
+        'phi': rays[3]#[mask]
     })
 
     return df_position, df_angles
@@ -98,7 +94,9 @@ def general_ray_plots(rf, nbins, lwl = 1032e-9, *, l_x = 0, u_x = 0.3, l_y = -5,
 
     # diag.lens_cutoff may not make a difference to the angle plot (after already masked seperately) - but it does to this
     # diag.lens_cutoff(...) passes a tuple of rf and Jf (= None), not just rf
-    rf, _ = diag.lens_cutoff(rf)
+    #rf, _ = diag.lens_cutoff(rf)
+
+    print(rf)
 
     _, _, _, im1 = ax1.hist2d(rf[0] * 1e3, rf[2] * 1e3, bins=(nbins, nbins), cmap=plt.cm.jet)
     plt.colorbar(im1, ax = ax1)
@@ -148,6 +146,7 @@ def general_ray_plots(rf, nbins, lwl = 1032e-9, *, l_x = 0, u_x = 0.3, l_y = -5,
     plt.show()
 
 def main():
+    '''
     SAVE_DIR = "saves"
 
     file_list = sorted([
@@ -161,19 +160,35 @@ def main():
 
         with h5py.File(file_path, 'r') as hf:
             data = hf['data'][:]
+    '''
+    from utils.handle_filetypes import load_array_member_from_hdf5_tar_gz
+    data = load_array_member_from_hdf5_tar_gz("saves/ray_output_total_20250829-164822.hdf5.tar.gz", "run_1")
+    print(data)
 
-        df_pos, df_ang = rays_to_dfs(data)
+    #data, _ = diag.lens_cutoff(data)
+    #df_pos, df_ang = rays_to_dfs(data)
 
-        # Position histogram with fixed axis limits (matching general_ray_plots)
-        render_histogram(df_pos, 'x', 'y', filename=f"position_frame_{i:05d}")
+    # Position histogram with fixed axis limits (matching general_ray_plots)
+    #render_histogram(df_pos, 'x', 'y', filename=f"position_frame_{0:05d}")
 
-        general_ray_plots(data, 256)
+    #in the diagnostic initialisation, details on the lens configurations, and detector dimensions can be specified
+    refractometer = diag.Refractometry(1032e-9, data)
+    # cam't clear_mem if you want to generate other graphs afterwards
+    refractometer.plot_rays(bin_scale = 1, clear_mem = False)
 
-        # Angle histogram with fixed axis limits
-        #render_histogram(df_ang, 'theta', 'phi', filename=f"angle_frame_{i:05d}")
+    #information accessed by .H(istogram) , e.g plt.imshow(refractometer.H)
 
-        # Optional: Plot the shadowgraphy and refractometry images as in general_ray_plots
-        # This part depends on your diag module and matplotlib, so keep that as is.
+    #plt.imshow(refractometer.H, cmap='hot', interpolation='nearest', clim = (0, 2))
+    plt.imshow(refractometer.H, cmap = 'hot', interpolation = 'nearest', clim = (0.5, 1))
+    plt.show()
+
+    general_ray_plots(data, 256)
+
+    # Angle histogram with fixed axis limits
+    #render_histogram(df_ang, 'theta', 'phi', filename=f"angle_frame_{i:05d}")
+
+    # Optional: Plot the shadowgraphy and refractometry images as in general_ray_plots
+    # This part depends on your diag module and matplotlib, so keep that as is.
 
 if __name__ == "__main__":
     main()

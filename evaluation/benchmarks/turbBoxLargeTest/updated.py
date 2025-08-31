@@ -126,11 +126,11 @@ ne_extent = probing_extent  # so the beam knows where to initialise initial posi
 divergence = 0.05e-3
 beam_type = "rectangular"
 
-_, _, duration = p.solve((beam_size, divergence, ne_extent, probing_direction, beam_type, True), domain, probing_extent, verbose = False)
+_, _, duration = p.solve((beam_size, divergence, ne_extent, probing_direction, beam_type, False), domain, probing_extent, verbose = False)
 
 total = memory_report()['used']
 
-print(colour.BOLD + "\nDuration of " + str(duration) + " sec for domain of size " + str(dims[i]) + " ^3 and " + str(rays[j]) + " rays with legacy solver." + colour.END)
+print(colour.BOLD + "\nDuration of " + str(duration) + " sec for domain of size " + str(dims[i]) + " and " + str(int(rays[j])) + " rays with legacy solver." + colour.END)
 
 new_entry = pd.DataFrame([{
     "dims": dims[i],

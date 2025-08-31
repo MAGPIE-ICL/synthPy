@@ -364,9 +364,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
         depth_traced = 0.0
 
         if ray_batch_count > 1 or unbatched_beam:
-            temp_beam = Beam(Np, beam_size = beam[0], divergence = beam[1], ne_extent = beam[2], probing_direction = beam[3], beam_type = beam[4], seeded = beam[5])
-            s0_import = temp_beam.s0
-            del temp_beam
+            s0_import = Beam(Np, beam_size = beam[0], divergence = beam[1], ne_extent = beam[2], probing_direction = beam[3], beam_type = beam[4], seeded = beam[5]).s0
 
         single_ray_size = getsizeof_default(s0_import[:, 0])
         print("\nEst. size in memory of rays (1 = {}): {}".format(mem_conversion(single_ray_size), mem_conversion(single_ray_size * Np)))
@@ -742,5 +740,5 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                 # need to confirm there is no mismatch between total depth_traced and the target probing_depth
                 return process_results(solutions, depth_traced, trace_depth, ScalarDomain.probing_direction, return_E, duration, save_points_per_region, ray_batch_count, verbose)
     else:
-        print("\nData output as several memmap files due to limitations of vram/ram space.")
-        print("Either collate output files or iteratively generate images.")
+        print("\nData output as a hdf4.tar.gz file due to limitations of vram/ram space.")
+        print("Graphs can be iteratively plotted by cycling through the 'run_n' entries after extraction from .tar.gz format.")
