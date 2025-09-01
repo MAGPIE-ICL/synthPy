@@ -43,7 +43,7 @@ if args.memoryLimit is not None:
 sys.path.insert(0, importPath)
 
 import simulator.config as config
-config.jax_init(core_limit = cores, jax_updated = False)
+config.jax_init(core_limit = cores, jax_updated = False, extra_info = True, debugging = True)
 
 import jax.numpy as jnp
 
