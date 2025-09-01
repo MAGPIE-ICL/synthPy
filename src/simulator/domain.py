@@ -319,40 +319,46 @@ class ScalarDomain(eqx.Module):
 
             # when jnp.float32 is not used, will cause overflow error if 64 bit floats are not enabled
             if limiting_value > np.float64(memory_stats['free_raw']):
-                from math import ceil
-                from math import floor
+                if self.ne is None:
+                    from math import ceil
+                    from math import floor
 
-                if self.Np_total is None:
-                    print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
+                    if self.Np_total is None:
+                        print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
+                    else:
+                        print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN + RAYS CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
+                        self.ray_batch_count = np.int64(ceil(ray_memory_raw * self.leeway_factor / np.float64(memory_stats['free_raw'])))
+                    print(" --> Auto-batching domain based on memory available and domain size estimate...")
+
+                    ##
+                    ## Used backed up information to re-assign to ScalarDomain in propagator
+                    ## Then call generate_electron_density_profile(...) and re-do calculations with end of prior domain
+                    ##
+
+                    #self.region_count = ceil((limiting_value - ray_memory_raw / self.ray_batch_count) / np.float64(memory_stats['free_raw']))
+                    self.region_count = ceil(np.float64(predicted_domain_allocation * allocation_count) / (np.float64(memory_stats['free_raw']) - ceil(ray_memory_raw / self.ray_batch_count)))
+
+                    self.coord_backup = jnp.float32(jnp.linspace(
+                    -self.lengths[['x', 'y', 'z'].index(self.probing_direction)] / 2,
+                        self.lengths[['x', 'y', 'z'].index(self.probing_direction)] / 2,
+                        self.dims[['x', 'y', 'z'].index(self.probing_direction)]
+                    ))
+
+                    dim_per_region = self.dims[['x', 'y', 'z'].index(self.probing_direction)] // self.region_count
+                    self.future_dims = jnp.concatenate([
+                        jnp.expand_dims(0, axis = 0), jnp.array([dim_per_region] * self.region_count),
+                        jnp.array([self.dims[['x', 'y', 'z'].index(self.probing_direction)] - dim_per_region * self.region_count])
+                    ])
+
+                    print(" --> Batching calculation completed. Domain will be split into " + str(self.region_count) + " regions with " + str(dim_per_region) + " dims per region.")
+                    print(colour.BOLD + "\nWARNING:" + colour.END + " This functionality will cause the solver to run slower due to domain regeneration, for optimal performance, increase the memory available to this program.")
+                    if self.Np_total is not None:
+                        print(" --> The domain is batched with the goal of minimising ray batching. Ray batches introduce sequantiality which reduces speed.")
                 else:
                     print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN + RAYS CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
                     self.ray_batch_count = np.int64(ceil(ray_memory_raw * self.leeway_factor / np.float64(memory_stats['free_raw'])))
-                print(" --> Auto-batching domain based on memory available and domain size estimate...")
-
-                ##
-                ## Used backed up information to re-assign to ScalarDomain in propagator
-                ## Then call generate_electron_density_profile(...) and re-do calculations with end of prior domain
-                ##
-
-                #self.region_count = ceil((limiting_value - ray_memory_raw / self.ray_batch_count) / np.float64(memory_stats['free_raw']))
-                self.region_count = ceil(np.float64(predicted_domain_allocation * allocation_count) / (np.float64(memory_stats['free_raw']) - ceil(ray_memory_raw / self.ray_batch_count)))
-
-                self.coord_backup = jnp.float32(jnp.linspace(
-                   -self.lengths[['x', 'y', 'z'].index(self.probing_direction)] / 2,
-                    self.lengths[['x', 'y', 'z'].index(self.probing_direction)] / 2,
-                       self.dims[['x', 'y', 'z'].index(self.probing_direction)]
-                ))
-
-                dim_per_region = self.dims[['x', 'y', 'z'].index(self.probing_direction)] // self.region_count
-                self.future_dims = jnp.concatenate([
-                    jnp.expand_dims(0, axis = 0), jnp.array([dim_per_region] * self.region_count),
-                    jnp.array([self.dims[['x', 'y', 'z'].index(self.probing_direction)] - dim_per_region * self.region_count])
-                ])
-
-                print(" --> Batching calculation completed. Domain will be split into " + str(self.region_count) + " regions with " + str(dim_per_region) + " dims per region.")
-                print(colour.BOLD + "\nWARNING:" + colour.END + " This functionality will cause the solver to run slower due to domain regeneration, for optimal performance, increase the memory available to this program.")
-                if self.Np_total is not None:
-                    print(" --> The domain is batched with the goal of minimising ray batching. Ray batches introduce sequantiality which reduces speed.")
+                    print(" --> Auto-batching rays based on memory available and domain size estimate...")
+                    print(" --> Can't auto-batch the domain as it is imported (limitation will be resolved in the future)")
             else:
                 self.region_count = 1
         else:

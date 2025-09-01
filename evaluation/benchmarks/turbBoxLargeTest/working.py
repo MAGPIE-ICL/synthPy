@@ -67,56 +67,19 @@ from shared.utils import mem_conversion
 columns = ["dims", "rays", "runtime", "legacyRuntime", "domainSize", "raySize", "totalMemory"]
 df = pd.DataFrame(columns = columns)
 
-#load hdf
-ne, dims, spacing = utilIO.hdf_readin(str(simPath))
-
-'''
-# multiply domain to match real size experimental target
-multi_x = 0 # get multiplier x
-multi_y = 0 # get multiplier y
-multi_z = 0 # get multiplier z
-
-for i in range(multi_x):
-    ne = np.append(ne, ne, axis = 0)
-for j in range(multi_y):
-    ne = np.append(ne, ne, axis = 1)
-for k in range(multi_z):
-    ne = np.append(ne, ne, axis = 2)
-'''
-
-dims = ne.shape
-
-extent_x = ((dims[0]*spacing[0].v)/2) * 1e-2
-extent_y = ((dims[1]*spacing[1].v)/2) * 1e-2
-extent_z = ((dims[2]*spacing[2].v)/2) * 1e-2
-
-lengths = 2 * jnp.array([extent_x, extent_y, extent_z], dtype = jnp.int32)
-
-ne_x = np.linspace(-extent_x, extent_x, dims[0])
-ne_y = np.linspace(-extent_y, extent_y, dims[1])
-ne_z = np.linspace(-extent_z, extent_z, dims[2])
-
-print(f'extent x: {extent_x}')
-print(f'extent y: {extent_y}')
-print(f'extent z: {extent_z}')
-
-print(f'dims x: {dims[0]}')
-print(f'dims y: {dims[1]}')
-print(f'dims z: {dims[2]}')
-
-print("\n\n")
-
 # is this baseline not decreasing after each run? - testing manually deleting objects first
 baseline = memory_report(memory_limit = memoryLimit)['used_raw']
 
 probing_direction = 'z'
-domain = d.ScalarDomain(lengths, dims, ne_type = "import", probing_direction = probing_direction, Np = Np, ne = ne.v * 1e6, memory_limit = memoryLimit)
+#domain = d.ScalarDomain(lengths, dims, ne_type = "import", probing_direction = probing_direction, Np = Np, ne = ne.v * 1e6, memory_limit = memoryLimit)
 
-del ne_x
-del ne_y
-del ne_z
+extent_x = 5e-3
+extent_y = 5e-3
+extent_z = 10e-3
 
-del ne
+lengths = 2 * np.array([extent_x, extent_y, extent_z])
+dims = 128
+domain = d.ScalarDomain(lengths, dims, ne_type = "test_exponential_cos", probing_direction = probing_direction, Np = Np)
 
 postDomain = memory_report(memory_limit = memoryLimit)['used_raw']
 domainAllocation = postDomain - baseline
@@ -131,7 +94,26 @@ ne_extent = probing_extent  # so the beam knows where to initialise initial posi
 divergence = 0.05e-3
 beam_type = "rectangular"
 
+beam_definition = beam_initialiser.Beam(
+    Np, beam_size, divergence, ne_extent,
+    probing_direction = probing_direction,
+    beam_type = beam_type
+)
+
 rf, _, duration = p.solve((beam_size, divergence, ne_extent, probing_direction, beam_type, False), domain, probing_extent, verbose = False)
+
+refractometer = diag.Refractometry(1032e-9, rf)
+# cam't clear_mem if you want to generate other graphs afterwards
+refractometer.plot_rays(bin_scale = 1, clear_mem = False)
+
+#information accessed by .H(istogram) , e.g plt.imshow(refractometer.H)
+
+#plt.imshow(refractometer.H, cmap='hot', interpolation='nearest', clim = (0, 2))
+plt.imshow(refractometer.H, cmap = 'hot', interpolation = 'nearest', clim = (0.5, 1))
+plt.show()
+
+from processing.plotting import general_ray_plots
+general_ray_plots(rf, dims)
 
 total = memory_report(memory_limit = memoryLimit)['used']
 

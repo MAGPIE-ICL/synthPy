@@ -126,6 +126,8 @@ def general_ray_plots(rf, nbins, lwl = 1032e-9, *, l_x = 0, u_x = 0.3, l_y = -5,
 
     axis[1].imshow(refractometer.H, cmap = 'hot', interpolation = 'nearest', clim = (0.5, 1))
 
+    plt.show()
+
 def stepped_ray_plot(rf, domain, sample_size = 32, *, indexing = "synthPy"):
     ##
     ## Matplotlib's plotting means that the axis that we would like to be used as z for display purposes is actually the x
