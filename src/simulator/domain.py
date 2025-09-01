@@ -72,10 +72,12 @@ class ScalarDomain(eqx.Module):
     extra_info: bool
     memory_reporting: bool
 
+    memory_limit: np.int64
+
     Np_total: np.int64
     ray_batch_count: np.int64
 
-    def __init__(self, lengths, dims, *, ne_type = None, inv_brems = False, phaseshift = False, B_on = False, probing_direction = 'z', auto_batching = True, iteration = 1, region_count = 1, leeway_factor = None, coord_backup = None, future_dims = None, extra_info = False, memory_reporting = False, Np = None,
+    def __init__(self, lengths, dims, *, ne_type = None, inv_brems = False, phaseshift = False, B_on = False, probing_direction = 'z', auto_batching = True, iteration = 1, region_count = 1, leeway_factor = None, coord_backup = None, future_dims = None, extra_info = False, memory_reporting = False, memory_limit = None, Np = None,
         s = None, s1 = None, s2 = None, Ly = None, ne_0 = None, ne = None, B = None, Bmax = None, Te = None, Te_min = None, Z = None):
         """
         A class to set-up/generate the scalar simulation domains and store for later use.
@@ -125,6 +127,9 @@ class ScalarDomain(eqx.Module):
 
         :param memory_reporting: Flag to enable priting of memory information.
         :type memory_reporting: bool, default: False
+
+        :param memory_limit: Set arbritrary jax memory usage limit in KiB, overrides autodetection of available space, see [here] for more details.
+        :type memory_limit: np.int64, default: None
 
         :param Np: The total number of rays to be simulated - needs to be set if intending to batch ray generation.
         :type Np: int, default: None
@@ -197,6 +202,7 @@ class ScalarDomain(eqx.Module):
         self.extra_info = extra_info
         # not used right now but probably will be in the future so not bothering to remove
         self.memory_reporting = memory_reporting
+        self.memory_limit = memory_limit
 
         if Np is not None:
             self.Np_total = np.int64(Np)
@@ -246,12 +252,12 @@ class ScalarDomain(eqx.Module):
         print("Predicted size in memory of domain:", mem_conversion(predicted_domain_allocation))
 
         if iteration == 1 and auto_batching:
-            memory_stats = memory_report()
+            memory_stats = memory_report(memory_limit = memory_limit)
 
             print("\nMemory prior to domain creation:")
-            print(f' - total : {memory_stats['total']}')
-            print(f' - free  : {memory_stats['free']}')
-            print(f' - used  : {memory_stats['used']}')
+            print(f" - total : {memory_stats['total']}")
+            print(f" - free  : {memory_stats['free']}")
+            print(f" - used  : {memory_stats['used']}")
 
             ##
             ## Need to work out the max allocation at any point and that estimated size
@@ -805,7 +811,7 @@ class ScalarDomain(eqx.Module):
             hour = dt.datetime.now().hour
 
             # filename extended to include the name of the property to be exported
-            fname = f'./plasma_PVTI_{property}_{day}_{month}_{year}_{hour}_{min}' #default fname to the current date and time 
+            fname = f"./plasma_PVTI_{property}_{day}_{month}_{year}_{hour}_{min}" #default fname to the current date and time 
 
         if property == 'ne':
             try: #check to ensure electron density has been added
@@ -832,9 +838,9 @@ class ScalarDomain(eqx.Module):
             # Add the data values to the cell data
             grid.cell_data["rnec"] = rnec.flatten(order="F")  # Flatten the array
 
-            grid.save(f'{fname}.vti')
+            grid.save(f"{fname}.vti")
 
-            print(f'VTI saved under {fname}.vti')
+            print(f"VTI saved under {fname}.vti")
 
         #prep values to write the pvti, written to match the exported vti using pyvista
 
@@ -854,10 +860,10 @@ class ScalarDomain(eqx.Module):
                         </VTKFile>"""
     
         # write file
-        with open(f'{fname}.pvti', 'w') as file:
+        with open(f"{fname}.pvti", "w") as file:
             file.write(content)
 
-        print(f'Scalar Domain electron density succesfully saved under {fname}.pvti !')
+        print(f"Scalar Domain electron density succesfully saved under {fname}.pvti !")
 
     #@jax.jit
     def cleanup(self):
