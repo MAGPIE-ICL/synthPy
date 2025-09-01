@@ -11,6 +11,7 @@ parser.add_argument("-r", "--rays", type = int)
 parser.add_argument("-c", "--cores", type = int)
 parser.add_argument("-p", "--importPath", type = str)
 parser.add_argument("-s", "--simPath", type = str)
+parser.add_argument("-m", "--memoryLimit", type = str)
 args = parser.parse_args()
 
 if args.rays is not None:
@@ -34,6 +35,10 @@ if args.simPath is not None:
     simPath = args.simPath
 else:
     simPath = importPath + "../evaluation/benchmarks/turbBoxLargeTest/radmeshablation_3d_prp_CH_ug_3rd_hdf5_plt_cnt_0228"
+
+memoryLimit = None
+if args.memoryLimit is not None:
+    memoryLimit = args.memoryLimit
 
 sys.path.insert(0, importPath)
 
@@ -102,10 +107,10 @@ print(f'dims z: {dims[2]}')
 print("\n\n")
 
 # is this baseline not decreasing after each run? - testing manually deleting objects first
-baseline = memory_report()['used_raw']
+baseline = memory_report(memory_limit = memoryLimit)['used_raw']
 
 probing_direction = 'z'
-domain = d.ScalarDomain(lengths, dims, ne_type = "import", probing_direction = probing_direction, Np = Np, ne = ne.v * 1e6)
+domain = d.ScalarDomain(lengths, dims, ne_type = "import", probing_direction = probing_direction, Np = Np, ne = ne.v * 1e6, memory_limit = memoryLimit)
 
 del ne_x
 del ne_y
@@ -113,10 +118,10 @@ del ne_z
 
 del ne
 
-postDomain = memory_report()['used_raw']
+postDomain = memory_report(memory_limit = memoryLimit)['used_raw']
 domainAllocation = postDomain - baseline
 
-plusRays = memory_report()['used_raw']
+plusRays = memory_report(memory_limit = memoryLimit)['used_raw']
 
 # define beam parameters
 lwl = 1064e-9
@@ -128,7 +133,7 @@ beam_type = "rectangular"
 
 _, _, duration = p.solve((beam_size, divergence, ne_extent, probing_direction, beam_type, False), domain, probing_extent, verbose = False)
 
-total = memory_report()['used']
+total = memory_report(memory_limit = memoryLimit)['used']
 
 print(colour.BOLD + "\nDuration of " + str(duration) + " sec for domain of size " + str(dims[i]) + " and " + str(int(rays[j])) + " rays with legacy solver." + colour.END)
 
