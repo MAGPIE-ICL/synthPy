@@ -209,11 +209,13 @@ def memory_report(running_device = None, memory_limit = None):
     }
 
     if memory_limit is not None:
-        results['total_raw'] = memory_limit * 1024
-        results['total'] = mem_conversion(results['total_raw'])
+        memory_limit *= 1024
+        if memory_limit < results['total_raw']:
+            results['total_raw'] = memory_limit
+            results['total'] = mem_conversion(results['total_raw'])
 
-        results['free_raw'] = memory_stats['total_raw'] - results['used_raw']
-        results['free'] = mem_conversion(results['free_raw'])
+            results['free_raw'] = memory_stats['total_raw'] - results['used_raw']
+            results['free'] = mem_conversion(results['free_raw'])
 
     return results
 
