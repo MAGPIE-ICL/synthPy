@@ -224,6 +224,11 @@ def jax_init(force_device = None, core_limit = None, extra_info = False, disable
             jax.config.update('jax_captured_constants_report_frames', -1)
             jax.config.update('jax_captured_constants_warn_bytes', 128 * 1024 ** 2)
 
+        '''
+        # Start profiling server - open in TensorBoard
+        jax.profiler.start_server(9999)
+        '''
+
     print(colour.END)
 
     if extra_info:

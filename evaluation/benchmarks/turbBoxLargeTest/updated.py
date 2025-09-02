@@ -90,7 +90,7 @@ extent_x = ((dims[0]*spacing[0].v)/2) * 1e-2
 extent_y = ((dims[1]*spacing[1].v)/2) * 1e-2
 extent_z = ((dims[2]*spacing[2].v)/2) * 1e-2
 
-lengths = 2 * jnp.array([extent_x, extent_y, extent_z], dtype = jnp.int32)
+lengths = 2 * jnp.array([extent_x, extent_y, extent_z], dtype = jnp.float32)
 
 ne_x = np.linspace(-extent_x, extent_x, dims[0])
 ne_y = np.linspace(-extent_y, extent_y, dims[1])

@@ -6,12 +6,23 @@ import equinox as eqx
 
 #from functools import partial
 
+from math import ceil
+from math import floor
+
 from shared.utils import mem_conversion
 from shared.printing import colour
 from shared.utils import dalloc
 from shared.utils import domain_estimate
 from shared.utils import memory_report
 from shared.utils import getsizeof_default
+
+# decorating a function like this will initiate manual rematerialisation - could reduce memory usage for large array calculations??
+# test? also test in propagator? where?
+'''
+from jax import checkpoint
+
+@checkpoint
+'''
 
 class ScalarDomain(eqx.Module):
     s: jnp.float32
@@ -320,9 +331,6 @@ class ScalarDomain(eqx.Module):
             # when jnp.float32 is not used, will cause overflow error if 64 bit floats are not enabled
             if limiting_value > np.float64(memory_stats['free_raw']):
                 if self.ne is None:
-                    from math import ceil
-                    from math import floor
-
                     if self.Np_total is None:
                         print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
                     else:
