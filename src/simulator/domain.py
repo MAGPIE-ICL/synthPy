@@ -363,6 +363,8 @@ class ScalarDomain(eqx.Module):
                     if self.Np_total is not None:
                         print(" --> The domain is batched with the goal of minimising ray batching. Ray batches introduce sequantiality which reduces speed.")
                 else:
+                    self.region_count = 1
+
                     print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN + RAYS CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
                     self.ray_batch_count = np.int64(ceil(ray_memory_raw * self.leeway_factor / np.float64(memory_stats['free_raw'])))
                     print(" --> Auto-batching rays based on memory available and domain size estimate...")
