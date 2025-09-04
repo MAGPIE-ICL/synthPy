@@ -2,6 +2,7 @@ numpy
 pandas
 diffrax
 jax
+"jax[cuda12_pip]"
 equinox
 matplotlib
 scipy
@@ -10,3 +11,4 @@ sympy
 psutil
 pynvml
 h5py
+yt
