@@ -127,12 +127,16 @@ def hdf_readin(filename):
     ds = yt.load(filename)
 
     def _ne(field, data):
-        return (
-            6.022e23
-            * data["flash", "dens"]
-            * data["flash", "ye"] #ye is Z/A
-            * data["flash", "sumy"] #sumy is inverse of mean molecular mass
-        )
+        if ("flash", "ye") in data:
+            return (
+                6.022e23
+                * data["flash", "dens"]
+                * data["flash", "ye"] #ye is Z/A
+            )
+        else:
+            return (
+                5e23 * data["flash", "dens"] # scaled electron density 5e23 m^-3
+            )
 
     ds.add_field(
         name=("flash","ne"),
