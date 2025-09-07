@@ -506,25 +506,31 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                     core_count = int(os.environ['XLA_FLAGS'].replace("--xla_force_host_platform_device_count=", ''))
                     print(", with:", core_count, "cores.")
 
-                    from jax.sharding import PartitionSpec as P, NamedSharding
+                    if Np >= core_count:
+                        from jax.sharding import PartitionSpec as P, NamedSharding
 
-                    # Create a Sharding object to distribute a value across devices:
-                    # Assume self.core_count is the no. of core devices available
-                    mesh = jax.make_mesh((core_count,), ('rows',))  # 1D mesh for columns
+                        # Create a Sharding object to distribute a value across devices:
+                        # Assume self.core_count is the no. of core devices available
+                        mesh = jax.make_mesh((core_count,), ('rows',))  # 1D mesh for columns
 
-                    # Specify sharding: don't split axis 0 (rows), split axis 1 (columns) across devices
-                    # then apply sharding to rewrite s0 as a sharded array from it's original matrix
-                    # and use jax.device_put to distribute it across devices:
-                    Np = ((Np // core_count) * core_count)
-                    assert Np > 0, "Not enough rays to parallelise over cores, increase to at least " + str(core_count)
+                        # Specify sharding: don't split axis 0 (rows), split axis 1 (columns) across devices
+                        # then apply sharding to rewrite s0 as a sharded array from it's original matrix
+                        # and use jax.device_put to distribute it across devices:
+                        Np = ((Np // core_count) * core_count)
+                        #assert Np > 0, "Not enough rays to parallelise over cores, increase to at least " + str(core_count)
 
-                    # if you don't wish to transpose before operation you need to use the old call
-                    # s0 = jax.device_put(s0_transformed[:, 0:Np], NamedSharding(mesh, P(None, 'cols')))
-                    s0 = jax.device_put(s0_transformed[0:Np, :], NamedSharding(mesh, P('rows', None)))  # 'None' means don't shard axis 0
+                        # if you don't wish to transpose before operation you need to use the old call
+                        # s0 = jax.device_put(s0_transformed[:, 0:Np], NamedSharding(mesh, P(None, 'cols')))
+                        s0 = jax.device_put(s0_transformed[0:Np, :], NamedSharding(mesh, P('rows', None)))  # 'None' means don't shard axis 0
 
-                    print(s0.sharding)            # See the sharding spec
-                    #print(s0.addressable_shards)  # Check each device's shard
-                    #jax.debug.visualize_array_sharding(s0)
+                        print(s0.sharding)            # See the sharding spec
+                        #print(s0.addressable_shards)  # Check each device's shard
+                        #jax.debug.visualize_array_sharding(s0)
+                    else:
+                        s0 = jax.device_put(s0_transformed)
+
+                        print(colour.BOLD + "Not enough rays to parallelise over cores" + colour.END + ": increase to at least " + str(core_count) + " to utilise parallelisation")
+                        print(" --> Running CPU processes sequentially")
                 elif running_device == 'gpu':
                     gpu_devices = jax.devices('gpu')
                     print("\nThere are", len(gpu_devices), "available GPU devices:", gpu_devices)
