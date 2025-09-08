@@ -26,6 +26,8 @@ evaluation/benchmarks/runtime/*.txt
 *.tar
 *.hdf5
 
+*.spk
+
 evaluation/benchmarks/turbBoxLargeTest/radmeshablation_3d_prp_CH_ug_3rd_hdf5_plt_cnt_0228
 
 evaluation/interferometry_testing/.ipynb_checkpoints

@@ -315,7 +315,6 @@ class Diagnostic:
         self.wavelength, self.focal_plane, self.L, self.R, self.Lx, self.Ly = wavelength, focal_plane, L, R, Lx, Ly
 
         self.x, self.y, self.x_l, self.y_l = x, y, x_l, y_l
-        self.amp, self.phase = rf[4, :], rf[5, :]
 
         # these HAVE to stay... for some reason - not entirely sure why you can't just reference self.Beam.r_ directly (or now just rf)
         # if you can make it without the memory duplication work please do, else DON'T REMOVE!
@@ -325,13 +324,18 @@ class Diagnostic:
         # just re-assert type here to fix
 
         if rf is not None:
-            rf = rf[:4, :]
+            # separates out the amp/phase part of rf from raw values
+            if rf.shape[0] == 6:
+                self.amp, self.phase = rf[4, :], rf[5, :]
+                rf = rf[:4, :]
+            else:
+                assert rf.shape[0] == 4, colour.BOLD + "\nIncorrect format for rf, are you sure you passed the right variable?" + colour.END
+                self.amp, self.phase = None, None
+
             # forces self.rf to the last slice if rf returns multiple samples
             # also preserves the whole pass if required
             if len(rf.shape) == 3:
-                #!! why would rf have length 3? will need to update this line to take into account the
-                #fact that I changed the structure of rf - Alan
-                #self.rf_full = rf
+                # rf might be 3-dimensional if it is a series of 2D ray solution slices
                 rf = rf[-1, :, :]
 
             self.Np = rf.shape[-1]

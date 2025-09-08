@@ -25,8 +25,6 @@ from simulator.interpolator import RegularGridInterpolator as trilinearInterpola
 from shared.propagation import ray_to_Jonesvector
 from shared.propagation import back_propogate
 
-
-
 ##
 ## Helper functions for calculations
 ##
@@ -79,30 +77,34 @@ def attenuation(domain, energy):
     
     if domain.num_materials == 1:
         grp_centres, grps, rho, Te, opa_data = open_emi_files(f"../../{domain.opacity_files}")
+
         opa_data_capped = jnp.minimum(opa_max, opa_data)
         opacity_interp = RegularGridInterpolator((grp_centres, rho, Te), opa_data_capped, bounds_error = False, fill_value = 0.0)
         energy_grid = jnp.full_like(domain.densities, energy)
         opacity_grid = opacity_interp((energy_grid, domain.densities, domain.Te))
         opacity_spatial_interp = RegularGridInterpolator((domain.x, domain.y, domain.z), opacity_grid, bounds_error = False, fill_value = 0.0)
+
         return opacity_spatial_interp
     else:
         if (len(domain.opacity_files) != len(domain.densities)) & (len(domain.densities) != domain.num_materials):
             raise ValueError("densities and opacity_files must have length equal to num_materials")
-        opacity_grids = [0]*domain.num_materials
+
+        opacity_grids = [0] * domain.num_materials
         for i in range (domain.num_materials):
             grp_centres, grps, rho, Te, opa_data = open_emi_files(f"../../{domain.opacity_files[i]}")
+
             opa_data_capped = jnp.minimum(opa_max, opa_data)
             # rhos = domain.densities[i].ravel()
             # r = jnp.c_[domain.energy*jnp.ones_like(rhos),rhos,domain.Te.ravel()]
             opacity_interp = RegularGridInterpolator((grp_centres, rho, Te), opa_data_capped,bounds_error = False, fill_value = 0.0)
             opacity_grids[i] = opacity_interp((energy, domain.densities[i], domain.Te))
+
         opacity_grids_tot = np.sum(opacity_grids, axis = 0)
-        opacity_spatial_interp_tot = RegularGridInterpolator((
-            domain.x, domain.y, domain.z), opacity_grids_tot, bounds_error = False, fill_value = 0.0)
+        opacity_spatial_interp_tot = RegularGridInterpolator((domain.x, domain.y, domain.z), opacity_grids_tot, bounds_error = False, fill_value = 0.0)
+
         return opacity_spatial_interp_tot
 
-
-def dndr(r, ne, omega, x, y, z, edensity, refrac_field):
+def dndr(r, gradient_term, omega, x, y, z):
     """
     Returns the gradient at the locations r
 
@@ -114,12 +116,6 @@ def dndr(r, ne, omega, x, y, z, edensity, refrac_field):
     """
 
     grad = jnp.zeros_like(r.T)
-
-    if edensity is True:
-        gradient_term = -0.5 * c**2 * ne / (3.14207787e-4 * omega ** 2)
-    else:
-        gradient_term = 0.5 * c**2 * refrac_field**2
-    
 
     dndx = jnp.gradient(gradient_term, x, axis = 0)
     grad = grad.at[0, :].set(trilinearInterpolator((x, y, z), dndx, r, fill_value = 0.0))
@@ -136,7 +132,7 @@ def dndr(r, ne, omega, x, y, z, edensity, refrac_field):
     return grad
 
 # ODEs of photon paths, standalone function to support the solve()
-def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, omega, VerdetConst, lengths, dims, opacity, edensity, refrac_field, opacity_interp, phase):
+def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, omega, VerdetConst, lengths, dims, opacity, edensity, refrac_field, opacity_interp):
     """
     Returns an array with the gradients and velocity per ray for ode_int
 
@@ -148,6 +144,7 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
     Returns:
         9N float array: flattened array for ode_int
     """
+
     if not parallelise:
         # jnp.reshape() auto converts to a jax array rather than having to do after a numpy reshape
         s = jnp.reshape(s, (9, s.size // 9))
@@ -161,6 +158,7 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
     # needs to be before the reshape to avoid indexing errors
     r = s[:3, :].T  # transposed so it is of the correct shape for interpolators
     v = s[3:6, :]
+
     # Amplitude, phase and polarisation
     amp = s[6, :]
     #phase = s[7,:]
@@ -171,18 +169,42 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
     # although probably really unnecessary?
     del s
 
+    if edensity is True:
+        gradient_term = -0.5 * c ** 2 * ne / (3.14207787e-4 * omega ** 2)
+    else:
+        gradient_term = 0.5 * c ** 2 * refrac_field ** 2
+
     # must unpack x, y, z tuple here for the sake of dndr, could be earlier but this is easier to pass and more generalised
     # r must be transposed within dndr(...) else we get an AbstractTerm error due to the effect on the return value
-    sprime = sprime.at[3:6, :].set(dndr(r, ne, omega, x, y, z, edensity, refrac_field))
+    sprime = sprime.at[3:6, :].set(dndr(r, gradient_term, omega, x, y, z))
     sprime = sprime.at[:3, :].set(v)
 
-    # Attenuation due to inverse bremsstrahlung
+    ###
+    ### Is opacity calculated correctly? Shouldn't it subtract from the previous value? Won't it be override by bremsstrahhlung instead of added to it?
+    ### Sort out passed functions and objects
+    ### Is opacity calculation wavelength dependent? Only should come into effect for x-ray wavelengths I believe?
+    ###
+
+    # Attenuation due to x-ray opacity
     if opacity:
-        sprime = sprime.at[6, :].set(-opacity_interp(r)*c*amp)
+        sprime = sprime.at[6, :].set(-opacity_interp(r) * c * amp)
+    # Attenuation due to inverse bremsstrahlung
     if inv_brems:
         sprime = sprime.at[6, :].set(trilinearInterpolator((x, y, z), kappa(ne, Te, Z, omega), r) * amp)
+
+    ###
+    ### Which one of these to use? Are they equivelemt?
+    ### - if not, which is right
+    ### - if they are, which is more efficient (prioritise memory efficiency)
+    ###
+
     if phaseshift:
-        sprime = sprime.at[7, :].set(phase(r))
+        sprime = sprime.at[7, :].set(omega * (trilinearInterpolator((x, y, z), n_refrac(ne, omega), r) - 1.0))
+        #sprime = sprime.at[7, :].set(omega * (trilinearInterpolator((x, y, z), jnp.sqrt(1.0 - (5.64 * jnp.sqrt(ne) / omega) ** 2), r) - 1.0))
+    '''
+    if phaseshift:
+        sprime = sprime.at[7, :].set(jnp.array(-0.5 * trilinearInterpolator((x, y, z), ne, r) / (3.14207787e-4 * omega), dtype = jnp.float64))
+    '''
 
     if B_on:
         """
@@ -220,7 +242,7 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
     # - as then data would be in the wrong place
     return sprime.flatten()
 
-def process_results(solutions, depth_traced, trace_depth, probing_direction, return_E, duration, save_points_per_region, ray_batch_count, verbose):
+def process_results(solutions, depth_traced, trace_depth, probing_direction, return_E, duration, save_points_per_region, ray_batch_count, verbose, amp_phase_return):
     """
     #for i in enumerate(sol.result):
     #    print(i)
@@ -295,7 +317,7 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, ret
         rf = solutions[0].ys[:, -1, :].T
 
         # depth_traced + trace_depth or just trace_depth
-        return *ray_to_Jonesvector(rf, ne_extent = depth_traced + trace_depth, probing_direction = probing_direction, return_E = return_E), duration
+        return *ray_to_Jonesvector(rf, ne_extent = depth_traced + trace_depth, probing_direction = probing_direction, return_E = return_E, amp_phase_return = amp_phase_return), duration
     elif save_points_per_region > 2:
         slice_rf_list = []
         slice_Jf_list = []
@@ -313,7 +335,7 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, ret
                 if j < save_points_per_region - 1 or (j == save_points_per_region - 1 and i == len(solutions) - 1):
                     # sol.ts having shape of (Np, save_points_per_region) per region is very inefficent given there are N - 1 duplications
                     # - issue with diffrax though I can't fix this
-                    rf_slice, Jf_slice = ray_to_Jonesvector(solutions[i].ys[:, j, :].T, ne_extent = depth_traced + trace_depth * solutions[i].ts[0, j], probing_direction = probing_direction, return_E = return_E, keep_current_plane = True)
+                    rf_slice, Jf_slice = ray_to_Jonesvector(solutions[i].ys[:, j, :].T, ne_extent = depth_traced + trace_depth * solutions[i].ts[0, j], probing_direction = probing_direction, return_E = return_E, keep_current_plane = True, amp_phase_return = amp_phase_return)
 
                     slice_rf_list.append(rf_slice)
                     if Jf_slice is not None:
@@ -333,13 +355,24 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, ret
         assert "\nWhat."
 
 def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = True, jitted = True, save_points_per_region = 2, memory_debug = False, lwl = 1064e-9, keep_domain = False, return_raw_results = False, verbose = True):
+    # General assertions
+    if return_E == False and ScalarDomain.B_on == True:
+        print(colour.BOLD + "Warning:" + colour.END + "return_E == False and ScalarDomain.B_on == True leads to pointless calculations as the output will not be used.")
+        print("\n --> Proceeding with run as per request, however please note this suggestion")
+    assert return_E == ScalarDomain.B_on or (return_E == False and ScalarDomain.B_on == True), colour.BOLD + "Setting ScalarDomain.B_on == False and return_E == True leads to incorrect results as B field calculations will not occur\n --> Stopping process, correct settings and re-run" + colour.END
+
+    if ScalarDomain.opacity is True or ScalarDomain.inv_brems is True or ScalarDomain.phaseshift is True:
+        amp_phase_return = True
+    else:
+        amp_phase_return = False
+
     # Find Faraday rotation constant http://farside.ph.utexas.edu/teaching/em/lectures/node101.html
     VerdetConst = 0.0
     if (ScalarDomain.B_on):
         VerdetConst = 2.62e-13 * lwl ** 2 # radians per Tesla per m^2
 
     if (ScalarDomain.opacity):
-        energy = 6.63e-34*c/(lwl*1.6e-19)
+        energy = 6.63e-34 * c / (lwl * 1.6e-19)
         opacity_interp = attenuation(domain = ScalarDomain, energy = energy)
         def atten(x):
             return opacity_interp(x)
@@ -349,15 +382,6 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
         
     omega = 2 * jnp.pi * c / lwl
 
-    if (ScalarDomain.phaseshift):
-        ne_interp = RegularGridInterpolator((ScalarDomain.x, ScalarDomain.y, ScalarDomain.z), ScalarDomain.ne, bounds_error = False, fill_value = 0.0)
-        def phase(x):
-            return  jnp.array(-0.5 * ne_interp(x)/(3.14207787e-4*omega), dtype = jnp.float64)
-    else:
-        def phase():
-            return 0.0
-    
-
     region_count = ScalarDomain.region_count
     ray_batch_count = ScalarDomain.ray_batch_count
 
@@ -365,8 +389,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
     print("Number of ray batches:", ray_batch_count)
 
     from simulator.beam import Beam
-    if isinstance(beam, Beam):
-        assert "\nThis function does not take in the direct output of the Beam object, pass either Beam.s0 rays, or the parameters passed to be Beam here as a tuple if batching rays."
+    assert not isinstance(beam, Beam), "\nThis function does not take in the direct output of the Beam object, pass either Beam.s0 rays, or the parameters passed to be Beam here as a tuple if batching rays."
 
     unbatched_beam = False
     if ray_batch_count == 1:
@@ -445,9 +468,16 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
                     ne_type = ScalarDomain.ne_type
 
+                    refrac_field = ScalarDomain.refrac_field
+                    opacity_files = ScalarDomain.opacity_files
+                    densities = ScalarDomain.densities
+                    num_materials = ScalarDomain.num_materials
+
                     inv_brems = ScalarDomain.inv_brems
+                    opacity = ScalarDomain.opacity
                     phaseshift = ScalarDomain.phaseshift
                     B_on = ScalarDomain.B_on
+                    edensity = ScalarDomain.edensity
 
                     probing_direction = ScalarDomain.probing_direction
 
@@ -467,9 +497,15 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                     ScalarDomain = d.ScalarDomain(
                         lengths, dims,
                         ne_type = ne_type,
+                        refrac_field = refrac_field,
+                        opacity_files = opacity_files,
+                        densities = densities,
+                        num_materials = num_materials,
                         inv_brems = inv_brems,
+                        opacity = opacity,
                         phaseshift = phaseshift,
                         B_on = B_on,
+                        edensity = edensity,
                         probing_direction = probing_direction,
                         auto_batching = True,
                         iteration = i,
@@ -484,9 +520,16 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
                     del ne_type
 
+                    del refrac_field
+                    del opacity_files
+                    del densities
+                    del num_materials
+
                     del inv_brems
+                    del opacity
                     del phaseshift
                     del B_on
+                    del edensity
 
                     del probing_direction
 
@@ -523,27 +566,33 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
             # passed args must be hashable to be made static for jax.jit, tuple is hashable, array & dict are not
             args = (parallelise, ScalarDomain.inv_brems, ScalarDomain.phaseshift, ScalarDomain.B_on, 
-                    ScalarDomain.ne, ScalarDomain.B, ScalarDomain.Te, ScalarDomain.Z, ScalarDomain.x, 
-                    ScalarDomain.y, ScalarDomain.z, omega, VerdetConst, ScalarDomain.lengths, 
-                    ScalarDomain.dims, ScalarDomain.opacity, ScalarDomain.edensity, 
-                    ScalarDomain.refrac_field)
+                    ScalarDomain.ne, ScalarDomain.B, ScalarDomain.Te, ScalarDomain.Z,
+                    ScalarDomain.x, ScalarDomain.y, ScalarDomain.z,
+                    omega, VerdetConst,
+                    ScalarDomain.lengths, ScalarDomain.dims,
+                    ScalarDomain.opacity, ScalarDomain.edensity, ScalarDomain.refrac_field)
+
+            ###
+            ### Check the original algorithm still works for the sake of testing
+            ###
 
             if not parallelise:
                 from numpy import array
-                if i == 1:
-                    s0 = array(jnp.ravel(s0_import))
-                    #s0 = s0.flatten() #odeint insists
-                else:
-                    assert "\nDomain batching is not set up to work with the legacy solver yet."
-                    '''
-                    # need a backpropogation algorithm that works for this too
-                    s0 = array(jnp.ravel(sol))
-                    del sol
-                    '''
+
+                assert i == 1, "\nDomain batching is not set up to work with the legacy solver yet."
+
+                s0 = array(jnp.ravel(s0_import))
+                #s0 = s0.flatten() #odeint insists
+
+                '''
+                # need a backpropogation algorithm that works for this too
+                s0 = array(jnp.ravel(sol))
+                del sol
+                '''
 
                 start = time()
                 # wrapper allows dummy variables t & y to be used by solve_ivp(), self is required by dsdt
-                sol = solve_ivp(lambda t, y: dsdt(t, y, *args), [0, t[-1]], s0, t_eval = t)
+                sol = solve_ivp(lambda t, y: dsdt(t, y, *(args + (atten, ))), [0, t[-1]], s0, t_eval = t)
             else:
                 # transposed as jax.vmap() expects form of [batch_idx, items] not [items, batch_idx]
                 available_devices = jax.devices()
@@ -638,7 +687,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                         term,
                         solver,
                         y0 = jnp.array(s0),
-                        args = args + (atten, phase),
+                        args = args + (atten, ),
                         t0 = t0,
                         t1 = t1,
                         dt0 = None, # can set = 0 if dtmax is set apparently?
@@ -666,14 +715,14 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
                 # pass s0[:, i] for each ray via a jax.vmap for parallelisation
                 start = time()
-               
+
                 sol = jax.block_until_ready(
                     # in_axes version ensures that vmap doesn't map args parameters, just s0
                     #jax.vmap(lambda rays, args: ODE_solve, in_axes = (0, None))(s0, args)
 
                     # default vmap_method argument is sequential, this is deprecated though and will cause a warning (if debugging) past jax 0.6.0
                     # look into different options for this parameter at a later date
-                    
+
                     jax.vmap(ODE_solve, in_axes = (0, None))(s0, args)
                 )
 
@@ -742,6 +791,10 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                 else:
                     print("No pprof install detected. Please download to visualise memory usage - requires Golang to run.")
 
+            ###
+            ### Test if streaming is still the source of memory issues by using, del s0 test again
+            ###
+
             #del s0
 
             #del sol - # this (and commenting out below section) prevents memory issues, so clearly solutions[...] needs to be
@@ -769,7 +822,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                     '''
                     from utils.handle_filetypes import save_jax_matrix_to_hdf5 as compressed_solution_export
                     filepath, filename = compressed_solution_export(
-                        ray_to_Jonesvector(sol.ys[:,-1].reshape(9, Np), ne_extent = probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E)[0],
+                        ray_to_Jonesvector(sol.ys[:,-1].reshape(9, Np), ne_extent = probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E, amp_phase_return = amp_phase_return)[0],
                         file_path = target_folder
                         #filename = None, file_path = ".", dataset_name = 'data', compression = 'gzip', compression_level = 4
                     )
@@ -784,7 +837,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                     filename = "run_" + str(ray_index)
                     stream_data_to_tar_gz(tar_gz_path, filename,
                         compress_matrix_to_hdf5_BytesIO(
-                            ray_to_Jonesvector(sol.ys[:,-1].reshape(9, Np), ne_extent = probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E)[0]
+                            ray_to_Jonesvector(sol.ys[:,-1].reshape(9, Np), ne_extent = probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E, amp_phase_return = amp_phase_return)[0]
                         )
                     )
                 else:
@@ -800,10 +853,10 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
             return solutions, None, duration
         else:
             if not parallelise:
-                return *ray_to_Jonesvector(solutions.ys[:,-1].reshape(9, Np), ne_extent = probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E), duration
+                return *ray_to_Jonesvector(solutions.ys[:,-1].reshape(9, Np), ne_extent = probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E, amp_phase_return = amp_phase_return), duration
             else:
                 # need to confirm there is no mismatch between total depth_traced and the target probing_depth
-                return process_results(solutions, depth_traced, trace_depth, ScalarDomain.probing_direction, return_E, duration, save_points_per_region, ray_batch_count, verbose)
+                return process_results(solutions, depth_traced, trace_depth, ScalarDomain.probing_direction, return_E, duration, save_points_per_region, ray_batch_count, verbose, amp_phase_return)
     else:
         print("\nData output as a hdf4.tar.gz file due to limitations of vram/ram space.")
         print("Graphs can be iteratively plotted by cycling through the 'run_n' entries after extraction from .tar.gz format.")

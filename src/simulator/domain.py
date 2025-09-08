@@ -167,6 +167,22 @@ class ScalarDomain(eqx.Module):
         :rtype: simulator.domain.ScalarDomain
         """
 
+        ###
+        ### Can some of these flags be moved to propagator.py instead?
+        ###
+
+        # Logical switches
+        self.inv_brems = inv_brems
+        del inv_brems
+        self.opacity = opacity
+        del opacity
+        self.phaseshift = phaseshift
+        del phaseshift
+        self.B_on = B_on
+        del B_on
+        self.edensity = edensity
+        del edensity
+
         # initalise
         self.s = s
         del s
@@ -205,7 +221,13 @@ class ScalarDomain(eqx.Module):
         self.Z = Z
         del Z
 
-        self.refrac_field = refrac_field
+        if self.edensity == True and refrac_field is not None:
+            print(colour.BOLD + "\nBy setting edensity == True, refrac_field will not be used. If this is intended, we suggest you do not pass this value in future." + colour.END)
+            print(" --> Overriding self.refrac_field entry to None")
+
+            self.refrac_field = None
+        else:
+            self.refrac_field = refrac_field
         del refrac_field
 
         self.opacity_files = opacity_files
@@ -217,16 +239,12 @@ class ScalarDomain(eqx.Module):
         self.num_materials = num_materials
         del num_materials
 
-        # Logical switches
-        self.inv_brems = inv_brems
-        self.opacity = opacity
-        self.phaseshift = phaseshift
-        self.B_on = B_on
-        self.edensity = edensity
-
         self.probing_direction = probing_direction
 
         self.ne_type = ne_type
+
+        assert (self.edensity == True and (self.ne is not None or self.ne_type is not None)), "\nMust pass either a pre-generated field or a type of field to generate."
+        assert not (self.edensity == False and self.refrac_field is not None), "\nIf edensity == False, refrac_field must be supplied."
 
         # working with 10% leeway in estimate for now
         if leeway_factor is not None:
@@ -281,16 +299,21 @@ class ScalarDomain(eqx.Module):
 
         del dims
         del valid_types
-        
+
+        ###
+        ### Why has this been set to override it?
+        ### Explains the override in propagator, but does this functionality make sense?
+        ###
+
         if self.opacity:
             self.inv_brems = False
-        
+
         # changed function to pass to np.int64 to prevent overflow - this was causing the negatives
         # --> (exactly 0 in the case of a 1024^3 domain as it is right on the limit)
         predicted_domain_allocation = domain_estimate(self.x_n, self.y_n, self.z_n)
         print("Predicted size in memory of domain:", mem_conversion(predicted_domain_allocation))
 
-        if iteration == 1 and auto_batching:
+        if iteration == 1 and auto_batching and self.edensity == True:
             memory_stats = memory_report(memory_limit = memory_limit)
 
             print("\nMemory prior to domain creation:")
@@ -298,9 +321,9 @@ class ScalarDomain(eqx.Module):
             print(f" - free  : {memory_stats['free']}")
             print(f" - used  : {memory_stats['used']}")
 
-            ##
-            ## Need to work out the max allocation at any point and that estimated size
-            ##
+            ###
+            ### Need to work out the max allocation at any point and that estimated size
+            ###
 
             # 2 for ne and ne_nc in calc_dndr(...) before ne is deleted
             # at peak mem usage ne should have been deleted, therefore this contributes only 1 domain
@@ -313,14 +336,14 @@ class ScalarDomain(eqx.Module):
             allocation_count = 2
 
             # up to +5 in calc_dndr(...) depending on the number of extra interps
-            if B_on:
+            if self.B_on:
                 # there are 4 B based interps
                 # and they also require a ScalarDomain.B domain sized matrice
                 allocation_count += 4
-            if inv_brems:
+            if self.inv_brems:
                 # unsure how many intermediaries exist at peak mem usage for this allocation - need to check and adjust this
                 allocation_count += 1
-            if phaseshift:
+            if self.phaseshift:
                 allocation_count += 1
 
             # compare to max allocation in domain setup and return the greatest

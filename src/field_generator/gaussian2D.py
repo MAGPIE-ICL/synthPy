@@ -207,9 +207,8 @@ class gaussian2D:
         S = np.zeros_like(k)
         mask = (k >= k_min) & (k <= k_max)
         S[mask] = self.k_func(k[mask])
-        
-        seed = 184929373
-        np.random.seed(seed = seed)
+
+        np.random.seed(seed = 42)
 
         # Generate complex Gaussian noise
         noise = np.random.normal(0, 1, k.shape) + 1j * np.random.normal(0, 1, k.shape)

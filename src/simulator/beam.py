@@ -325,8 +325,8 @@ class Beam:
 
         # Initialise amplitude, phase and polarisation
         s0 = s0.at[6, :].set(1.0)
-        s0 = s0.at[8, :].set(0.0)
-        s0 = s0.at[7, :].set(0.0)
+        #s0 = s0.at[7, :].set(0.0)
+        #s0 = s0.at[8, :].set(0.0)
 
         self.s0 = s0
         #self.rf = s0
