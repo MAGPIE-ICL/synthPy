@@ -13,17 +13,19 @@ from diffrax import Solution
 
 from scipy.constants import c
 from scipy.constants import e
-
+from jax.scipy.interpolate import RegularGridInterpolator
 from shared.utils import getsizeof
 from shared.utils import mem_conversion
 from shared.printing import colour
 from shared.utils import add_integer_postfix
-
+from shared.SpK_reader import open_emi_files
 # change name when it actualy is a trilinear interpolator - if it's still a regular grid, change it.
 from simulator.interpolator import RegularGridInterpolator as trilinearInterpolator
 
 from shared.propagation import ray_to_Jonesvector
 from shared.propagation import back_propogate
+
+
 
 ##
 ## Helper functions for calculations
@@ -72,7 +74,35 @@ def kappa(ne, Te, Z, omega):
 def n_refrac(ne, omega):
     return jnp.sqrt(1.0 - (omega_pe(ne * 1e-6) / omega) ** 2)
 
-def dndr(r, ne, omega, x, y, z):
+def attenuation(domain, energy):
+    opa_max = domain.z_n/domain.z_length
+    
+    if domain.num_materials == 1:
+        grp_centres, grps, rho, Te, opa_data = open_emi_files(f"../../{domain.opacity_files}")
+        opa_data_capped = jnp.minimum(opa_max, opa_data)
+        opacity_interp = RegularGridInterpolator((grp_centres, rho, Te), opa_data_capped, bounds_error = False, fill_value = 0.0)
+        energy_grid = jnp.full_like(domain.densities, energy)
+        opacity_grid = opacity_interp((energy_grid, domain.densities, domain.Te))
+        opacity_spatial_interp = RegularGridInterpolator((domain.x, domain.y, domain.z), opacity_grid, bounds_error = False, fill_value = 0.0)
+        return opacity_spatial_interp
+    else:
+        if (len(domain.opacity_files) != len(domain.densities)) & (len(domain.densities) != domain.num_materials):
+            raise ValueError("densities and opacity_files must have length equal to num_materials")
+        opacity_grids = [0]*domain.num_materials
+        for i in range (domain.num_materials):
+            grp_centres, grps, rho, Te, opa_data = open_emi_files(f"../../{domain.opacity_files[i]}")
+            opa_data_capped = jnp.minimum(opa_max, opa_data)
+            # rhos = domain.densities[i].ravel()
+            # r = jnp.c_[domain.energy*jnp.ones_like(rhos),rhos,domain.Te.ravel()]
+            opacity_interp = RegularGridInterpolator((grp_centres, rho, Te), opa_data_capped,bounds_error = False, fill_value = 0.0)
+            opacity_grids[i] = opacity_interp((energy, domain.densities[i], domain.Te))
+        opacity_grids_tot = np.sum(opacity_grids, axis = 0)
+        opacity_spatial_interp_tot = RegularGridInterpolator((
+            domain.x, domain.y, domain.z), opacity_grids_tot, bounds_error = False, fill_value = 0.0)
+        return opacity_spatial_interp_tot
+
+
+def dndr(r, ne, omega, x, y, z, edensity, refrac_field):
     """
     Returns the gradient at the locations r
 
@@ -85,22 +115,28 @@ def dndr(r, ne, omega, x, y, z):
 
     grad = jnp.zeros_like(r.T)
 
-    dndx = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), x, axis = 0)
+    if edensity is True:
+        gradient_term = -0.5 * c**2 * ne / (3.14207787e-4 * omega ** 2)
+    else:
+        gradient_term = 0.5 * c**2 * refrac_field**2
+    
+
+    dndx = jnp.gradient(gradient_term, x, axis = 0)
     grad = grad.at[0, :].set(trilinearInterpolator((x, y, z), dndx, r, fill_value = 0.0))
     del dndx
 
-    dndy = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), y, axis = 1)
+    dndy = jnp.gradient(gradient_term, y, axis = 1)
     grad = grad.at[1, :].set(trilinearInterpolator((x, y, z), dndy, r, fill_value = 0.0))
     del dndy
 
-    dndz = -0.5 * c ** 2 * jnp.gradient(ne / (3.14207787e-4 * omega ** 2), z, axis = 2)
+    dndz = jnp.gradient(gradient_term, z, axis = 2)
     grad = grad.at[2, :].set(trilinearInterpolator((x, y, z), dndz, r, fill_value = 0.0))
     del dndz
 
     return grad
 
 # ODEs of photon paths, standalone function to support the solve()
-def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, omega, VerdetConst, lengths, dims):
+def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, omega, VerdetConst, lengths, dims, opacity, edensity, refrac_field, opacity_interp, phase):
     """
     Returns an array with the gradients and velocity per ray for ode_int
 
@@ -112,7 +148,6 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
     Returns:
         9N float array: flattened array for ode_int
     """
-
     if not parallelise:
         # jnp.reshape() auto converts to a jax array rather than having to do after a numpy reshape
         s = jnp.reshape(s, (9, s.size // 9))
@@ -126,7 +161,6 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
     # needs to be before the reshape to avoid indexing errors
     r = s[:3, :].T  # transposed so it is of the correct shape for interpolators
     v = s[3:6, :]
-
     # Amplitude, phase and polarisation
     amp = s[6, :]
     #phase = s[7,:]
@@ -139,14 +173,16 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
 
     # must unpack x, y, z tuple here for the sake of dndr, could be earlier but this is easier to pass and more generalised
     # r must be transposed within dndr(...) else we get an AbstractTerm error due to the effect on the return value
-    sprime = sprime.at[3:6, :].set(dndr(r, ne, omega, x, y, z))
+    sprime = sprime.at[3:6, :].set(dndr(r, ne, omega, x, y, z, edensity, refrac_field))
     sprime = sprime.at[:3, :].set(v)
 
     # Attenuation due to inverse bremsstrahlung
+    if opacity:
+        sprime = sprime.at[6, :].set(-opacity_interp(r)*c*amp)
     if inv_brems:
         sprime = sprime.at[6, :].set(trilinearInterpolator((x, y, z), kappa(ne, Te, Z, omega), r) * amp)
     if phaseshift:
-        sprime = sprime.at[7, :].set(omega * (trilinearInterpolator((x, y, z), n_refrac(ne, omega), r) - 1.0))
+        sprime = sprime.at[7, :].set(phase(r))
 
     if B_on:
         """
@@ -302,7 +338,25 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
     if (ScalarDomain.B_on):
         VerdetConst = 2.62e-13 * lwl ** 2 # radians per Tesla per m^2
 
+    if (ScalarDomain.opacity):
+        energy = 6.63e-34*c/(lwl*1.6e-19)
+        opacity_interp = attenuation(domain = ScalarDomain, energy = energy)
+        def atten(x):
+            return opacity_interp(x)
+    else:
+        def atten():
+            return 0.0
+        
     omega = 2 * jnp.pi * c / lwl
+
+    if (ScalarDomain.phaseshift):
+        ne_interp = RegularGridInterpolator((ScalarDomain.x, ScalarDomain.y, ScalarDomain.z), ScalarDomain.ne, bounds_error = False, fill_value = 0.0)
+        def phase(x):
+            return  jnp.array(-0.5 * ne_interp(x)/(3.14207787e-4*omega), dtype = jnp.float64)
+    else:
+        def phase():
+            return 0.0
+    
 
     region_count = ScalarDomain.region_count
     ray_batch_count = ScalarDomain.ray_batch_count
@@ -468,7 +522,11 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
             # think we should change this???
 
             # passed args must be hashable to be made static for jax.jit, tuple is hashable, array & dict are not
-            args = (parallelise, ScalarDomain.inv_brems, ScalarDomain.phaseshift, ScalarDomain.B_on, ScalarDomain.ne, ScalarDomain.B, ScalarDomain.Te, ScalarDomain.Z, ScalarDomain.x, ScalarDomain.y, ScalarDomain.z, omega, VerdetConst, ScalarDomain.lengths, ScalarDomain.dims)
+            args = (parallelise, ScalarDomain.inv_brems, ScalarDomain.phaseshift, ScalarDomain.B_on, 
+                    ScalarDomain.ne, ScalarDomain.B, ScalarDomain.Te, ScalarDomain.Z, ScalarDomain.x, 
+                    ScalarDomain.y, ScalarDomain.z, omega, VerdetConst, ScalarDomain.lengths, 
+                    ScalarDomain.dims, ScalarDomain.opacity, ScalarDomain.edensity, 
+                    ScalarDomain.refrac_field)
 
             if not parallelise:
                 from numpy import array
@@ -557,7 +615,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                 #import optax - diffrax uses as a dependency, don't need to import directly
 
                 # using lengths and/or dims to set parameters of diffeqsolve(...) results in BooleanConversionError due to tracing variable resolution
-                def diffrax_solve(dydt, t0, t1, Nt, lengths, dims, *, rtol = 1e-7, atol = 1e-9):
+                def diffrax_solve(dydt, t0, t1, Nt, lengths, dims, *, rtol = 1e-2, atol = 1e-5):
                     """
                     Here we wrap the diffrax diffeqsolve function such that we can easily parallelise it
                     """
@@ -573,27 +631,27 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                     saveat = SaveAt(ts = jnp.linspace(t0, t1, Nt))
         
                     # Diffrax uses adaptive time stepping to gain accuracy within certain tolerances
-                    #dtmax = 0.5 * ((lengths[0] * lengths[1] * lengths[2]) / (dims[0] * dims[1] * dims[2])) ** (1 / 3) / (c * norm_factor)
-                    stepsize_controller = PIDController(rtol = 1, atol = 1e-5)#, dtmax = dtmax)
+                    dtmax = 0.5 * ((lengths[0]/dims[0])**2 + (lengths[1]/dims[1])**2 + (lengths[2]/dims[2])**2) ** (1 / 2) / (c * norm_factor)
+                    stepsize_controller = PIDController(rtol = rtol, atol = atol, dtmax = dtmax)
 
                     return lambda s0, args : diffeqsolve(
                         term,
                         solver,
                         y0 = jnp.array(s0),
-                        args = args,
+                        args = args + (atten, phase),
                         t0 = t0,
                         t1 = t1,
-                        dt0 = (t1 - t0) * norm_factor / Nt, # can set = 0 if dtmax is set apparently?
+                        dt0 = None, # can set = 0 if dtmax is set apparently?
                         saveat = saveat,
                         stepsize_controller = stepsize_controller,
                         # set max steps to no. of cells x100
                         # cannot be passed as dims --> causes boolean conversion error, has to be passed directly
                         # need to pass this correctly so that it remains consistent with class when batching
-                        max_steps = 10000#dims[0] * dims[1] * dims[2] * 100 #10000 - default for solve_ivp?????
+                        max_steps = int(2e8) #dims[0] * dims[1] * dims[2] * 100 #10000 - default for solve_ivp?????
                     )
 
                 # hardcode to normalise to 1 due to diffrax bug
-                ODE_solve = diffrax_solve(dsdt_ODE, t[0], t[-1] / norm_factor, save_points_per_region, ScalarDomain.lengths, ScalarDomain.dims)
+                ODE_solve = diffrax_solve(dsdt_ODE, 0, 1, save_points_per_region, ScalarDomain.lengths, ScalarDomain.dims)
 
                 if jitted:
                     start_comp = time()
@@ -608,13 +666,14 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
                 # pass s0[:, i] for each ray via a jax.vmap for parallelisation
                 start = time()
+               
                 sol = jax.block_until_ready(
                     # in_axes version ensures that vmap doesn't map args parameters, just s0
                     #jax.vmap(lambda rays, args: ODE_solve, in_axes = (0, None))(s0, args)
 
                     # default vmap_method argument is sequential, this is deprecated though and will cause a warning (if debugging) past jax 0.6.0
                     # look into different options for this parameter at a later date
-
+                    
                     jax.vmap(ODE_solve, in_axes = (0, None))(s0, args)
                 )
 

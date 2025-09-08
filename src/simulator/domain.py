@@ -39,7 +39,9 @@ class ScalarDomain(eqx.Module):
 
     inv_brems: bool
     phaseshift: bool
+    opacity: bool
     B_on: bool
+    edensity: bool
 
     probing_direction: str
 
@@ -72,9 +74,9 @@ class ScalarDomain(eqx.Module):
     ne: jax.Array
 
     B: jax.Array
-    Te: jax.Array
+    Te: np.array
     Z: jax.Array
-
+  
     region_count: jnp.int32
 
     coord_backup: jax.Array
@@ -88,8 +90,14 @@ class ScalarDomain(eqx.Module):
     Np_total: np.int64
     ray_batch_count: np.int64
 
-    def __init__(self, lengths, dims, *, ne_type = None, inv_brems = False, phaseshift = False, B_on = False, probing_direction = 'z', auto_batching = True, iteration = 1, region_count = 1, leeway_factor = None, coord_backup = None, future_dims = None, extra_info = False, memory_reporting = False, memory_limit = None, Np = None,
-        s = None, s1 = None, s2 = None, Ly = None, ne_0 = None, ne = None, B = None, Bmax = None, Te = None, Te_min = None, Z = None):
+    opacity_files: list
+    densities: list
+    num_materials: jnp.int32
+
+    refrac_field: jax.Array
+
+    def __init__(self, lengths, dims, *, ne_type = None, inv_brems = False, opacity = False, phaseshift = False, B_on = False, probing_direction = 'z', auto_batching = True, iteration = 1, region_count = 1, leeway_factor = None, coord_backup = None, future_dims = None, extra_info = False, memory_reporting = False, memory_limit = None, Np = None,
+        s = None, s1 = None, s2 = None, Ly = None, ne_0 = None, ne = None, B = None, Bmax = None, Te = None, Te_min = None, Z = None, opacity_files = None, densities = None, num_materials = None, edensity = True, refrac_field = None):
         """
         A class to set-up/generate the scalar simulation domains and store for later use.
 
@@ -105,6 +113,9 @@ class ScalarDomain(eqx.Module):
 
         :param inv_brems: Disables python multithreading to prevent conflict with jax parallelisation in some instances.
         :type inv_brems: bool (default = True)
+
+        :param opacity:
+        :type opacity:
 
         :param phaseshift: Enable 64-bit values in jax (double precision floating point arithmetic).
         :type phaseshift: bool (default = False)
@@ -194,10 +205,24 @@ class ScalarDomain(eqx.Module):
         self.Z = Z
         del Z
 
+        self.refrac_field = refrac_field
+        del refrac_field
+
+        self.opacity_files = opacity_files
+        del opacity_files
+
+        self.densities = densities
+        del densities
+
+        self.num_materials = num_materials
+        del num_materials
+
         # Logical switches
         self.inv_brems = inv_brems
+        self.opacity = opacity
         self.phaseshift = phaseshift
         self.B_on = B_on
+        self.edensity = edensity
 
         self.probing_direction = probing_direction
 
@@ -256,7 +281,10 @@ class ScalarDomain(eqx.Module):
 
         del dims
         del valid_types
-
+        
+        if self.opacity:
+            self.inv_brems = False
+        
         # changed function to pass to np.int64 to prevent overflow - this was causing the negatives
         # --> (exactly 0 in the case of a 1024^3 domain as it is right on the limit)
         predicted_domain_allocation = domain_estimate(self.x_n, self.y_n, self.z_n)

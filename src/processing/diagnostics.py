@@ -299,7 +299,7 @@ class Diagnostic:
     """
 
     # this is in mm's not metres - self.rf is converted to mm's (not sure if everything else is covered though)
-    def __init__(self, wavelength, rf, Jf = None, *, focal_plane = 0, L = 400, R = 25, Lx = 18, Ly = 13.5, x = None, y = None, x_l = None, y_l = None, amp = None, phase = None, l_x = 0, u_x = 0.3, l_y = -5, u_y = 5):
+    def __init__(self, wavelength, rf, Jf = None, *, focal_plane = 0, L = 400, R = 25, Lx = 18, Ly = 13.5, x = None, y = None, x_l = None, y_l = None, l_x = 0, u_x = 0.3, l_y = -5, u_y = 5):
         """
         Initialise ray diagnostic.
 
@@ -315,7 +315,7 @@ class Diagnostic:
         self.wavelength, self.focal_plane, self.L, self.R, self.Lx, self.Ly = wavelength, focal_plane, L, R, Lx, Ly
 
         self.x, self.y, self.x_l, self.y_l = x, y, x_l, y_l
-        self.amp, self.phase = amp, phase
+        self.amp, self.phase = rf[4, :], rf[5, :]
 
         # these HAVE to stay... for some reason - not entirely sure why you can't just reference self.Beam.r_ directly (or now just rf)
         # if you can make it without the memory duplication work please do, else DON'T REMOVE!
@@ -325,9 +325,12 @@ class Diagnostic:
         # just re-assert type here to fix
 
         if rf is not None:
+            rf = rf[:4, :]
             # forces self.rf to the last slice if rf returns multiple samples
             # also preserves the whole pass if required
             if len(rf.shape) == 3:
+                #!! why would rf have length 3? will need to update this line to take into account the
+                #fact that I changed the structure of rf - Alan
                 #self.rf_full = rf
                 rf = rf[-1, :, :]
 
