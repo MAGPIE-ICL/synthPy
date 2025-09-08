@@ -379,7 +379,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
     else:
         def atten():
             return 0.0
-        
+
     omega = 2 * jnp.pi * c / lwl
 
     region_count = ScalarDomain.region_count
