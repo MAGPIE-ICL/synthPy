@@ -72,6 +72,41 @@ def kappa(ne, Te, Z, omega):
 def n_refrac(ne, omega):
     return jnp.sqrt(1.0 - (omega_pe(ne * 1e-6) / omega) ** 2)
 
+def opacity_grid_generation(domain, energy):
+    opa_max = domain.z_n/domain.z_length
+
+    if domain.num_materials == 1:
+        # pulls data from files
+        grp_centres, grps, rho, Te, opa_data = open_emi_files(f"../../{domain.opacity_files}")
+
+        # creates an energy grid?
+        energy_grid = jnp.full_like(domain.densities, energy)
+        # maps data and energies to grid via interpolation for later calculation, returns opacity_mapped_grid
+        return trilinearInterpolator((grp_centres, rho, Te), jnp.minimum(opa_max, opa_data), (energy_grid, domain.densities, domain.Te))
+
+        ### opacity_mapped_grid is what needs to be passed as a new domain sized object to be interpolated
+        ### trilinearInterpolator will need generalising to take in a 3D grid of interpolation points
+
+        # interpolates at points r
+        #opacity_spatial_grid = trilinearInterpolator((domain.x, domain.y, domain.z), opacity_mapped_grid, r)
+    else:
+        if (len(domain.opacity_files) != len(domain.densities)) & (len(domain.densities) != domain.num_materials):
+            raise ValueError("densities and opacity_files must have length equal to num_materials")
+
+        opacity_grids = [0] * domain.num_materials
+        for i in range (domain.num_materials):
+            grp_centres, grps, rho, Te, opa_data = open_emi_files(f"../../{domain.opacity_files[i]}")
+
+            # rhos = domain.densities[i].ravel()
+            # r = jnp.c_[domain.energy*jnp.ones_like(rhos),rhos,domain.Te.ravel()]
+            opacity_grids[i] = trilinearInterpolator((grp_centres, rho, Te), jnp.minimum(opa_max, opa_data), (energy, domain.densities[i], domain.Te))
+
+        # returns opacity_grids_tot
+        return np.sum(opacity_grids, axis = 0)
+
+        # interpolates at points r
+        #opacity_spatial_grid_tot = trilinearInterpolator((domain.x, domain.y, domain.z), opacity_grids_tot, r)
+
 def attenuation(domain, energy):
     opa_max = domain.z_n/domain.z_length
     
@@ -146,9 +181,11 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
     """
 
     if not parallelise:
+        print("False")
         # jnp.reshape() auto converts to a jax array rather than having to do after a numpy reshape
         s = jnp.reshape(s, (9, s.size // 9))
     else:
+        print("True")
         # forces s to be a matrix even if has the indexes of a 1d array such that dsdt() can be generalised
         s = jnp.reshape(s, (9, 1))  # one ray per vmap iteration if parallelised
 
@@ -170,8 +207,10 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
     del s
 
     if edensity is True:
+        print("True")
         gradient_term = -0.5 * c ** 2 * ne / (3.14207787e-4 * omega ** 2)
     else:
+        print("False")
         gradient_term = 0.5 * c ** 2 * refrac_field ** 2
 
     # must unpack x, y, z tuple here for the sake of dndr, could be earlier but this is easier to pass and more generalised
@@ -180,33 +219,38 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
     sprime = sprime.at[:3, :].set(v)
 
     ###
-    ### Is opacity calculated correctly? Shouldn't it subtract from the previous value? Won't it be override by bremsstrahhlung instead of added to it?
     ### Sort out passed functions and objects
-    ### Is opacity calculation wavelength dependent? Only should come into effect for x-ray wavelengths I believe?
     ###
 
-    # Attenuation due to x-ray opacity
+    # Attenuation due to x-ray opacity, this takes into account inverse brehmmstrauhlung effects - hence opacity = True overrides inv_brems = True
     if opacity:
+        print("opacity")
         sprime = sprime.at[6, :].set(-opacity_interp(r) * c * amp)
     # Attenuation due to inverse bremsstrahlung
     if inv_brems:
+        print("inv_brems")
         sprime = sprime.at[6, :].set(trilinearInterpolator((x, y, z), kappa(ne, Te, Z, omega), r) * amp)
 
-    ###
-    ### Which one of these to use? Are they equivelemt?
-    ### - if not, which is right
-    ### - if they are, which is more efficient (prioritise memory efficiency)
-    ###
+    ##
+    ## Commented out code is previous version - this was apparently causing floating point errors (Alan did not specify what/how)
+    ## Second form of this is the expansion of the n_refrac() function directly into calculation
+    ##
+    ## Current version is an expansion of the expression to avoid these floating point errors
+    ## It has been changes to use trilinearInterpolator in similar fashion to original instead of passing a phase() function as this change was made to do originally
+    ##
 
+    '''
     if phaseshift:
+        print("phaseshift")
         sprime = sprime.at[7, :].set(omega * (trilinearInterpolator((x, y, z), n_refrac(ne, omega), r) - 1.0))
         #sprime = sprime.at[7, :].set(omega * (trilinearInterpolator((x, y, z), jnp.sqrt(1.0 - (5.64 * jnp.sqrt(ne) / omega) ** 2), r) - 1.0))
     '''
     if phaseshift:
+        print("phaseshift")
         sprime = sprime.at[7, :].set(jnp.array(-0.5 * trilinearInterpolator((x, y, z), ne, r) / (3.14207787e-4 * omega), dtype = jnp.float64))
-    '''
 
     if B_on:
+        print("B_on")
         """
         Returns the VerdetConst ne B.v
 
@@ -372,11 +416,15 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
         VerdetConst = 2.62e-13 * lwl ** 2 # radians per Tesla per m^2
 
     if (ScalarDomain.opacity):
+        opacity_domain_grid = opacity_grid_generation(domain = ScalarDomain, energy = 6.63e-34 * c / (lwl * 1.6e-19))
+
         energy = 6.63e-34 * c / (lwl * 1.6e-19)
         opacity_interp = attenuation(domain = ScalarDomain, energy = energy)
         def atten(x):
             return opacity_interp(x)
     else:
+        opacity_domain_grid = 0.0
+
         def atten():
             return 0.0
 
@@ -565,12 +613,15 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
             # think we should change this???
 
             # passed args must be hashable to be made static for jax.jit, tuple is hashable, array & dict are not
-            args = (parallelise, ScalarDomain.inv_brems, ScalarDomain.phaseshift, ScalarDomain.B_on, 
-                    ScalarDomain.ne, ScalarDomain.B, ScalarDomain.Te, ScalarDomain.Z,
-                    ScalarDomain.x, ScalarDomain.y, ScalarDomain.z,
-                    omega, VerdetConst,
-                    ScalarDomain.lengths, ScalarDomain.dims,
-                    ScalarDomain.opacity, ScalarDomain.edensity, ScalarDomain.refrac_field)
+            args = (
+                parallelise, ScalarDomain.inv_brems, ScalarDomain.phaseshift, ScalarDomain.B_on, 
+                ScalarDomain.ne, ScalarDomain.B, ScalarDomain.Te, ScalarDomain.Z,
+                ScalarDomain.x, ScalarDomain.y, ScalarDomain.z,
+                omega, VerdetConst,
+                ScalarDomain.lengths, ScalarDomain.dims,
+                ScalarDomain.opacity, ScalarDomain.edensity, ScalarDomain.refrac_field,
+                opacity_domain_grid
+            )
 
             ###
             ### Check the original algorithm still works for the sake of testing
@@ -592,7 +643,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
                 start = time()
                 # wrapper allows dummy variables t & y to be used by solve_ivp(), self is required by dsdt
-                sol = solve_ivp(lambda t, y: dsdt(t, y, *(args + (atten, ))), [0, t[-1]], s0, t_eval = t)
+                sol = solve_ivp(lambda t, y: dsdt(t, y, *args), [0, t[-1]], s0, t_eval = t)
             else:
                 # transposed as jax.vmap() expects form of [batch_idx, items] not [items, batch_idx]
                 available_devices = jax.devices()
@@ -687,7 +738,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                         term,
                         solver,
                         y0 = jnp.array(s0),
-                        args = args + (atten, ),
+                        args = args,# + (atten, ),
                         t0 = t0,
                         t1 = t1,
                         dt0 = None, # can set = 0 if dtmax is set apparently?
