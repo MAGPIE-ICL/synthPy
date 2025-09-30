@@ -713,7 +713,8 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                 #import optax - diffrax uses as a dependency, don't need to import directly
 
                 # using lengths and/or dims to set parameters of diffeqsolve(...) results in BooleanConversionError due to tracing variable resolution
-                def diffrax_solve(dydt, t0, t1, Nt, lengths, dims, *, rtol = 1e-2, atol = 1e-5):
+                # rtol & atol are good here - setting too precise increases runtime dramatically for little change in results, it overcompensates
+                def diffrax_solve(dydt, t0, t1, Nt, lengths, dims, *, rtol = 1, atol = 1e-5):
                     """
                     Here we wrap the diffrax diffeqsolve function such that we can easily parallelise it
                     """
@@ -729,8 +730,9 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                     saveat = SaveAt(ts = jnp.linspace(t0, t1, Nt))
         
                     # Diffrax uses adaptive time stepping to gain accuracy within certain tolerances
-                    dtmax = 0.5 * ((lengths[0]/dims[0])**2 + (lengths[1]/dims[1])**2 + (lengths[2]/dims[2])**2) ** (1 / 2) / (c * norm_factor)
-                    stepsize_controller = PIDController(rtol = rtol, atol = atol, dtmax = dtmax)
+                    # setting dtmax increases runtime significantly - maybe this is too high and thus calculations are not precise due to scale of change?
+                    #dtmax = 0.5 * ((lengths[0] / dims[0])**2 + (lengths[1] / dims[1])**2 + (lengths[2] / dims[2])**2) ** (1 / 2) / (c * norm_factor)
+                    stepsize_controller = PIDController(rtol = rtol, atol = atol)#, dtmax = dtmax)
 
                     return lambda s0, args : diffeqsolve(
                         term,
@@ -739,14 +741,15 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                         args = args,# + (atten, ),
                         t0 = t0,
                         t1 = t1,
-                        dt0 = None, # can set = 0 if dtmax is set apparently?
+                        # None (leaving up to controller) shows better performance than setting ourselves
+                        dt0 = None,#(t1 - t0) * norm_factor / Nt, # can set = 0 if dtmax is set apparently?
                         saveat = saveat,
                         stepsize_controller = stepsize_controller,
                         # set max steps to no. of cells x100
                         # cannot be passed as dims --> causes boolean conversion error, has to be passed directly
                         # need to pass this correctly so that it remains consistent with class when batching
                         max_steps = int(2e8) #dims[0] * dims[1] * dims[2] * 100 #10000 - default for solve_ivp?????
-                    )
+                    ) # the 2e8 choice is very arbritrary
 
                 # hardcode to normalise to 1 due to diffrax bug
                 ODE_solve = diffrax_solve(dsdt_ODE, 0, 1, save_points_per_region, ScalarDomain.lengths, ScalarDomain.dims)
