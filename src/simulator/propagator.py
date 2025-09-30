@@ -207,10 +207,8 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
     del s
 
     if edensity is True:
-        print("True")
         gradient_term = -0.5 * c ** 2 * ne / (3.14207787e-4 * omega ** 2)
     else:
-        print("False")
         gradient_term = 0.5 * c ** 2 * refrac_field ** 2
 
     # must unpack x, y, z tuple here for the sake of dndr, could be earlier but this is easier to pass and more generalised
