@@ -14,4 +14,4 @@ echo 'packages loaded successfully'
 
 echo 'starting job'
 
-python -u evaluation/benchmarks/turbBoxLargeTest/updated.py
+python -u evaluation/benchmarks/turbBoxLargeTest/updated.py -p "path/synthPy/src" -s "path/radmeshablation_3d_prp_CH_ug_3rd_hdf5_plt_cnt_0228" #-m 100663296

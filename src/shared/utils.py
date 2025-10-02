@@ -170,7 +170,7 @@ def heat_plot(x, y, *, bin_scale = 1, pix_x = 3448, pix_y = 2574, Lx = 18, Ly = 
     #axis.set_xlim([-9, 9])
     #axis.set_ylim([-6.75, 6.75])
 
-def memory_report(running_device = None):
+def memory_report(running_device = None, memory_limit = None):
     if running_device is None:
         from jax.lib import xla_bridge
         running_device = xla_bridge.get_backend().platform
@@ -198,7 +198,7 @@ def memory_report(running_device = None):
     total = info.total
     used = info.used
 
-    return {
+    results = {
         'device': running_device,
         'total_raw': total,
         'total': mem_conversion(total),
@@ -207,5 +207,16 @@ def memory_report(running_device = None):
         'used_raw': used,
         'used': mem_conversion(used)
     }
+
+    if memory_limit is not None:
+        memory_limit *= 1024
+        if memory_limit < results['total_raw']:
+            results['total_raw'] = memory_limit
+            results['total'] = mem_conversion(results['total_raw'])
+
+            results['free_raw'] = memory_stats['total_raw'] - results['used_raw']
+            results['free'] = mem_conversion(results['free_raw'])
+
+    return results
 
 generic_valid_types = (int, np.int32, np.int64, jnp.int32, jnp.int64, float, np.float32, np.float64, jnp.float32, jnp.float64)

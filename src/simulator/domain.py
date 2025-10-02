@@ -6,12 +6,23 @@ import equinox as eqx
 
 #from functools import partial
 
+from math import ceil
+from math import floor
+
 from shared.utils import mem_conversion
 from shared.printing import colour
 from shared.utils import dalloc
 from shared.utils import domain_estimate
 from shared.utils import memory_report
 from shared.utils import getsizeof_default
+
+# decorating a function like this will initiate manual rematerialisation - could reduce memory usage for large array calculations??
+# test? also test in propagator? where?
+'''
+from jax import checkpoint
+
+@checkpoint
+'''
 
 class ScalarDomain(eqx.Module):
     s: jnp.float32
@@ -28,7 +39,9 @@ class ScalarDomain(eqx.Module):
 
     inv_brems: bool
     phaseshift: bool
+    opacity: bool
     B_on: bool
+    edensity: bool
 
     probing_direction: str
 
@@ -61,9 +74,9 @@ class ScalarDomain(eqx.Module):
     ne: jax.Array
 
     B: jax.Array
-    Te: jax.Array
+    Te: np.array
     Z: jax.Array
-
+  
     region_count: jnp.int32
 
     coord_backup: jax.Array
@@ -72,11 +85,19 @@ class ScalarDomain(eqx.Module):
     extra_info: bool
     memory_reporting: bool
 
+    memory_limit: np.int64
+
     Np_total: np.int64
     ray_batch_count: np.int64
 
-    def __init__(self, lengths, dims, *, ne_type = None, inv_brems = False, phaseshift = False, B_on = False, probing_direction = 'z', auto_batching = True, iteration = 1, region_count = 1, leeway_factor = None, coord_backup = None, future_dims = None, extra_info = False, memory_reporting = False, Np = None,
-        s = None, s1 = None, s2 = None, Ly = None, ne_0 = None, ne = None, B = None, Bmax = None, Te = None, Te_min = None, Z = None):
+    opacity_files: list
+    densities: list
+    num_materials: jnp.int32
+
+    refrac_field: jax.Array
+
+    def __init__(self, lengths, dims, *, ne_type = None, inv_brems = False, opacity = False, phaseshift = False, B_on = False, probing_direction = 'z', auto_batching = True, iteration = 1, region_count = 1, leeway_factor = None, coord_backup = None, future_dims = None, extra_info = False, memory_reporting = False, memory_limit = None, Np = None,
+        s = None, s1 = None, s2 = None, Ly = None, ne_0 = None, ne = None, B = None, Bmax = None, Te = None, Te_min = None, Z = None, opacity_files = None, densities = None, num_materials = None, edensity = True, refrac_field = None):
         """
         A class to set-up/generate the scalar simulation domains and store for later use.
 
@@ -93,41 +114,47 @@ class ScalarDomain(eqx.Module):
         :param inv_brems: Disables python multithreading to prevent conflict with jax parallelisation in some instances.
         :type inv_brems: bool (default = True)
 
+        :param opacity:
+        :type opacity:
+
         :param phaseshift: Enable 64-bit values in jax (double precision floating point arithmetic).
         :type phaseshift: bool (default = False)
 
         :param B_on: Enables debug flags, increases runtime.
         :type B_on: bool (default = False)
 
-        :param probing_direction: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
-        :type probing_direction: bool (default = True)
+        :param probing_direction: Set's the direction the beam is propagating in.
+        :type probing_direction: char (default = 'z')
 
-        :param auto_batching: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
+        :param auto_batching: Enable automatic domain and ray batching algorithm.
         :type auto_batching: bool (default = True)
 
-        :param iteration: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
-        :type iteration: bool (default = True)
+        :param iteration: Indicates which batch of rays this is, important to distinguish if it is the first or not.
+        :type iteration: int (default = 1)
 
-        :param region_count: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
-        :type region_count: bool (default = True)
+        :param region_count: The number of regions the domain is batched into.
+        :type region_count: int, default: 1
 
-        :param leeway_factor: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
-        :type leeway_factor: bool (default = True)
+        :param leeway_factor: Scalar to memory usage estimations, used to give extra leeway to total predictions.
+        :type leeway_factor: float, default: 1.1 - 10% margin
 
-        :param coord_backup: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
-        :type coord_backup: bool (default = True)
+        :param coord_backup: Co-ordinates of the previous domain object.
+        :type coord_backup: jax.Array, default: None
 
-        :param future_dims: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
-        :type future_dims: bool (default = True)
+        :param future_dims: Array of dim allocations for past/current/future domain objects.
+        :type future_dims: jax.Array, default: None
 
-        :param extra_info: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
-        :type extra_info: bool (default = True)
+        :param extra_info: Flag to enable printing of extra information - namely domain parameters.
+        :type extra_info: bool, default: False
 
-        :param memory_reporting: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
-        :type memory_reporting: bool (default = True)
+        :param memory_reporting: Flag to enable priting of memory information.
+        :type memory_reporting: bool, default: False
 
-        :param Np: Some flags aren't available in older versions of jax, set to False if running into issues setting them - should deprecate soon.
-        :type Np: bool (default = True)
+        :param memory_limit: Set arbritrary jax memory usage limit in KiB, overrides autodetection of available space, see [here] for more details.
+        :type memory_limit: np.int64, default: None
+
+        :param Np: The total number of rays to be simulated - needs to be set if intending to batch ray generation.
+        :type Np: int, default: None
 
         + plus an assortment of paramters for domain generation that can be set to override defaults
             (s, s1, s2, Ly, ne_0, ne, B, Bmax, Te, Te_min, Z)
@@ -139,6 +166,22 @@ class ScalarDomain(eqx.Module):
         :return: Returns an equinox.Module inheriting object containing information about and the generated/imported domain itself.
         :rtype: simulator.domain.ScalarDomain
         """
+
+        ###
+        ### Can some of these flags be moved to propagator.py instead?
+        ###
+
+        # Logical switches
+        self.inv_brems = inv_brems
+        del inv_brems
+        self.opacity = opacity
+        del opacity
+        self.phaseshift = phaseshift
+        del phaseshift
+        self.B_on = B_on
+        del B_on
+        self.edensity = edensity
+        del edensity
 
         # initalise
         self.s = s
@@ -178,25 +221,42 @@ class ScalarDomain(eqx.Module):
         self.Z = Z
         del Z
 
-        # Logical switches
-        self.inv_brems = inv_brems
-        self.phaseshift = phaseshift
-        self.B_on = B_on
+        if self.edensity == True and refrac_field is not None:
+            print(colour.BOLD + "\nBy setting edensity == True, refrac_field will not be used. If this is intended, we suggest you do not pass this value in future." + colour.END)
+            print(" --> Overriding self.refrac_field entry to None")
+
+            self.refrac_field = None
+        else:
+            self.refrac_field = refrac_field
+        del refrac_field
+
+        self.opacity_files = opacity_files
+        del opacity_files
+
+        self.densities = densities
+        del densities
+
+        self.num_materials = num_materials
+        del num_materials
 
         self.probing_direction = probing_direction
 
         self.ne_type = ne_type
 
+        assert (self.edensity == True and (self.ne is not None or self.ne_type is not None)), "\nMust pass either a pre-generated field or a type of field to generate."
+        assert not (self.edensity == False and self.refrac_field is not None), "\nIf edensity == False, refrac_field must be supplied."
+
         # working with 10% leeway in estimate for now
         if leeway_factor is not None:
             self.leeway_factor = leeway_factor
         else:
-            # set to 2 as a result of concerns of ray memory size
-            self.leeway_factor = 2
+            # set to 1.1 by default, gives 10% leeway in prediction
+            self.leeway_factor = 1.1
 
         self.extra_info = extra_info
         # not used right now but probably will be in the future so not bothering to remove
         self.memory_reporting = memory_reporting
+        self.memory_limit = memory_limit
 
         if Np is not None:
             self.Np_total = np.int64(Np)
@@ -240,22 +300,30 @@ class ScalarDomain(eqx.Module):
         del dims
         del valid_types
 
+        ###
+        ### Why has this been set to override it?
+        ### Explains the override in propagator, but does this functionality make sense?
+        ###
+
+        if self.opacity:
+            self.inv_brems = False
+
         # changed function to pass to np.int64 to prevent overflow - this was causing the negatives
         # --> (exactly 0 in the case of a 1024^3 domain as it is right on the limit)
         predicted_domain_allocation = domain_estimate(self.x_n, self.y_n, self.z_n)
         print("Predicted size in memory of domain:", mem_conversion(predicted_domain_allocation))
 
-        if iteration == 1 and auto_batching:
-            memory_stats = memory_report()
+        if iteration == 1 and auto_batching and self.edensity == True:
+            memory_stats = memory_report(memory_limit = memory_limit)
 
             print("\nMemory prior to domain creation:")
-            print(f' - total : {memory_stats['total']}')
-            print(f' - free  : {memory_stats['free']}')
-            print(f' - used  : {memory_stats['used']}')
+            print(f" - total : {memory_stats['total']}")
+            print(f" - free  : {memory_stats['free']}")
+            print(f" - used  : {memory_stats['used']}")
 
-            ##
-            ## Need to work out the max allocation at any point and that estimated size
-            ##
+            ###
+            ### Need to work out the max allocation at any point and that estimated size
+            ###
 
             # 2 for ne and ne_nc in calc_dndr(...) before ne is deleted
             # at peak mem usage ne should have been deleted, therefore this contributes only 1 domain
@@ -268,14 +336,14 @@ class ScalarDomain(eqx.Module):
             allocation_count = 2
 
             # up to +5 in calc_dndr(...) depending on the number of extra interps
-            if B_on:
+            if self.B_on:
                 # there are 4 B based interps
                 # and they also require a ScalarDomain.B domain sized matrice
                 allocation_count += 4
-            if inv_brems:
+            if self.inv_brems:
                 # unsure how many intermediaries exist at peak mem usage for this allocation - need to check and adjust this
                 allocation_count += 1
-            if phaseshift:
+            if self.phaseshift:
                 allocation_count += 1
 
             # compare to max allocation in domain setup and return the greatest
@@ -313,40 +381,45 @@ class ScalarDomain(eqx.Module):
 
             # when jnp.float32 is not used, will cause overflow error if 64 bit floats are not enabled
             if limiting_value > np.float64(memory_stats['free_raw']):
-                from math import ceil
-                from math import floor
+                if self.ne is None:
+                    if self.Np_total is None:
+                        print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
+                    else:
+                        print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN + RAYS CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
+                        self.ray_batch_count = np.int64(ceil(ray_memory_raw * self.leeway_factor / np.float64(memory_stats['free_raw'])))
+                    print(" --> Auto-batching domain based on memory available and domain size estimate...")
 
-                if self.Np_total is None:
-                    print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
+                    ##
+                    ## Used backed up information to re-assign to ScalarDomain in propagator
+                    ## Then call generate_electron_density_profile(...) and re-do calculations with end of prior domain
+                    ##
+
+                    #self.region_count = ceil((limiting_value - ray_memory_raw / self.ray_batch_count) / np.float64(memory_stats['free_raw']))
+                    self.region_count = ceil(np.float64(predicted_domain_allocation * allocation_count) / (np.float64(memory_stats['free_raw']) - ceil(ray_memory_raw / self.ray_batch_count)))
+
+                    self.coord_backup = jnp.float32(jnp.linspace(
+                    -self.lengths[['x', 'y', 'z'].index(self.probing_direction)] / 2,
+                        self.lengths[['x', 'y', 'z'].index(self.probing_direction)] / 2,
+                        self.dims[['x', 'y', 'z'].index(self.probing_direction)]
+                    ))
+
+                    dim_per_region = self.dims[['x', 'y', 'z'].index(self.probing_direction)] // self.region_count
+                    self.future_dims = jnp.concatenate([
+                        jnp.expand_dims(0, axis = 0), jnp.array([dim_per_region] * self.region_count),
+                        jnp.array([self.dims[['x', 'y', 'z'].index(self.probing_direction)] - dim_per_region * self.region_count])
+                    ])
+
+                    print(" --> Batching calculation completed. Domain will be split into " + str(self.region_count) + " regions with " + str(dim_per_region) + " dims per region.")
+                    print(colour.BOLD + "\nWARNING:" + colour.END + " This functionality will cause the solver to run slower due to domain regeneration, for optimal performance, increase the memory available to this program.")
+                    if self.Np_total is not None:
+                        print(" --> The domain is batched with the goal of minimising ray batching. Ray batches introduce sequantiality which reduces speed.")
                 else:
+                    self.region_count = 1
+
                     print(colour.BOLD + "\nESTIMATE SUGGESTS DOMAIN + RAYS CANNOT FIT IN AVAILABLE MEMORY." + colour.END)
                     self.ray_batch_count = np.int64(ceil(ray_memory_raw * self.leeway_factor / np.float64(memory_stats['free_raw'])))
-                print(" --> Auto-batching domain based on memory available and domain size estimate...")
-
-                ##
-                ## Used backed up information to re-assign to ScalarDomain in propagator
-                ## Then call generate_electron_density_profile(...) and re-do calculations with end of prior domain
-                ##
-
-                #self.region_count = ceil((limiting_value - ray_memory_raw / self.ray_batch_count) / np.float64(memory_stats['free_raw']))
-                self.region_count = ceil(np.float64(predicted_domain_allocation * allocation_count) / (np.float64(memory_stats['free_raw']) - ceil(ray_memory_raw / self.ray_batch_count)))
-
-                self.coord_backup = jnp.float32(jnp.linspace(
-                   -self.lengths[['x', 'y', 'z'].index(self.probing_direction)] / 2,
-                    self.lengths[['x', 'y', 'z'].index(self.probing_direction)] / 2,
-                       self.dims[['x', 'y', 'z'].index(self.probing_direction)]
-                ))
-
-                dim_per_region = self.dims[['x', 'y', 'z'].index(self.probing_direction)] // self.region_count
-                self.future_dims = jnp.concatenate([
-                    jnp.expand_dims(0, axis = 0), jnp.array([dim_per_region] * self.region_count),
-                    jnp.array([self.dims[['x', 'y', 'z'].index(self.probing_direction)] - dim_per_region * self.region_count])
-                ])
-
-                print(" --> Batching calculation completed. Domain will be split into " + str(self.region_count) + " regions with " + str(dim_per_region) + " dims per region.")
-                print(colour.BOLD + "\nWARNING:" + colour.END + " This functionality will cause the solver to run slower due to domain regeneration, for optimal performance, increase the memory available to this program.")
-                if self.Np_total is not None:
-                    print(" --> The domain is batched with the goal of minimising ray batching. Ray batches introduce sequantiality which reduces speed.")
+                    print(" --> Auto-batching rays based on memory available and domain size estimate...")
+                    print(" --> Can't auto-batch the domain as it is imported (limitation will be resolved in the future)")
             else:
                 self.region_count = 1
         else:
@@ -501,6 +574,18 @@ class ScalarDomain(eqx.Module):
 
     #@partial(jax.jit, static_argnames=("self",))  
     def generate_electron_density_profile(self):
+        """
+        Generate/import the selected electron density profile
+
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :raise AssertionError: If ne_type is changed from the default but not set to a valid type.
+
+        :return: No return, selects domain generation or import function and calls it from its assignment in the passed self object.
+        :rtype: None
+        """
+
         print("\nGenerating test", end = " ")
         if self.ne_type == "test_null":
             print("null -e field...")
@@ -551,6 +636,12 @@ class ScalarDomain(eqx.Module):
     def test_null(self):
         """
         Null test, an empty cube
+
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :return: No return, exports the empty (zeroed) cubic domain as an attribute to the passed self object.
+        :rtype: None
         """
 
         self.ne = self.ne.at[:, :, :].set(jnp.zeros_like(self.XX))
@@ -558,14 +649,19 @@ class ScalarDomain(eqx.Module):
     #@partial(jax.jit, static_argnames=("self",))  
     def test_slab(self, *, s = 1, ne_0 = 2e23):
         """
-        A slab with a linear gradient in x:
-        n_e =  ne_0 * (1 + s*x/extent)
+        A slab with a linear gradient in x: n_e =  ne_0 * (1 + s * x / extent) - will cause a ray deflection in x
 
-        Will cause a ray deflection in x
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
 
-        Args:
-            s (int, optional): scale factor. Defaults to 1.
-            ne_0 ([type], optional): mean density. Defaults to 2e23 m^-3.
+        :param s: scale factor
+        :type s: float, default: 1
+
+        :param ne_0: mean electron density
+        :type ne_0: float, default: 2e23 m\ :sup:`-3`
+
+        :return: No return, generates domain as attribute to passed self object.
+        :rtype: None
         """
 
         if self.s is not None:
@@ -580,11 +676,23 @@ class ScalarDomain(eqx.Module):
         """
         Linearly growing sinusoidal perturbation
 
-        Args:
-            s1 (float, optional): scale of linear growth. Defaults to 0.1.
-            s2 (float, optional): amplitude of sinusoidal perturbation. Defaults to 0.1.
-            ne_0 ([type], optional): mean electron density. Defaults to 2e23 m^-3.
-            Ly (int, optional): spatial scale of sinusoidal perturbation. Defaults to 1.
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :param s1: scale of linear growth
+        :type s1: float, default: 0.1
+
+        :param s2:  amplitude of sinusoidal perturbation
+        :type 2: float, default: 0.1
+
+        :param ne_0: mean electron density
+        :type ne_0: float, default: 2e23
+
+        :param Ly: spatial scale of sinusoidal perturbation
+        :type Ly: float, default: 1
+
+        :return: No return, generates domain as attribute to passed self object.
+        :rtype: None
         """
 
         if self.s1 is not None:
@@ -603,10 +711,20 @@ class ScalarDomain(eqx.Module):
         """
         Exponentially growing/decaying sinusoidal perturbation
 
-        Args:
-            ne_0 ([type], optional): mean electron density. Defaults to 1e24 m^-3.
-            Ly (int, optional): spatial scale of sinusoidal perturbation. Defaults to 1e-3 m.
-            s ([type], optional): scale of exponential change. Defaults to -2e-3 m (exponential decay).
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :param ne_0: mean electron density
+        :type ne_0: float, default: 1e24 m\ :sup:`-3`
+
+        :param Ly: scale of exponential change
+        :type Ly: float, default: -2e-3 [exponential decay]
+
+        :param s: spatial scale of sinusoidal perturbation
+        :type s: float, default: 1e-3
+
+        :return: No return, generates domain as attribute to passed self object.
+        :rtype: None
         """
 
         if self.ne_0 is not None:
@@ -636,33 +754,48 @@ class ScalarDomain(eqx.Module):
     #@partial(jax.jit, static_argnames=("self",))  
     def external_ne(self):
         """
-        Load externally generated grid
+        Load externally generated MxMxM grid of electron density (ne) in m\ :sup:`-3`
 
-        Args:
-            ne ([type]): MxMxM grid of density in m^-3
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :return: No return, loads domain as an attribute to the self referenced object.
+        :rtype: None
         """
 
         self.ne = self.ne.at[:, :, :].set(self.ne)
 
     '''
     #@partial(jax.jit, static_argnames=("self",))  
-    def external_B(self, *, B):
+    def external_B(self):
         """
-        Load externally generated grid
+        Load externally generated MxMxMx3 grid of B field in T
 
-        Args:
-            B ([type]): MxMxMx3 grid of B field in T
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :return: No return, loads domain as an attribute to the self referenced object.
+        :rtype: None
         """
 
-        self.B = self.B.at[:, :, :].set(B)
+        self.B = self.B.at[:, :, :, :].set(B)
 
     #@partial(jax.jit, static_argnames=("self",))  
     def external_Te(self, *, Te, Te_min = 1.0):
         """
-        Load externally generated grid
+        Load externally generated MxMxM grid of electron temperature in eV
 
-        Args:
-            Te ([type]): MxMxM grid of electron temperature in eV
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :param Te: MxMxM grid of electron temperature in eV
+        :type Te: jax.Array or numpy.array of shape M^3
+
+        :param Te_min: Set the minimum temperature of the grid
+        :type Te_min: float, default: 1.0
+
+        :return: No return, loads domain as an attribute to the self referenced object.
+        :rtype: None
         """
 
         self.Te = self.Te.at[:, :, :].set(jnp.maximum(Te_min, Te))
@@ -675,6 +808,21 @@ class ScalarDomain(eqx.Module):
         Args:
             Z ([type]): MxMxM grid of ionisation
         """
+        """
+        Load externally generated MxMxM grid of electron temperature in eV
+
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :param Te: MxMxM grid of electron temperature in eV
+        :type Te: jax.Array or numpy.array of shape M^3
+
+        :param Te_min: Set the minimum temperature of the grid
+        :type Te_min: float, default: 1.0
+
+        :return: No return, loads domain as an attribute to the self referenced object.
+        :rtype: None
+        """
 
         self.Z = self.Z.at[:, :, :].set(Z)
     '''
@@ -682,11 +830,16 @@ class ScalarDomain(eqx.Module):
     #@partial(jax.jit, static_argnames=("self",))  
     def test_B(self, *, Bmax = 1.0):
         """
-        A Bz field with a linear gradient in x:
-        Bz =  Bmax*x/extent
+        Generate a Bz field with a linear gradient in x: Bz =  Bmax * x / extent
 
-        Args:
-            Bmax ([type], optional): maximum B field, default 1.0 T
+        :param self: ScalarDomain object containing the domain to be generated's parameters.
+        :type self: simulator.domain.ScalarDomain object
+
+        :param Bmax: Limiting max value B field in a cell
+        :type Te: float, default: 1.0 T [Tesla]
+
+        :return: No return, loads domain as an attribute to the self referenced object.
+        :rtype: None
         """
 
         if self.Bmax is not None:
@@ -725,7 +878,7 @@ class ScalarDomain(eqx.Module):
             hour = dt.datetime.now().hour
 
             # filename extended to include the name of the property to be exported
-            fname = f'./plasma_PVTI_{property}_{day}_{month}_{year}_{hour}_{min}' #default fname to the current date and time 
+            fname = f"./plasma_PVTI_{property}_{day}_{month}_{year}_{hour}_{min}" #default fname to the current date and time 
 
         if property == 'ne':
             try: #check to ensure electron density has been added
@@ -752,9 +905,9 @@ class ScalarDomain(eqx.Module):
             # Add the data values to the cell data
             grid.cell_data["rnec"] = rnec.flatten(order="F")  # Flatten the array
 
-            grid.save(f'{fname}.vti')
+            grid.save(f"{fname}.vti")
 
-            print(f'VTI saved under {fname}.vti')
+            print(f"VTI saved under {fname}.vti")
 
         #prep values to write the pvti, written to match the exported vti using pyvista
 
@@ -774,10 +927,10 @@ class ScalarDomain(eqx.Module):
                         </VTKFile>"""
     
         # write file
-        with open(f'{fname}.pvti', 'w') as file:
+        with open(f"{fname}.pvti", "w") as file:
             file.write(content)
 
-        print(f'Scalar Domain electron density succesfully saved under {fname}.pvti !')
+        print(f"Scalar Domain electron density succesfully saved under {fname}.pvti !")
 
     #@jax.jit
     def cleanup(self):

@@ -256,6 +256,8 @@ class gaussian3D:
         mask = (k >= k_min) & (k <= k_max)
         S[mask] = self.k_func(k[mask])
 
+        np.random.seed(seed = 42)
+        
         # Generate complex Gaussian noise
         noise = np.random.normal(0, 1, k.shape) + 1j * np.random.normal(0, 1, k.shape)
 

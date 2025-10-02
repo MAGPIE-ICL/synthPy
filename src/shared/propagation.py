@@ -1,7 +1,7 @@
 import jax.numpy as jnp
 
 # Need to backproject to ne volume, then find angles
-def ray_to_Jonesvector(rays, *, ne_extent = None, probing_direction = 'z', keep_current_plane = False, return_E = False):
+def ray_to_Jonesvector(rays, *, ne_extent = None, probing_direction = 'z', keep_current_plane = False, return_E = False, amp_phase_return = False):
     # * forces keep_current_plane and return_E to be keyword-only arguments
     # meaning .. return_E = True (missing out keep_current_plane) will work as it will not rely on position
     """
@@ -29,11 +29,18 @@ def ray_to_Jonesvector(rays, *, ne_extent = None, probing_direction = 'z', keep_
 
     Np = rays.shape[1] # number of photons
 
-    ray_p = jnp.zeros((4, Np))
-    if return_E:
-        ray_J = jnp.zeros((2, Np), dtype = complex)
-
     x, y, z, vx, vy, vz = rays[0], rays[1], rays[2], rays[3], rays[4], rays[5]
+    if amp_phase_return or return_E:
+        amp = rays[6]
+        phase = rays[7]
+
+    if amp_phase_return:
+        ray_p = jnp.zeros((6, Np))
+
+        ray_p = ray_p.at[4].set(amp)
+        ray_p = ray_p.at[5].set(phase)
+    else:
+        ray_p = jnp.zeros((4, Np))
 
     # Resolve distances and angles
     # YZ plane
@@ -99,8 +106,10 @@ def ray_to_Jonesvector(rays, *, ne_extent = None, probing_direction = 'z', keep_
     del vz
 
     if return_E:
+        ray_J = jnp.zeros((2, Np), dtype = complex)
+
         # Resolve Jones vectors
-        amp, phase, pol = rays[6], rays[7], rays[8]
+        pol = rays[8]
 
         # Assume initially polarised along y
         E_x_init = jnp.zeros(Np)
@@ -119,13 +128,14 @@ def ray_to_Jonesvector(rays, *, ne_extent = None, probing_direction = 'z', keep_
 
     del Np
 
-    # test returning these values and using the fresnel integral
-    #return ray_p, rays[6], rays[7]
+    if amp_phase_return or return_E:
+        del amp
+        del phase
 
-    # ray_p [x, phi, y, theta], ray_J [E_x, E_y]
+    # ray_p [x, phi, y, theta] +? [amp, phase], ray_J [E_x, E_y]
 
     if return_E:
-        return ray_p, ray_J
+        ray_p, ray_J
 
     return ray_p, None
 

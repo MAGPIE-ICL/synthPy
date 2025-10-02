@@ -17,10 +17,16 @@ evaluation/benchmarks/memory/memory-*
 evaluation/benchmarks/memory/domain_vs_rays_*
 
 evaluation/benchmarks/runtime/benchmark*
-evaluation/benchmarks/runtime/*.csv
-evaluation/benchmarks/runtime/*.pdf
+*.csv
+*.pdf
 evaluation/benchmarks/runtime/*.txt
-evaluation/benchmarks/runtime/*.png
+*.png
+*.zip
+*.gz
+*.tar
+*.hdf5
+
+*.spk
 
 evaluation/benchmarks/turbBoxLargeTest/radmeshablation_3d_prp_CH_ug_3rd_hdf5_plt_cnt_0228
 
@@ -31,6 +37,8 @@ examples/jobs/run_scripts/.ipynb_checkpoints
 # can't just do .../error_reading as that ignores the whole directory not just the files within - ! can't override that
 evaluation/error_reading/*
 !evaluation/error_reading/error_parser.py
+
+saves
 
 **/__pycache__/
 **/.ipynb_checkpoints/

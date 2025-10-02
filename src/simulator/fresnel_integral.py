@@ -1,6 +1,7 @@
 import numpy as np
 
 from scipy.signal.windows import tukey
+from scipy.ndimage import gaussian_filter
 from scipy.interpolate import CloughTocher2DInterpolator as CT2D
 from scipy.interpolate import LinearNDInterpolator as LND
 
@@ -59,20 +60,19 @@ def fresnel_propagate(U0_prepared, L, wavelength, z, original_shape, pad_factor=
 
     return Uz_padded[start_x:end_x, start_y:end_y]
 
-def propagate(lwl, x, y, x_length, y_length, jones_vector, amplitudes, phases, z, pad_factor = 2):
+def propagate(lwl, domain, x_pos, y_pos, amplitudes, phases, z, pix_x, pix_y, convolve = True, sigma = 2, pad_factor = 2):
     """
     Prepares and propagates the field, using an energy-dependent PSF.
     """
 
-    N_f = (x_length)**2 / (lwl * z)
+    N_f = (domain.x_length)**2 / (lwl * z)
     #print(f"Fresnel Number: {N_f:.4f}")
 
-    x_positions = jones_vector[0]
-    y_positions = jones_vector[2]
+    phases_interp = LND((x_pos, y_pos), phases, fill_value = 0.0)
+    amplitudes_interp = LND((x_pos, y_pos), amplitudes, fill_value = 0.0)
 
-    phases_interp = LND((x_positions, y_positions), phases, fill_value = 0.0)
-    amplitudes_interp = LND((x_positions, y_positions), amplitudes, fill_value = 0.0)
-
+    x = np.linspace(-domain.x_length/2, domain.x_length/2, pix_x)
+    y = np.linspace(-domain.y_length/2, domain.y_length/2, pix_y)
     XX, YY = np.meshgrid(x, y)
 
     phase_grid = phases_interp((XX, YY))
@@ -82,13 +82,17 @@ def propagate(lwl, x, y, x_length, y_length, jones_vector, amplitudes, phases, z
     del YY
 
     U_0 = amplitude_grid * np.exp(-1j * phase_grid)
-    #U_0 = amplitudes_interp(np.meshgrid(x, y))
-    #U_0 *= np.exp(-1j * phases_interp(np.meshgrid(x, y)))
+
+    if convolve is True:
+        U_0_re = gaussian_filter(np.real(U_0), sigma = sigma)
+        U_0_im = gaussian_filter(np.imag(U_0), sigma = sigma)
+        U_0 = U_0_re + 1j* U_0_im
+
     U_0_prepared = prepare_field_for_propagation(U_0, pad_factor = pad_factor)
 
     # Pass the dynamically calculated FWHM to the propagation function
     U_0_proped = fresnel_propagate(
-        U_0_prepared, (x_length, y_length), 
+        U_0_prepared, (domain.x_length, domain.y_length), 
         lwl, z, U_0.shape, pad_factor = pad_factor, lanex_fwhm_m = None
     )
 

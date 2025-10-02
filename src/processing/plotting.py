@@ -6,6 +6,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 import processing.diagnostics as diag
+from simulator.fresnel_integral import *
 
 def graph_domain(domain, *, save = False):
     fig, ax = plt.subplots(figsize = (9.5, 9.5))
@@ -126,6 +127,8 @@ def general_ray_plots(rf, nbins, lwl = 1032e-9, *, l_x = 0, u_x = 0.3, l_y = -5,
 
     axis[1].imshow(refractometer.H, cmap = 'hot', interpolation = 'nearest', clim = (0.5, 1))
 
+    plt.show()
+
 def stepped_ray_plot(rf, domain, sample_size = 32, *, indexing = "synthPy"):
     ##
     ## Matplotlib's plotting means that the axis that we would like to be used as z for display purposes is actually the x
@@ -185,3 +188,116 @@ def stepped_ray_plot(rf, domain, sample_size = 32, *, indexing = "synthPy"):
         ax.set_zlabel('y (m)')
 
         plt.show()
+
+def initial_field(domain, x, y, phases, amplitudes, pix_x, pix_y, title, savefig = False, fname = "hi"):
+    from scipy.interpolate import LinearNDInterpolator as LND
+    phases_interp = LND((x, y), phases, fill_value = 0.0)
+    amplitudes_interp = LND((x, y), amplitudes, fill_value = 0.0)
+
+    x = np.linspace(-domain.x_length/2, domain.x_length/2, pix_x)
+    y = np.linspace(-domain.y_length/2, domain.y_length/2, pix_y)
+    XX, YY = np.meshgrid(x, y)
+    phase_grid = phases_interp((XX, YY))
+    amplitude_grid = amplitudes_interp((XX, YY))
+
+    initial_field = amplitude_grid * np.exp(-1j * phase_grid)
+    fig0, axs0 = plt.subplots()
+    im = axs0.imshow(np.absolute(initial_field)**2, extent = (-domain.x_length/2, domain.x_length/2, -domain.y_length/2, domain.y_length/2), origin = "lower")
+    axs0.set_xlabel("x position (m)")
+    axs0.set_ylabel("y position (m)")
+    axs0.set_title(title)
+    fig0.colorbar(im, ax = axs0, orientation='vertical', fraction = .1)
+    plt.show()
+    if savefig is True:
+        plt.savefig(f"../../../{fname}.png",dpi=800, bbox_inches='tight', pad_inches=0.1)
+
+def propagated_field(domain, x_pos, y_pos, z, phases, amplitudes, pix_x, pix_y, title, lwl, pad_factor = 2, vmin = None, vmax = None, savefig = False, fname = "hi"):
+    fig, axs = plt.subplots()
+    final_field = propagate(lwl, domain, x_pos, y_pos, amplitudes, phases, z, pix_x, pix_y, pad_factor)
+    im = axs.imshow(np.absolute(final_field)**2, extent = (-domain.x_length/2, domain.x_length/2, -domain.y_length/2, domain.y_length/2), origin = "lower", cmap = "viridis", vmin = vmin, vmax = vmax)
+    axs.set_xlabel("x position (m)")
+    axs.set_ylabel("y position (m)")
+    axs.set_title(title)
+    fig.colorbar(im, ax = axs, fraction = .05, pad = 0.08)
+    plt.show()
+    if savefig is True:
+        plt.savefig(f"../../../{fname}.png",dpi=800, bbox_inches='tight', pad_inches=0.1)
+
+def phase_on_off(params, suptitle, lwl, domain, z, pad_factor = 2, titles = ["Phase off", "Phase on"], savefig = False, fname = "hi", pix_x = 400, pix_y = 400, 
+         vmin = None, vmax = None, vmin1 = None, vmax1 = None):
+    fig, axs = plt.subplots(1,2)
+    fig.suptitle(suptitle, y=0.8)
+    fig.tight_layout()
+    fig.subplots_adjust(wspace = 0.5, top = 0.9)
+    axes = axs.flatten()
+    x_pos, y_pos, amplitudes, phases = params[0]
+    x_pos1, y_pos1, amplitudes1, phases1 = params[1]
+    final_field = propagate(lwl, domain, x_pos, y_pos, amplitudes, phases, z, pix_x, pix_y, pad_factor)
+    final_field1 = propagate(lwl, domain, x_pos1, y_pos1, amplitudes1, phases1, z, pix_x, pix_y, pad_factor)
+    final_field = np.absolute(final_field)
+    final_field1 = np.absolute(final_field1)
+    
+    im = axes[0].imshow(final_field1**2, extent = (-domain.x_length/2, domain.x_length/2, -domain.y_length/2, domain.y_length/2), cmap = "viridis", vmin = vmin, vmax = vmax, origin = "lower")
+    im1 = axes[1].imshow(final_field**2, extent = (-domain.x_length/2, domain.x_length/2, -domain.y_length/2, domain.y_length/2), cmap = "viridis", vmin = vmin1, vmax = vmax1, origin = "lower")
+    images = [im, im1] 
+
+    for i, ax in enumerate(axes):
+        ax.set_xlabel("x position (mm)")
+        ax.set_ylabel("y position (mm)")
+        fig.colorbar(images[i], ax = ax, fraction = .05, pad = 0.2)
+        ax.set_title(titles[i])
+    if savefig is True:
+        plt.savefig(f"../../../{fname}.png",dpi=800, bbox_inches='tight', pad_inches=0.1)
+
+def var_distance(domain, x_pos, y_pos, z, phases, amplitudes, pix_x, pix_y, title, lwl, pad_factor = 2, a = 2, b = 3, savefig = False, fname = "hi"):
+    if len(z) != a*b:
+        raise ValueError("z must have length equal to a*b, i.e. number of plots")
+
+    fig, axs = plt.subplots(a,b)
+    fig.suptitle(title)
+    fig.subplots_adjust(wspace = 0.3)
+    axes = axs.flatten()
+    final_fields = []
+
+    for i in range (0,a*b):
+        final_field = propagate(lwl, domain, x_pos, y_pos, amplitudes, phases, z[i], pix_x, pix_y, pad_factor)
+        final_fields.append(np.absolute(final_field)**2)
+
+    images = []
+    counter = 0
+
+    for ax, data in zip(axes, final_fields):
+        im = ax.imshow(data, extent = (-domain.x_length/2, domain.x_length/2, -domain.y_length/2, domain.y_length/2), cmap = "viridis", origin = "lower")
+        images.append(im)
+        if counter == 0:
+            ax.set_xlabel("x position (mm)")
+            ax.set_ylabel("y position (mm)")
+        else:
+            ax.set_xticks([])  
+            ax.set_yticks([])  
+        ax.set_title(f"z = {(z[counter]):.2f} m")
+        fig.colorbar(im, ax = ax, fraction = .05, pad = 0.2)
+        counter += 1
+    if savefig is True:
+        plt.savefig(f"../../../{fname}",dpi=800, bbox_inches='tight', pad_inches=0.1)
+
+def interpolated_phase(domain, x_pos, y_pos, phases, pix_x, pix_y, title = "Interpolated Phase", savefig = False, fname = "hi", wrapped = False, vmin = None, vmax = None):
+    
+    phases_interp = LND((x_pos, y_pos), phases, fill_value = 0.0)
+    x = np.linspace(-domain.x_length/2, domain.x_length/2, pix_x)
+    y = np.linspace(-domain.y_length/2, domain.y_length/2, pix_y)
+    XX, YY = np.meshgrid(x, y)
+    phase_grid = phases_interp((XX, YY))
+    fig1, ax1 = plt.subplots()
+    fig1.suptitle(title)
+
+    if wrapped is True:
+        im = ax1.imshow((-phase_grid) % (2*np.pi), extent = (-domain.x_length/2, domain.x_length/2, -domain.y_length/2, domain.y_length/2), origin = "lower", vmin = vmin, vmax = vmax)
+    else:
+        im = ax1.imshow(phase_grid, extent = (-domain.x_length/2, domain.x_length/2, -domain.y_length/2, domain.y_length/2), origin = "lower", vmin = vmin, vmax = vmax)
+   
+    ax1.set_xlabel("x position (mm)")
+    ax1.set_ylabel("y position (mm)")
+    fig1.colorbar(im, ax = ax1, orientation='vertical', fraction = .1)
+    if savefig is True:
+        plt.savefig(f"../../../{fname}",dpi=800, bbox_inches='tight', pad_inches=0.1)
