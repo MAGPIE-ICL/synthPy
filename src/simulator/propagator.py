@@ -223,7 +223,7 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
     # Attenuation due to x-ray opacity, this takes into account inverse brehmmstrauhlung effects - hence opacity = True overrides inv_brems = True
     if opacity:
         print("opacity")
-        sprime = sprime.at[6, :].set(-opacity_interp(r) * c * amp)
+        sprime = sprime.at[6, :].set(trilinearInterpolator((x, y, z), -opacity_interp, r) * c * amp)
     # Attenuation due to inverse bremsstrahlung
     if inv_brems:
         print("inv_brems")
@@ -416,15 +416,15 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
     if (ScalarDomain.opacity):
         opacity_domain_grid = opacity_grid_generation(domain = ScalarDomain, energy = 6.63e-34 * c / (lwl * 1.6e-19))
 
-        energy = 6.63e-34 * c / (lwl * 1.6e-19)
-        opacity_interp = attenuation(domain = ScalarDomain, energy = energy)
-        def atten(x):
-            return opacity_interp(x)
+        #energy = 6.63e-34 * c / (lwl * 1.6e-19)
+        #opacity_interp = attenuation(domain = ScalarDomain, energy = energy)
+        #def atten(x):
+        #    return opacity_interp(x)
     else:
         opacity_domain_grid = 0.0
 
-        def atten():
-            return 0.0
+        #def atten():
+        #    return 0.0
 
     omega = 2 * jnp.pi * c / lwl
 
