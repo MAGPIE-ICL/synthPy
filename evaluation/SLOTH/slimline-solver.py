@@ -2,13 +2,6 @@ import sys
 import os
 
 class colour:
-    PURPLE = '\033[95m'
-    CYAN = '\033[96m'
-    DARKCYAN = '\033[36m'
-    BLUE = '\033[94m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    RED = '\033[91m'
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
     END = '\033[0m'
@@ -136,15 +129,6 @@ def mem_conversion(mem_size):
 
     return str(mem_size) + " " + unit
 
-# stored here for later in case needed - check first, this was just copied from stackoverflow I have no idea if it works yet
-def proper_round(num, dec=0):
-    num = str(num)[:str(num).index('.')+dec+2]
-    if num[-1]>='5':
-      a = num[:-2-(not dec)]       # integer part
-      b = int(num[-2-(not dec)])+1 # decimal part
-      return float(a)+b**(-dec+1) if a and b == 10 else float(a+str(b))
-    return float(num[:-1])
-
 def dalloc(var):
     try:
         del var
@@ -153,78 +137,8 @@ def dalloc(var):
         var = None
         #print(f'set {var = }')
 
-def domain_estimate(x_n, y_n, z_n, *, enable_x64 = False):
-    if enable_x64:
-        conv = 8
-    else:
-        conv = 4
-
-    return np.int64(x_n * y_n * z_n * conv)
-    # np.int64 not jnp.int64 as jnp arrays are limited to 32 bits by default
-    #return np.int64(dims[0] * dims[1] * dims[2] * conv)
-
-def add_integer_postfix(int):
-    if int // 10 == 1:
-        postfix = "th"
-    else:
-        digit = int % 10
-
-        if digit == 1:
-            postfix = "st"
-        elif digit == 2:
-            postfix = "nd"
-        elif digit == 3:
-            postfix = "rd"
-        else:
-            postfix = "th"
-
-    return str(int) + postfix
-
-def find_sig_n(x, n):
-    '''
-    ValueError: Non-hashable static arguments are not supported. An error occurred while trying to hash an object of type <class 'jaxlib.xla_extension.ArrayImpl'>, 5. The error was:
-    TypeError: unhashable type: 'jaxlib.xla_extension.ArrayImpl'
-
-    using jnp.int32 instead of regular int conversion causes issues - why does jnp.round not support standard jax data types?
-    '''
-
-    return n - int(jnp.floor(jnp.log10(abs(x)))) - 1
-
 def round_to_n(x, n):
-    return jnp.round(x, find_sig_n(x, n))
-
-def baseRayPlot(x, y, *, scaling = 1, bin_scale = 1, pix_x = 3448, pix_y = 2574, Lx = 18, Ly = 13.5):
-    print("\nrf size expected: (", len(x), ", ", len(y), ")", sep='')
-
-    # means that jnp.isnan(a) returns True when a is not Nan
-    # ensures that x & y are the same length, if output of either is Nan then will not try to render ray in histogram
-    mask = ~jnp.isnan(x) & ~jnp.isnan(y)
-
-    x = x[mask]
-    y = y[mask]
-
-    print("rf after clearing nan's: (", len(x), ", ", len(y), ")", sep='')
-
-    H, xedges, yedges = jnp.histogram2d(x, y, bins=[pix_x // bin_scale, pix_y // bin_scale], range=[[-Lx / 2, Lx / 2],[-Ly / 2, Ly / 2]])
-    H = H.T
-
-    plt.imshow(H, cmap = 'hot', interpolation = 'nearest', clim = (0.5, 1))
-
-def heat_plot(x, y, *, bin_scale = 1, pix_x = 3448, pix_y = 2574, Lx = 18, Ly = 13.5):
-    #fig, axis = plt.subplots(1, figsize = (20,5))
-
-    H,_,_,im1 = plt.hist2d(x, y, bins = (pix_x, pix_y), cmap = "turbo")
-
-    #plt.imshow(H, cmap = 'turbo', interpolation = 'nearest', clim = (0, 10))
-    #im1.set_clim(0, 10)
-
-    plt.colorbar(im1)
-    plt.grid(False)
-
-    #axis.set_xlabel("x (mm)")
-    #axis.set_ylabel("z (mm)")
-    #axis.set_xlim([-9, 9])
-    #axis.set_ylim([-6.75, 6.75])
+    return jnp.round(x, n - int(jnp.floor(jnp.log10(abs(x)))) - 1)
 
 generic_valid_types = (int, np.int32, np.int64, jnp.int32, jnp.int64, float, np.float32, np.float64, jnp.float32, jnp.float64)
 
@@ -497,6 +411,55 @@ class Beam:
 
         del s0
 
+def memory_report(running_device = None, memory_limit = None):
+    if running_device is None:
+        from jax.lib import xla_bridge
+        running_device = xla_bridge.get_backend().platform
+
+    if running_device == 'cpu':
+        from psutil import virtual_memory
+
+        info = virtual_memory()
+
+        free = info.available
+    elif running_device == 'gpu':
+        from pynvml import nvmlInit, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
+
+        nvmlInit()
+
+        h = nvmlDeviceGetHandleByIndex(0)
+        info = nvmlDeviceGetMemoryInfo(h)
+
+        free = info.free
+    elif running_device == 'tpu':
+        free_mem = None
+    else:
+        assert "\nNo suitable device detected when checking ram/vram available."
+
+    total = info.total
+    used = info.used
+
+    results = {
+        'device': running_device,
+        'total_raw': total,
+        'total': mem_conversion(total),
+        'free_raw': free,
+        'free': mem_conversion(free),
+        'used_raw': used,
+        'used': mem_conversion(used)
+    }
+
+    if memory_limit is not None:
+        memory_limit *= 1024
+        if memory_limit < results['total_raw']:
+            results['total_raw'] = memory_limit
+            results['total'] = mem_conversion(results['total_raw'])
+
+            results['free_raw'] = memory_stats['total_raw'] - results['used_raw']
+            results['free'] = mem_conversion(results['free_raw'])
+
+    return results
+
 import equinox as eqx
 
 from math import ceil
@@ -540,28 +503,19 @@ class ScalarDomain(eqx.Module):
     ZZ: jax.Array
 
     ne: jax.Array
-
-    B: jax.Array
-    Te: np.array
-    Z: jax.Array
   
     region_count: jnp.int32
 
     coord_backup: jax.Array
     future_dims: jax.Array
 
-    extra_info: bool
-    memory_reporting: bool
-
     memory_limit: np.int64
 
     Np_total: np.int64
     ray_batch_count: np.int64
 
-    refrac_field: jax.Array
-
     def __init__(self, lengths, dims, *, ne_type = None, probing_direction = 'z', auto_batching = True, iteration = 1, region_count = 1, leeway_factor = None, coord_backup = None, future_dims = None, Np = None,
-        s = None, s1 = None, s2 = None, Ly = None, ne_0 = None, ne = None):
+        s = None, s1 = None, s2 = None, Ly = None, ne_0 = None, ne = None, memory_limit = None):
 
         # initalise
         self.s = s
@@ -585,6 +539,8 @@ class ScalarDomain(eqx.Module):
         self.probing_direction = probing_direction
 
         self.ne_type = ne_type
+
+        self.memory_limit = memory_limit
 
         # working with 10% leeway in estimate for now
         if leeway_factor is not None:
@@ -630,7 +586,10 @@ class ScalarDomain(eqx.Module):
 
         # changed function to pass to np.int64 to prevent overflow - this was causing the negatives
         # --> (exactly 0 in the case of a 1024^3 domain as it is right on the limit)
-        predicted_domain_allocation = domain_estimate(self.x_n, self.y_n, self.z_n)
+
+        predicted_domain_allocation = np.int64(self.x_n, self.y_n, self.z_n * 4)
+        if enable_x64:
+            predicted_domain_allocation *= 2
         print("Predicted size in memory of domain:", mem_conversion(predicted_domain_allocation))
 
         if iteration == 1 and auto_batching:
@@ -956,12 +915,6 @@ class ScalarDomain(eqx.Module):
         if self.ZZ is not None:
             dalloc(self.ZZ)
 
-import jax
-import jax.numpy as jnp
-import numpy as np
-
-import os
-
 from scipy.integrate import odeint, solve_ivp
 from time import time
 from sys import getsizeof as getsizeof_default
@@ -1076,53 +1029,6 @@ def trilinearInterpolator(points, values, xi, method = "linear", bounds_error = 
 
     return result.reshape(xi_shape[:-1] + values.shape[ndim:])
 
-##
-## Helper functions for calculations
-##
-
-def omega_pe(ne):
-    """Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28"""
-
-    return 5.64e4 * jnp.sqrt(ne)
-
-# NRL formulary inverse brems - cheers Jack Halliday for coding in Python
-# Converted to rate coefficient by multiplying by group velocity in plasma
-def kappa(ne, Te, Z, omega):
-    # Useful subroutines
-    def v_the(Te):
-        """Calculate electron thermal speed. Provide Te in eV. Retrurns result in m/s"""
-
-        return 4.19e5 * jnp.sqrt(Te)
-
-    def V(ne, Te, Z, omega):
-        o_pe = omega_pe(ne)
-        #o_max = jnp.copy(o_pe)
-        #o_max[o_pe < omega] = omega
-        o_pe = o_pe.at[:, :].set(jnp.where(o_pe < omega, omega, o_pe))
-        L_classical = Z * e / Te
-        L_quantum = 2.760428269727312e-10 / jnp.sqrt(Te) # hbar / jnp.sqrt(m_e * e * Te)
-        L_max = jnp.maximum(L_classical, L_quantum)
-
-        #return o_max * L_max
-        return o_pe * L_max
-
-    def coloumbLog(ne, Te, Z, omega):
-        return jnp.maximum(2.0, jnp.log(v_the(Te) / V(ne, Te, Z, omega)))
-
-    ne_cc = ne * 1e-6
-    # don't think this is actually used?
-    #o_pe = omega_pe(ne_cc)
-    CL = coloumbLog(ne_cc, Te, Z, omega)
-
-    result = 3.1e-5 * Z * c * jnp.power(ne_cc / omega, 2) * CL * jnp.power(Te, -1.5) # 1/s
-    del ne_cc
-
-    return result
-
-# Plasma refractive index
-def n_refrac(ne, omega):
-    return jnp.sqrt(1.0 - (omega_pe(ne * 1e-6) / omega) ** 2)
-
 def dndr(r, gradient_term, omega, x, y, z):
     grad = jnp.zeros_like(r.T)
 
@@ -1141,7 +1047,7 @@ def dndr(r, gradient_term, omega, x, y, z):
     return grad
 
 # ODEs of photon paths, standalone function to support the solve()
-def dsdt(t, s, ne, x, y, z, omega, lengths, dims, refrac_field):
+def dsdt(t, s, ne, x, y, z, omega, lengths, dims):
     # forces s to be a matrix even if has the indexes of a 1d array such that dsdt() can be generalised
     s = jnp.reshape(s, (9, 1))  # one ray per vmap iteration if parallelised
 
@@ -1170,7 +1076,7 @@ def dsdt(t, s, ne, x, y, z, omega, lengths, dims, refrac_field):
 
     return sprime.flatten()
 
-def process_results(solutions, depth_traced, trace_depth, probing_direction, return_E, duration, save_points_per_region, ray_batch_count, verbose, amp_phase_return):
+def process_results(solutions, depth_traced, trace_depth, probing_direction, return_E, duration, save_points_per_region, ray_batch_count, verbose):
     if ray_batch_count > 1:
         # Concatenate time and state arrays
         ts = jnp.concatenate([sol.ts for sol in solutions], axis = 0)
@@ -1224,7 +1130,7 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, ret
         rf = solutions[0].ys[:, -1, :].T
 
         # depth_traced + trace_depth or just trace_depth
-        return *ray_to_Jonesvector(rf, ne_extent = depth_traced + trace_depth, probing_direction = probing_direction, return_E = return_E, amp_phase_return = amp_phase_return), duration
+        return *ray_to_Jonesvector(rf, ne_extent = depth_traced + trace_depth, probing_direction = probing_direction, return_E = return_E), duration
     elif save_points_per_region > 2:
         slice_rf_list = []
         slice_Jf_list = []
@@ -1242,7 +1148,7 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, ret
                 if j < save_points_per_region - 1 or (j == save_points_per_region - 1 and i == len(solutions) - 1):
                     # sol.ts having shape of (Np, save_points_per_region) per region is very inefficent given there are N - 1 duplications
                     # - issue with diffrax though I can't fix this
-                    rf_slice, Jf_slice = ray_to_Jonesvector(solutions[i].ys[:, j, :].T, ne_extent = depth_traced + trace_depth * solutions[i].ts[0, j], probing_direction = probing_direction, return_E = return_E, keep_current_plane = True, amp_phase_return = amp_phase_return)
+                    rf_slice, Jf_slice = ray_to_Jonesvector(solutions[i].ys[:, j, :].T, ne_extent = depth_traced + trace_depth * solutions[i].ts[0, j], probing_direction = probing_direction, return_E = return_E, keep_current_plane = True)
 
                     slice_rf_list.append(rf_slice)
                     if Jf_slice is not None:
@@ -1332,14 +1238,12 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                 if i == 1:
                     print("\nUsing pre-generated 1st section of domain.")
                 else:
-                    print("\nGenerating", add_integer_postfix(i), "section of the domain...")
+                    print("\nGenerating section" + i + "of the domain...")
 
                     lengths = ScalarDomain.lengths
                     dims = ScalarDomain.dims
 
                     ne_type = ScalarDomain.ne_type
-
-                    refrac_field = ScalarDomain.refrac_field
 
                     probing_direction = ScalarDomain.probing_direction
 
@@ -1359,7 +1263,6 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                     ScalarDomain = d.ScalarDomain(
                         lengths, dims,
                         ne_type = ne_type,
-                        refrac_field = refrac_field,
                         probing_direction = probing_direction,
                         auto_batching = True,
                         iteration = i,
@@ -1373,8 +1276,6 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                     del dims
 
                     del ne_type
-
-                    del refrac_field
 
                     del probing_direction
 
@@ -1536,8 +1437,6 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
             duration += np.float64(time() - start)
 
             if i == ScalarDomain.region_count:
-                from shared.utils import memory_report
-
                 if total_ray_size_estimate_raw >= memory_report("cpu")['free_raw']:
                     target_folder = os.getcwd() + "/saves"
                     if not os.path.isdir(target_folder):
@@ -1550,25 +1449,13 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
                     tar_gz_path = target_folder + "/ray_output_total_" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".hdf5.tar.gz"
 
-                    '''
-                    from utils.handle_filetypes import save_jax_matrix_to_hdf5 as compressed_solution_export
-                    filepath, filename = compressed_solution_export(
-                        ray_to_Jonesvector(sol.ys[:,-1].reshape(9, Np), ne_extent = probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E, amp_phase_return = amp_phase_return)[0],
-                        file_path = target_folder
-                        #filename = None, file_path = ".", dataset_name = 'data', compression = 'gzip', compression_level = 4
-                    )
-
-                    from utils.handle_filetypes import move_file_to_tar_gz
-                    move_file_to_tar_gz(tar_gz_path, filepath)
-                    '''
-
                     from utils.handle_filetypes import compress_matrix_to_hdf5_BytesIO
                     from utils.handle_filetypes import stream_data_to_tar_gz
 
                     filename = "run_" + str(ray_index)
                     stream_data_to_tar_gz(tar_gz_path, filename,
                         compress_matrix_to_hdf5_BytesIO(
-                            ray_to_Jonesvector(sol.ys[:,-1].reshape(9, Np), ne_extent = probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E, amp_phase_return = amp_phase_return)[0]
+                            ray_to_Jonesvector(sol.ys[:,-1].reshape(9, Np), ne_extent = probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E)[0]
                         )
                     )
                 else:
@@ -1584,10 +1471,10 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
             return solutions, None, duration
         else:
             if not parallelise:
-                return *ray_to_Jonesvector(solutions.ys[:,-1].reshape(9, Np), ne_extent = probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E, amp_phase_return = amp_phase_return), duration
+                return *ray_to_Jonesvector(solutions.ys[:,-1].reshape(9, Np), ne_extent = probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E), duration
             else:
                 # need to confirm there is no mismatch between total depth_traced and the target probing_depth
-                return process_results(solutions, depth_traced, trace_depth, ScalarDomain.probing_direction, return_E, duration, save_points_per_region, ray_batch_count, verbose, amp_phase_return)
+                return process_results(solutions, depth_traced, trace_depth, ScalarDomain.probing_direction, return_E, duration, save_points_per_region, ray_batch_count, verbose)
     else:
         print("\nData output as a hdf4.tar.gz file due to limitations of vram/ram space.")
         print("Graphs can be iteratively plotted by cycling through the 'run_n' entries after extraction from .tar.gz format.")
@@ -1597,7 +1484,7 @@ import matplotlib as mpl
 from sympy import Matrix
 
 # Need to backproject to ne volume, then find angles
-def ray_to_Jonesvector(rays, *, ne_extent = None, probing_direction = 'z', keep_current_plane = False, return_E = False, amp_phase_return = False):
+def ray_to_Jonesvector(rays, *, ne_extent = None, probing_direction = 'z', keep_current_plane = False, return_E = False):
     # * forces keep_current_plane and return_E to be keyword-only arguments
     # meaning .. return_E = True (missing out keep_current_plane) will work as it will not rely on position
 
@@ -1610,17 +1497,11 @@ def ray_to_Jonesvector(rays, *, ne_extent = None, probing_direction = 'z', keep_
     Np = rays.shape[1] # number of photons
 
     x, y, z, vx, vy, vz = rays[0], rays[1], rays[2], rays[3], rays[4], rays[5]
-    if amp_phase_return or return_E:
+    if return_E:
         amp = rays[6]
         phase = rays[7]
 
-    if amp_phase_return:
-        ray_p = jnp.zeros((6, Np))
-
-        ray_p = ray_p.at[4].set(amp)
-        ray_p = ray_p.at[5].set(phase)
-    else:
-        ray_p = jnp.zeros((4, Np))
+    ray_p = jnp.zeros((4, Np))
 
     # Resolve distances and angles
     # YZ plane
@@ -1708,7 +1589,7 @@ def ray_to_Jonesvector(rays, *, ne_extent = None, probing_direction = 'z', keep_
 
     del Np
 
-    if amp_phase_return or return_E:
+    if return_E:
         del amp
         del phase
 
@@ -1995,7 +1876,7 @@ class Diagnostic:
 
         self.Jf = self.Jf.at[:, :].set(self.Jf[:, :] * jnp.exp(1.0j * k * jnp.sqrt(dx ** 2 + dy ** 2 + (r1[1, :] - r0[1, :]) ** 2)))
 
-    def histogram(self, *, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False, plain_plot = False, extra_info = True):
+    def histogram(self, *, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False, plain_plot = False):
         """
         Bin data into a histogram. Defaults are for a KAF-8300.
         Outputs are H, the histogram, and xedges and yedges, the bin edges.
@@ -2289,10 +2170,6 @@ extent_z = 10e-3
 
 n_cells = 128
 
-#x = np.linspace(-extent_x, extent_x, n_cells)
-#y = np.linspace(-extent_y, extent_y, n_cells)
-#z = np.linspace(-extent_z, extent_z, n_cells)
-
 probing_extent = extent_z
 probing_direction = 'z'
 
@@ -2321,7 +2198,5 @@ refractometer = Refractometry(lwl, rf)
 # cam't clear_mem if you want to generate other graphs afterwards
 refractometer.plot_rays(bin_scale = 1, clear_mem = False)
 
-#information accessed by .H(istogram) , e.g plt.imshow(refractometer.H)
-
-#plt.imshow(refractometer.H, cmap='hot', interpolation='nearest', clim = (0, 2))
 plt.imshow(refractometer.H, cmap = 'hot', interpolation = 'nearest', clim = (0.5, 1))
+plt.show()
