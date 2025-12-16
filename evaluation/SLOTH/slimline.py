@@ -1,69 +1,15 @@
 import sys
 import os
 
+import jax
+
 class colour:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
     END = '\033[0m'
 
-print(colour.BOLD)
-
-# has to be disabled by default to prevent possible interference with jax parallelisation (caused issues on the cluster)
-disable_python_multithreading = True
-if disable_python_multithreading:
-    print("Disabling python multi-threading...")
-
-    thread_count = str(1)
-    os.environ["OMP_NUM_THREADS"]        = thread_count
-    os.environ["OPENBLAS_NUM_THREADS"]   = thread_count
-    os.environ["MKL_NUM_THREADS"]        = thread_count
-    os.environ["VECLIB_MAXIMUM_THREADS"] = thread_count
-    os.environ["NUMEXPR_NUM_THREADS"]    = thread_count
-
-from multiprocessing import cpu_count
-
-print("Initialising jax...")
-
-assert "jax" not in sys.modules, "jax already imported: you must restart your runtime - DO NOT RUN THIS FUNCTION TWICE"
-
-core_count = cpu_count()
-core_limit = None
-if core_limit is not None:
-    if core_limit > core_count:
-        print("\nWARNING: Core limit was set greater than the number of available cores. Defaulting to max available.")
-    else:
-        core_count = core_limit
-
-os.environ['XLA_FLAGS'] = "--xla_force_host_platform_device_count=" + str(core_count)
-
-force_device = None
-if force_device == "cpu":
-    os.environ['JAX_PLATFORM_NAME'] = 'cpu'
-else:
-    os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
-    os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.9"
-    os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"
-
-import jax
-
-# enables float data types to use 64-bit instead of 32 for greater precision
-# currently disabled by default as greater precision will vastly increase run times
-enable_x64 = False
-if enable_x64:
-    print("\nWARNING: x64 bit currently disabled by default as greater precision will vastly increase run times")
-    jax.config.update('jax_enable_x64', True)
-
-print(colour.END)
-
-print("Default jax backend:", jax.default_backend())
-
-available_devices = jax.devices()
-print(f"Available devices: {available_devices}")
-
 import numpy as np
 import jax.numpy as jnp
-
-import matplotlib.pyplot as plt
 
 from sys import getsizeof as getsizeof_default
 
@@ -514,8 +460,10 @@ class ScalarDomain(eqx.Module):
     Np_total: np.int64
     ray_batch_count: np.int64
 
+    mirrored: bool
+
     def __init__(self, lengths, dims, *, ne_type = None, probing_direction = 'z', auto_batching = True, iteration = 1, region_count = 1, leeway_factor = None, coord_backup = None, future_dims = None, Np = None,
-        s = None, s1 = None, s2 = None, Ly = None, ne_0 = None, ne = None, memory_limit = None):
+        s = None, s1 = None, s2 = None, Ly = None, ne_0 = None, ne = None, memory_limit = None, mirrored = True):
 
         # initalise
         self.s = s
@@ -537,10 +485,16 @@ class ScalarDomain(eqx.Module):
         del ne
 
         self.probing_direction = probing_direction
+        del probing_direction
 
         self.ne_type = ne_type
+        del ne_type
 
         self.memory_limit = memory_limit
+        del memory_limit
+
+        self.mirrored = mirrored
+        del mirrored
 
         # working with 10% leeway in estimate for now
         if leeway_factor is not None:
@@ -587,13 +541,13 @@ class ScalarDomain(eqx.Module):
         # changed function to pass to np.int64 to prevent overflow - this was causing the negatives
         # --> (exactly 0 in the case of a 1024^3 domain as it is right on the limit)
 
-        predicted_domain_allocation = np.int64(self.x_n, self.y_n, self.z_n * 4)
-        if enable_x64:
-            predicted_domain_allocation *= 2
+        predicted_domain_allocation = np.int64(self.x_n * self.y_n * self.z_n * 4)
+        #if enable_x64:
+        #    predicted_domain_allocation *= 2
         print("Predicted size in memory of domain:", mem_conversion(predicted_domain_allocation))
 
         if iteration == 1 and auto_batching:
-            memory_stats = memory_report(memory_limit = memory_limit)
+            memory_stats = memory_report(memory_limit = self.memory_limit)
 
             print("\nMemory prior to domain creation:")
             print(f" - total : {memory_stats['total']}")
@@ -619,7 +573,7 @@ class ScalarDomain(eqx.Module):
                 allocation_count = max(allocation_count, 2)
             elif self.ne_type == "test_linear_cos" or self.ne_type == "test_exponential_cos" or self.ne_type is None:
                 allocation_count = max(allocation_count, 3)
-            elif self.ne_type == "import":
+            elif self.ne_type == "import" or self.ne_type == "quad_trough_test":
                 allocation_count = max(allocation_count, 1)
             else:
                 raise AssertionError("\nNo valid profile detected! Ensure passed name is correct or call yourself.")
@@ -641,11 +595,10 @@ class ScalarDomain(eqx.Module):
             print("Est. domain memory limit: {}".format(mem_conversion(estimate_limit)))
             print(" --> inc. +{}% variance margin".format(jnp.float32((self.leeway_factor - 1) * 100)))
 
+            limiting_value = estimate_limit
             if self.Np_total is not None:
-                limiting_value = estimate_limit + ray_memory_raw * self.leeway_factor
+                limiting_value += ray_memory_raw * self.leeway_factor
                 print("Total estimated maximum: {}".format(mem_conversion(limiting_value)))
-            else:
-                limiting_value = estimate_limit
 
             # when jnp.float32 is not used, will cause overflow error if 64 bit floats are not enabled
             if limiting_value > np.float64(memory_stats['free_raw']):
@@ -698,9 +651,14 @@ class ScalarDomain(eqx.Module):
             self.future_dims = None
 
             # define coordinate space
-            self.x = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
-            self.y = jnp.float32(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n))
-            self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
+            if self.mirrored:
+                self.x = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
+                self.y = jnp.float32(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n))
+                self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
+            else:
+                self.x = jnp.float32(jnp.linspace(0, self.x_length, self.x_n))
+                self.y = jnp.float32(jnp.linspace(0, self.y_length, self.y_n))
+                self.z = jnp.float32(jnp.linspace(0, self.z_length, self.z_n))
         else:
             if iteration != 1:
                 self.coord_backup = coord_backup
@@ -716,8 +674,12 @@ class ScalarDomain(eqx.Module):
             if self.probing_direction == 'x':
                 # define coordinate space
                 self.x = self.coord_backup[lower:upper]
-                self.y = jnp.float32(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n))
-                self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
+                if self.mirrored:
+                    self.y = jnp.float32(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n))
+                    self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
+                else:
+                    self.y = jnp.float32(jnp.linspace(0, self.y_length, self.y_n))
+                    self.z = jnp.float32(jnp.linspace(0, self.z_length, self.z_n))
 
                 self.x_length = self.x[-1] - self.x[0]
                 self.lengths = self.lengths.at[0].set(self.x_length)
@@ -726,9 +688,13 @@ class ScalarDomain(eqx.Module):
                 self.dims = self.dims.at[0].set(self.x_n)
             elif self.probing_direction == 'y':
                 # define coordinate space
-                self.x = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
                 self.y = self.coord_backup[lower:upper]
-                self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
+                if self.mirrored:
+                    self.x = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
+                    self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
+                else:
+                    self.x = jnp.float32(jnp.linspace(0, self.x_length, self.x_n))
+                    self.z = jnp.float32(jnp.linspace(0, self.z_length, self.z_n))
 
                 self.y_length = self.y[-1] - self.y[0]
                 self.lengths = self.lengths.at[1].set(self.y_length)
@@ -737,9 +703,13 @@ class ScalarDomain(eqx.Module):
                 self.dims = self.dims.at[1].set(self.y_n)
             elif self.probing_direction == 'z':
                 # define coordinate space
-                self.x = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
-                self.y = jnp.float32(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n))
                 self.z = self.coord_backup[lower:upper]
+                if self.mirrored:
+                    self.x = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
+                    self.y = jnp.float32(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n))
+                else:
+                    self.x = jnp.float32(jnp.linspace(0, self.x_length, self.x_n))
+                    self.y = jnp.float32(jnp.linspace(0, self.y_length, self.y_n))
 
                 self.z_length = self.z[-1] - self.z[0]
                 self.lengths = self.lengths.at[2].set(self.z_length)
@@ -833,6 +803,14 @@ class ScalarDomain(eqx.Module):
             self.ZZ = None
 
             self.test_B()
+        elif self.ne_type == "quad_trough_test":
+            print("Generating field for the Quadratic Trough test case...")
+            self.YY, _, _ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)
+
+            self.XX = None
+            self.ZZ = None
+
+            self.quad_trough()
         elif self.ne_type == "import":
             print("pre-generated ne field is auto-imported if passed (not None)...")
         else:
@@ -865,7 +843,7 @@ class ScalarDomain(eqx.Module):
             Ly = self.Ly
 
         self.ne = self.ne.at[:, :, :].set(ne_0 * (1.0 + s1 * self.XX / self.x_length) * (1 + s2 * jnp.cos(2 * jnp.pi * self.YY / Ly)))
-    
+
     #@partial(jax.jit, static_argnames=("self",))  
     def test_exponential_cos(self, *, ne_0 = 1e24, Ly = 1e-3, s = -2e-3):
         if self.ne_0 is not None:
@@ -891,6 +869,18 @@ class ScalarDomain(eqx.Module):
         self.ne = self.ne.at[:, :, :].set(ne_0 * self.ne)
 
         #self.ne = jnp.float32(ne_0 * 10 ** (self.XX / s) * (1 + jnp.cos(2 * jnp.pi * self.YY / Ly)))
+
+    def quad_trough(self, *, n_cr = 9.049e27, y_c = 5e-2):
+        if self.ne_0 is not None:
+            n_cr = self.ne_0
+        if self.s is not None:
+            y_c = self.s
+
+        self.YY = self.YY.at[:, :, :].set(1 + (self.YY / y_c) ** 2)
+        self.YY = self.YY.at[:, :, :].set(n_cr * self.YY / 2)
+
+        self.ne = self.YY
+        self.cleanup()
 
     #@partial(jax.jit, static_argnames=("self",))  
     def external_ne(self):
@@ -1076,7 +1066,7 @@ def dsdt(t, s, ne, x, y, z, omega, lengths, dims):
 
     return sprime.flatten()
 
-def process_results(solutions, depth_traced, trace_depth, probing_direction, return_E, duration, save_points_per_region, ray_batch_count, verbose):
+def process_results(solutions, depth_traced, trace_depth, probing_direction, duration, save_points_per_region, ray_batch_count, verbose):
     if ray_batch_count > 1:
         # Concatenate time and state arrays
         ts = jnp.concatenate([sol.ts for sol in solutions], axis = 0)
@@ -1130,7 +1120,7 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, ret
         rf = solutions[0].ys[:, -1, :].T
 
         # depth_traced + trace_depth or just trace_depth
-        return *ray_to_Jonesvector(rf, ne_extent = depth_traced + trace_depth, probing_direction = probing_direction, return_E = return_E), duration
+        return ray_to_Jonesvector(rf, ne_extent = depth_traced + trace_depth, probing_direction = probing_direction), duration
     elif save_points_per_region > 2:
         slice_rf_list = []
         slice_Jf_list = []
@@ -1148,26 +1138,16 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, ret
                 if j < save_points_per_region - 1 or (j == save_points_per_region - 1 and i == len(solutions) - 1):
                     # sol.ts having shape of (Np, save_points_per_region) per region is very inefficent given there are N - 1 duplications
                     # - issue with diffrax though I can't fix this
-                    rf_slice, Jf_slice = ray_to_Jonesvector(solutions[i].ys[:, j, :].T, ne_extent = depth_traced + trace_depth * solutions[i].ts[0, j], probing_direction = probing_direction, return_E = return_E, keep_current_plane = True)
-
-                    slice_rf_list.append(rf_slice)
-                    if Jf_slice is not None:
-                        slice_Jf_list.append(Jf_slice)
+                    slice_rf_list.append(ray_to_Jonesvector(solutions[i].ys[:, j, :].T, ne_extent = depth_traced + trace_depth * solutions[i].ts[0, j], probing_direction = probing_direction, keep_current_plane = True))
 
         rf = jnp.stack(slice_rf_list, axis = 0)
         del slice_rf_list
 
-        if len(slice_Jf_list) > 0:
-            Jf = jnp.stack(slice_Jf_list, axis = 0)
-            del slice_Jf_list
-        else:
-            Jf = None
-
-        return rf, Jf, duration
+        return rf, duration
     else:
         assert "\nWhat."
 
-def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = True, jitted = True, save_points_per_region = 2, memory_debug = False, lwl = 1064e-9, keep_domain = False, return_raw_results = False, verbose = True):
+def solve(beam, ScalarDomain, probing_depth, *, jitted = True, save_points_per_region = 2, memory_debug = False, lwl = 1064e-9, keep_domain = False, return_raw_results = False, verbose = True):
     omega = 2 * jnp.pi * c / lwl
 
     region_count = ScalarDomain.region_count
@@ -1254,6 +1234,8 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                     coord_backup = ScalarDomain.coord_backup
                     future_dims = ScalarDomain.future_dims
 
+                    mirrored = ScalarDomain.mirrored
+
                     try:
                         del ScalarDomain
                     except:
@@ -1269,7 +1251,8 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                         region_count = region_count,
                         leeway_factor = leeway_factor,
                         coord_backup = coord_backup,
-                        future_dims = future_dims
+                        future_dims = future_dims,
+                        mirrored = mirrored
                     )
 
                     del lengths
@@ -1285,6 +1268,8 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
                     del coord_backup
                     del future_dims
+
+                    del mirrored
 
                 # Need to make sure all rays have left volume
                 # Conservative estimate of diagonal across volume
@@ -1455,7 +1440,7 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
                     filename = "run_" + str(ray_index)
                     stream_data_to_tar_gz(tar_gz_path, filename,
                         compress_matrix_to_hdf5_BytesIO(
-                            ray_to_Jonesvector(sol.ys[:,-1].reshape(9, Np), ne_extent = probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E)[0]
+                            ray_to_Jonesvector(sol.ys[:,-1].reshape(9, Np), ne_extent = probing_depth, probing_direction = ScalarDomain.probing_direction)[0]
                         )
                     )
                 else:
@@ -1468,13 +1453,10 @@ def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = 
 
     if total_ray_size_estimate_raw < memory_report("cpu")['free_raw']:
         if return_raw_results:
-            return solutions, None, duration
+            return solutions, duration
         else:
-            if not parallelise:
-                return *ray_to_Jonesvector(solutions.ys[:,-1].reshape(9, Np), ne_extent = probing_depth, probing_direction = ScalarDomain.probing_direction, return_E = return_E), duration
-            else:
-                # need to confirm there is no mismatch between total depth_traced and the target probing_depth
-                return process_results(solutions, depth_traced, trace_depth, ScalarDomain.probing_direction, return_E, duration, save_points_per_region, ray_batch_count, verbose)
+            # need to confirm there is no mismatch between total depth_traced and the target probing_depth
+            return process_results(solutions, depth_traced, trace_depth, ScalarDomain.probing_direction, duration, save_points_per_region, ray_batch_count, verbose)
     else:
         print("\nData output as a hdf4.tar.gz file due to limitations of vram/ram space.")
         print("Graphs can be iteratively plotted by cycling through the 'run_n' entries after extraction from .tar.gz format.")
@@ -1484,9 +1466,9 @@ import matplotlib as mpl
 from sympy import Matrix
 
 # Need to backproject to ne volume, then find angles
-def ray_to_Jonesvector(rays, *, ne_extent = None, probing_direction = 'z', keep_current_plane = False, return_E = False):
-    # * forces keep_current_plane and return_E to be keyword-only arguments
-    # meaning .. return_E = True (missing out keep_current_plane) will work as it will not rely on position
+def ray_to_Jonesvector(rays, *, ne_extent = None, probing_direction = 'z', keep_current_plane = False):
+    # * forces keep_current_plane to be a keyword-only argument
+    # meaning .. keep_current_plane = True (missing out others) will work as it will not rely on position
 
     if ne_extent is None and keep_current_plane == False:
         from shared.printing import colour
@@ -1497,9 +1479,6 @@ def ray_to_Jonesvector(rays, *, ne_extent = None, probing_direction = 'z', keep_
     Np = rays.shape[1] # number of photons
 
     x, y, z, vx, vy, vz = rays[0], rays[1], rays[2], rays[3], rays[4], rays[5]
-    if return_E:
-        amp = rays[6]
-        phase = rays[7]
 
     ray_p = jnp.zeros((4, Np))
 
@@ -1566,39 +1545,11 @@ def ray_to_Jonesvector(rays, *, ne_extent = None, probing_direction = 'z', keep_
     del vy
     del vz
 
-    if return_E:
-        ray_J = jnp.zeros((2, Np), dtype = complex)
-
-        # Resolve Jones vectors
-        pol = rays[8]
-
-        # Assume initially polarised along y
-        E_x_init = jnp.zeros(Np)
-        E_y_init = jnp.ones(Np)
-
-        # Perform rotation for polarisation, multiplication for amplitude, and complex rotation for phase
-        ray_J = ray_J.at[0, :].set(amp * (jnp.cos(phase) + 1.0j * jnp.sin(phase)) * (jnp.cos(pol) * E_x_init - jnp.sin(pol) * E_y_init))
-        ray_J = ray_J.at[1, :].set(amp * (jnp.cos(phase) + 1.0j * jnp.sin(phase)) * (jnp.sin(pol) * E_x_init + jnp.cos(pol) * E_y_init))
-
-        del amp
-        del phase
-        del pol
-
-        del E_x_init
-        del E_y_init
-
     del Np
-
-    if return_E:
-        del amp
-        del phase
 
     # ray_p [x, phi, y, theta] +? [amp, phase], ray_J [E_x, E_y]
 
-    if return_E:
-        ray_p, ray_J
-
-    return ray_p, None
+    return ray_p
 
 def back_propogate(rays, ne_extent, probing_direction):
     Np = rays.shape[1] # number of photons
@@ -1702,23 +1653,14 @@ def travel(r, d):
 
     return jnp.matmul(L, r)
 
-def circular_aperture(r, R, E = None):
+def circular_aperture(r, R):
     """
     Rejects rays outside radius R
     """
 
     filt = r[0, :] ** 2 + r[2, :] ** 2 > R ** 2
     # if you want to reject rays outside of the radius, then when filt is true you should set equal to None
-    r = r.at[:, filt].set(jnp.nan)
-
-    if E is not None:
-        # double checks it is a jnp array (matrix in this case, 9*Np) and converts if not
-        # - had issues in the past, is just a 'just in case' thing - likely useless
-        E = jnp.asarray(E).at[:, filt].set(jnp.nan) # filters out all in [:, i] if i contains any jnp.nan values in [:, i] axis
-
-        return r, E
-
-    return r
+    return r.at[:, filt].set(jnp.nan)
 
 def circular_stop(r, R):
     """
@@ -1778,14 +1720,13 @@ def knife_edge(r, offset, axis, direction):
 
 def clear_rays(self):
     """
-    Clears the r0, rf and Jf variables to save memory
+    Clears the r0 and rf variables to save memory
     """
     # does this actually save memory in the best way?
     # would it be better to del self.r_ instead?
 
     self.r0 = None
     self.rf = None
-    self.Jf = None
 
 def ray(x, θ, y, ϕ):
     """
@@ -1798,18 +1739,13 @@ def d2r(d):
     # helper function, degrees to radians
     return d * jnp.pi / 180
 
-def lens_cutoff(rf, Jf = None, *, L = 400, R = 25):
+def lens_cutoff(rf, *, L = 400, R = 25):
     mask = jnp.pow(jnp.pow(L * jnp.tan(rf[1]) + rf[0], 2) + jnp.pow(L * jnp.tan(rf[3]) + rf[2], 2), 0.5) <= R
-
-    rf = jnp.asarray(rf)[:, mask]
-    if Jf is not None:
-        Jf = jnp.asarray(Jf)[:, mask]
-
-    return rf, Jf
+    return jnp.asarray(rf)[:, mask]
 
 class Diagnostic:
     # this is in mm's not metres - self.rf is converted to mm's (not sure if everything else is covered though)
-    def __init__(self, wavelength, rf, Jf = None, *, focal_plane = 0, L = 400, R = 25, Lx = 18, Ly = 13.5, x = None, y = None, x_l = None, y_l = None, l_x = 0, u_x = 0.3, l_y = -5, u_y = 5):
+    def __init__(self, wavelength, rf, *, focal_plane = 0, L = 400, R = 25, Lx = 18, Ly = 13.5, x = None, y = None, x_l = None, y_l = None, l_x = 0, u_x = 0.3, l_y = -5, u_y = 5):
         """
         Initialise ray diagnostic.
 
@@ -1836,11 +1772,9 @@ class Diagnostic:
         if rf is not None:
             # separates out the amp/phase part of rf from raw values
             if rf.shape[0] == 6:
-                self.amp, self.phase = rf[4, :], rf[5, :]
                 rf = rf[:4, :]
             else:
                 assert rf.shape[0] == 4, colour.BOLD + "\nIncorrect format for rf, are you sure you passed the right variable?" + colour.END
-                self.amp, self.phase = None, None
 
             # forces self.rf to the last slice if rf returns multiple samples
             # also preserves the whole pass if required
@@ -1850,9 +1784,9 @@ class Diagnostic:
 
             self.Np = rf.shape[-1]
 
-            # masks rf (& Jf) to only hold entries corr. to rays that will be captured by the lense setup
+            # masks rf to only hold entries corr. to rays that will be captured by the lense setup
             # also forces matrices to type jax.Array via jnp.asarray()
-            self.rf, self.Jf = lens_cutoff(rf, Jf)  # DO pass Jf to this, else self.Jf will be assigned None even if Jf is not None
+            self.rf = lens_cutoff(rf)
 
             self.Np_inc = self.rf.shape[-1]
             if self.Np == self.Np_inc:
@@ -1867,14 +1801,6 @@ class Diagnostic:
         # still odd though... (hence the keeping of the comment)
 
         self.r0 = m_to_mm(self.rf)
-
-    def propagate_E(self, r1, r0):
-        dx = r1[0, :] - r0[0, :]
-        dy = r1[2, :] - r0[2, :]
-
-        k = 2 * jnp.pi / self.wavelength
-
-        self.Jf = self.Jf.at[:, :].set(self.Jf[:, :] * jnp.exp(1.0j * k * jnp.sqrt(dx ** 2 + dy ** 2 + (r1[1, :] - r0[1, :]) ** 2)))
 
     def histogram(self, *, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False, plain_plot = False):
         """
@@ -1918,8 +1844,8 @@ class Diagnostic:
         mask = (0 <= x_indices) & (x_indices < amplitude_x.shape[1]) & (0 <= y_indices) & (y_indices < amplitude_x.shape[0])
 
         # jax arrays are immutable - fix later
-        amplitude_x = amplitude_x.at[y_indices[mask], x_indices[mask]].set(amplitude_x[y_indices[mask], x_indices[mask]] + self.Jf[0, mask])
-        amplitude_y = amplitude_y.at[y_indices[mask], x_indices[mask]].set(amplitude_y[y_indices[mask], x_indices[mask]] + self.Jf[1, mask])
+        amplitude_x = amplitude_x.at[y_indices[mask], x_indices[mask]].set(amplitude_x[y_indices[mask], x_indices[mask]])
+        amplitude_y = amplitude_y.at[y_indices[mask], x_indices[mask]].set(amplitude_y[y_indices[mask], x_indices[mask]])
 
         amplitude = jnp.sqrt(jnp.real(amplitude_x) ** 2 + jnp.real(amplitude_y) ** 2)
         # amplitude_normalised = (amplitude - amplitude.min()) / (amplitude.max() - amplitude.min()) # this line needs work and is currently causing problems
@@ -2034,44 +1960,32 @@ class Refractometry(Diagnostic):
         ## Imaging the spatial axis - M = 2 - Coherent Implementation of the Refractometer
         r1 = travel(self.r0, 3 * self.L / 4 - self.focal_plane)
         # propagate E field
-        self.propagate_E(r1, self.r0)
 
-        r2, self.Jf = circular_aperture(self.r0, self.R, E = self.Jf)      # cut off
+        r2 = circular_aperture(self.r0, self.R)      # cut off
         r3 = sym_lens(r2, self.L / 2)          # lens 1 - spherical
-        self.propagate_E(r3, r2)
 
-        r4 = travel(r3, 3 * self.L / 2)
-        self.propagate_E(r4, r3)                 # displace rays to lens 2 - hybrid
+        r4 = travel(r3, 3 * self.L / 2)                 # displace rays to lens 2 - hybrid
 
-        r5, self.Jf = circular_aperture(r4, self.R, E = self.Jf)      # cut off
+        r5 = circular_aperture(r4, self.R)      # cut off
         r6 = lens(r5, self.L / 3, self.L / 2)       # lens 2 - hybrid lens
-        self.propagate_E(r6, r5)
 
         self.rf = travel(r6, self.L)               # displace rays to detector
-        self.propagate_E(self.rf, r6)
 
     def coherent_solve_alt(self):
         ## Imaging the spatial axis - M = 2 - Coherent Implementation of the Refractometer
         r1 = travel(self.r0, 3 * self.L / 4 - self.focal_plane)
 
-        r2, self.Jf = circular_aperture(r1, self.R, E = self.Jf)      # cut off
-        # propagate E field
-        self.propagate_E(r2, r1)
+        r2 = circular_aperture(r1, self.R)      # cut off
 
         r3 = sym_lens(r2, self.L / 2)          # lens 1 - spherical
-        self.propagate_E(r3, r2)
 
         r4 = travel(r3, 3 * self.L / 2)
 
-        r5, self.Jf = circular_aperture(r4, self.R, E = self.Jf)      # cut off
-        self.propagate_E(r4, r3)                 # displace rays to lens 2 - hybrid
-        self.propagate_E(r5, r4)                 # displace rays to lens 2 - hybrid
+        r5 = circular_aperture(r4, self.R)      # cut off                 # displace rays to lens 2 - hybrid                # displace rays to lens 2 - hybrid
 
         r6 = lens(r5, self.L / 3, self.L / 2)       # lens 2 - hybrid lens
-        self.propagate_E(r6, r5)
 
         self.rf = travel(r6, self.L)               # displace rays to detector
-        self.propagate_E(self.rf, r6)
 
     def refractogram(self, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
         self.histogram_legacy(bin_scale = bin_scale, pix_x = pix_x, pix_y = pix_y, clear_mem = clear_mem)
@@ -2081,58 +1995,25 @@ class Interferometry(Diagnostic):
     Simple class to keep all the ray properties together
     """
 
-    def interfere_ref_beam(self, n_fringes, deg):
-        """
-        Input beam ray positions and electric field component, and desired angle of evenly spaced background fringes. 
-        Deg is angle in degrees from the vertical axis
-
-        Returns:
-            'Interfered with' E field
-        """
-
-        assert self.Jf is not None, print("\nThis diagnostic requires a calculated Jf matrix.")
-
-        if deg >= 45:
-            deg = - jnp.abs(deg - 90)
-
-        rad = deg * jnp.pi / 180 #deg to rad
-        y_weight = jnp.arctan(rad) #take x_weight is 1
-        x_weight = jnp.sqrt(1 - y_weight**2)
-
-        ref_beam = jnp.exp(2 * n_fringes / 3 * 1.0j * (x_weight * self.rf[0, :] + y_weight * self.rf[2, :]))
-
-        self.Jf = self.Jf.at[1, :].set(self.Jf[1, :] + ref_beam) # assume ref_beam is polarised in y
-
     def bkg(self, domain_length, n_fringes, deg, ne_extent, probing_direction):
-        rr0, E0 = ray_to_Jonesvector(self.rf, ne_extent, probing_direction = probing_direction, keep_current_plane = True, return_E = True)
-
-        E = self.Jf.copy() #temporarily store E field in another variable
-        self.Jf = E0
+        rr0 = ray_to_Jonesvector(self.rf, ne_extent, probing_direction = probing_direction, keep_current_plane = True)
 
         # assuming reference is recombined with the probe beam at the exit of the domain (should be changed)
         self.interfere_ref_beam(n_fringes, deg)
         ## 2 lens telescope, M = 1
         r1 = travel(rr0, self.L + domain_length) #displace rays to lens. Accounts for object with depth
-        # propagate E field
-        self.propagate_E(r1, rr0)
-        r2, self.Jf = circular_aperture(r1, self.R, E = self.Jf)    # cut off
+        r2 = circular_aperture(r1, self.R)    # cut off
         r3 = sym_lens(r2, self.L / 2)           # lens 1
-        self.propagate_E(r3, r2)
 
         r4 = travel(r3, self.L * 2)           # displace rays to lens 2.
-        self.propagate_E(r4, r3)
-        r5, self.Jf = circular_aperture(r4, self.R, E = self.Jf)    # cut off
+        r5 = circular_aperture(r4, self.R)    # cut off
         r6 = sym_lens(r5, self.L / 2)                             # lens 2
-        self.propagate_E(r6, r5)
         
         r7 = travel(r6, self.L)             # displace rays to detector
-        self.propagate_E(r7, r6)
         rf = r7
 
         self.histogram(self)
         self.bkg_signal = self.H
-
-        self.Jf = E #restore E field
 
     def two_lens_solve(self):
         # assuming reference is recombined with the probe beam at the exit of the domain (should be changed)
@@ -2140,63 +2021,19 @@ class Interferometry(Diagnostic):
         ## 2 lens telescope, M = 1
         r1 = travel(self.r0, self.L - self.focal_plane) #displace rays to lens. Accounts for object with depth
 
-        # propagate E field
-        self.propagate_E(r1, self.r0)
-        r2, self.Jf = circular_aperture(r1, self.R, E = self.Jf)    # cut off
+        r2 = circular_aperture(r1, self.R)    # cut off
 
         r3 = sym_lens(r2, self.L/2)           # lens 1
-        self.propagate_E(r3, r2)
 
         r4 = travel(r3, self.L*2)           # displace rays to lens 2.
-        self.propagate_E(r4, r3)
 
-        r5, self.Jf = circular_aperture(r4, self.R, E = self.Jf)    # cut off
+        r5 = circular_aperture(r4, self.R)    # cut off
 
         r6 = sym_lens(r5, self.L/2)                             # lens 2
-        self.propagate_E(r6, r5)
         
         r7 = travel(r6, self.L)             # displace rays to detector
-        self.propagate_E(r7, r6)
 
         self.rf = r7
 
     def interferogram(self, *, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
         self.histogram_legacy(bin_scale = bin_scale, pix_x = pix_x, pix_y = pix_y, clear_mem = clear_mem)
-
-# define some extent, the domain should be distributed as +extent to -extent, does not need to be cubic
-extent_x = 5e-3
-extent_y = 5e-3
-extent_z = 10e-3
-
-n_cells = 128
-
-probing_extent = extent_z
-probing_direction = 'z'
-
-lengths = 2 * np.array([extent_x, extent_y, extent_z])
-domain = ScalarDomain(lengths, n_cells, ne_type = "test_exponential_cos", probing_direction = probing_direction)
-
-lwl = 1064e-9 #define laser wavelength
-
-# initialise beam
-Np = 200000    # number of photons
-divergence = 5e-5   # realistic divergence value
-beam_size = extent_x    # beam radius
-ne_extent = probing_extent  # so the beam knows where to initialise initial positions
-beam_type = 'circular'
-
-beam_definition = Beam(
-    Np, beam_size, divergence, ne_extent,
-    probing_direction = probing_direction,
-    beam_type = "circular"
-)
-
-rf, _, duration = solve(beam_definition.s0, domain, probing_extent)
-
-#in the diagnostic initialisation, details on the lens configurations, and detector dimensions can be specified
-refractometer = Refractometry(lwl, rf)
-# cam't clear_mem if you want to generate other graphs afterwards
-refractometer.plot_rays(bin_scale = 1, clear_mem = False)
-
-plt.imshow(refractometer.H, cmap = 'hot', interpolation = 'nearest', clim = (0.5, 1))
-plt.show()

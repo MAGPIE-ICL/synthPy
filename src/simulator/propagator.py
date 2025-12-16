@@ -181,11 +181,9 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
     """
 
     if not parallelise:
-        print("False")
         # jnp.reshape() auto converts to a jax array rather than having to do after a numpy reshape
         s = jnp.reshape(s, (9, s.size // 9))
     else:
-        print("True")
         # forces s to be a matrix even if has the indexes of a 1d array such that dsdt() can be generalised
         s = jnp.reshape(s, (9, 1))  # one ray per vmap iteration if parallelised
 
