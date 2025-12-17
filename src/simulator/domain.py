@@ -717,11 +717,11 @@ class ScalarDomain(eqx.Module):
         :param ne_0: mean electron density
         :type ne_0: float, default: 1e24 m\ :sup:`-3`
 
-        :param Ly: scale of exponential change
-        :type Ly: float, default: -2e-3 [exponential decay]
+        :param Ly: spatial scale of sinusoidal perturbation
+        :type Ly: float, default: 1e-3 [exponential decay]
 
-        :param s: spatial scale of sinusoidal perturbation
-        :type s: float, default: 1e-3
+        :param s: scale of exponential change
+        :type s: float, default: -2e-3
 
         :return: No return, generates domain as attribute to passed self object.
         :rtype: None

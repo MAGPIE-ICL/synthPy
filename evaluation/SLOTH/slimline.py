@@ -89,7 +89,7 @@ def round_to_n(x, n):
 generic_valid_types = (int, np.int32, np.int64, jnp.int32, jnp.int64, float, np.float32, np.float64, jnp.float32, jnp.float64)
 
 class Beam:
-    def __init__(self, Np, beam_size, divergence, ne_extent, *, probing_direction = 'z', beam_type = 'circular', seeded = False):
+    def __init__(self, Np, beam_size, divergence, ne_extent, *, probing_direction = 'z', beam_type = 'circular', seeded = False, offset = None):
         self.Np = np.int64(Np)
         self.beam_size = beam_size
         self.divergence = divergence
@@ -102,11 +102,13 @@ class Beam:
         else:
             self.seed = None
 
+        self.offset = jnp.asarray(offset)
+
         # calls actual initialisation of beam automatically, first function just initialises variables
         # forces ne_extent to negative when passed to init_beam(... ne_extent < 0 ...)
-        Beam.init_beam(self, -self.ne_extent, self.seed) # [x if x < 0 else -x for x in jnp.array(ne_extent)]
+        Beam.init_beam(self, -self.ne_extent, self.seed, self.offset) # [x if x < 0 else -x for x in jnp.array(ne_extent)]
 
-    def init_beam(self, ne_extent, seed):
+    def init_beam(self, ne_extent, seed, offset):
         from scipy.constants import c
 
         s0 = jnp.zeros((9, self.Np))
@@ -343,6 +345,11 @@ class Beam:
             del beam_size_2
         else:
             print("\nself.beam_type unrecognised! Accepted args: circular, square, rectangular, linear, even, rect_trackers.")
+
+        if offset is not None:
+            s0 = s0.at[0, :].set(s0[0, :] + offset[0, None])
+            s0 = s0.at[1, :].set(s0[1, :] + offset[1, None])
+            s0 = s0.at[2, :].set(s0[2, :] + offset[2, None])
 
         del t
         del u
