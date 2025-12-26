@@ -12,11 +12,15 @@ def graph_domain(domain, *, save = False):
     fig, ax = plt.subplots(figsize = (9.5, 9.5))
     fig.subplots_adjust(.15, .15, .95, .95, hspace = 0.5)
 
-    im = ax.imshow(domain.ne[:,:,0].T/1e24, cmap = 'jet', origin = 'lower', extent = [-5, 5, -5, 5], clim = [0, 8])
-    ax.set_xlim(-5, 5)
-    ax.set_ylim(-5, 5)
-    ax.set_xticks([-5, -2.5, 0, 2.5, 5])
-    ax.set_yticks([-5, -2.5, 0, 2.5, 5])
+    x = 1000 * domain.x
+    y = 1000 * domain.y
+
+    im = ax.imshow(domain.ne[:,:,0].T/1e24, cmap = 'jet', origin = 'lower', extent = [x[0], x[-1], y[0], y[-1]], clim = [0, 8])
+
+    ax.set_xlim(x[0], x[-1])
+    ax.set_ylim(y[0], y[-1])
+    ax.set_xticks(np.linspace(x[0], x[-1], 5))
+    ax.set_yticks(np.linspace(y[0], y[-1], 5))
 
     axins1 = inset_axes(
         ax,
@@ -43,7 +47,7 @@ def graph_domain(domain, *, save = False):
     profile_vert    =   domain.ne[:, :, 0].T.sum(axis = 0)
     profile_vert    =   (profile_vert - profile_vert.min() ) / (profile_vert.max() - profile_vert.min())
     axhoriz.plot(domain.x, profile_vert, lw = 3, c = 'k', alpha = 1)
-    axhoriz.set_xlim(-5e-3, 5e-3)
+    axhoriz.set_xlim(x[0], x[-1])
     axhoriz.set_ylim(0, 1)
     axhoriz.set_ylabel(r'$n_e$(x)', fontsize = 23)
 
@@ -51,7 +55,7 @@ def graph_domain(domain, *, save = False):
     profile_hor     =   (profile_hor - profile_hor.min() ) / (profile_hor.max() - profile_hor.min())
     profile_hor_theory  =  profile_hor
     axvert.plot(profile_hor, domain.y, lw = 3, c = 'k', alpha = 1)
-    axvert.set_ylim(-5e-3, 5e-3)
+    axvert.set_ylim(y[0], y[-1])
     axvert.set_xlabel(r'$n_e$(z)', fontsize = 23)
 
     ax.tick_params(axis = 'both', labelsize = 24)
