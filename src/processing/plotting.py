@@ -8,14 +8,31 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import processing.diagnostics as diag
 from simulator.fresnel_integral import *
 
-def graph_domain(domain, *, save = False):
+def graph_domain(domain, *, save = False, slice = "z"):
     fig, ax = plt.subplots(figsize = (9.5, 9.5))
     fig.subplots_adjust(.15, .15, .95, .95, hspace = 0.5)
 
-    x = 1000 * domain.x
-    y = 1000 * domain.y
+    if slice == "x":
+        x = domain.y
+        y = domain.z
 
-    im = ax.imshow(domain.ne[:,:,0].T/1e24, cmap = 'jet', origin = 'lower', extent = [x[0], x[-1], y[0], y[-1]], clim = [0, 8])
+        ne_T = domain.ne[0, :, :].T
+    elif slice == "y":
+        x = domain.z
+        y = domain.x
+
+        ne_T = domain.ne[:, 0, :].T
+    elif slice == "z":
+        x = domain.x
+        y = domain.y
+
+        ne_T = domain.ne[:, :, 0].T
+
+    x *= 1000
+    y *= 1000
+
+    norm = domain.ne.max()
+    im = ax.imshow(ne_T / norm, cmap = 'jet', origin = 'lower', extent = [x[0], x[-1], y[0], y[-1]], clim = [domain.ne.min() / norm, 1])
 
     ax.set_xlim(x[0], x[-1])
     ax.set_ylim(y[0], y[-1])
@@ -33,28 +50,37 @@ def graph_domain(domain, *, save = False):
     )
 
     axins1.xaxis.set_ticks_position("bottom")
-    cbar = plt.colorbar(im, cax=axins1, ticks=[0, 2, 4, 6, 8], shrink = 0.4, orientation="horizontal", extend='both')
-    cbar.set_label(r'$ n_e(x, y, z_0)$ ($\times 10^{18}$ $cm^{-3}$)', fontsize = 24)
+    cbar = plt.colorbar(im, cax=axins1, ticks=np.linspace(domain.ne.min(), 1, 5), shrink = 0.4, orientation="horizontal", extend='both')
+    mantissa, exponent = f"{norm:e}".split("e+")
+    cbar.set_label(r'$ n_e(x, y, z_0)$ ($\times $' + str(mantissa) + "^" + str(exponent) + r'$\ m^{-3}$)', fontsize = 24)
     cbar.ax.tick_params(labelsize = 24)
 
-    ax.set_xlabel('x (mm)', fontsize = 24)
-    ax.set_ylabel('y (mm)', fontsize = 24)
+    if slice == "x":
+        ax.set_xlabel('y (mm)', fontsize = 24)
+        ax.set_ylabel('z (mm)', fontsize = 24)
+    elif slice == "y":
+        ax.set_xlabel('z (mm)', fontsize = 24)
+        ax.set_ylabel('x (mm)', fontsize = 24)
+    elif slice == "z":
+        ax.set_xlabel('x (mm)', fontsize = 24)
+        ax.set_ylabel('y (mm)', fontsize = 24)
 
     divider = make_axes_locatable(ax)
     axvert  = divider.append_axes('right', size = '30%', pad = 0.15)
     axhoriz = divider.append_axes('top',   size = '30%', pad = 0.15)
 
-    profile_vert    =   domain.ne[:, :, 0].T.sum(axis = 0)
+    profile_vert    =   ne_T.sum(axis = 0)
     profile_vert    =   (profile_vert - profile_vert.min() ) / (profile_vert.max() - profile_vert.min())
-    axhoriz.plot(domain.x, profile_vert, lw = 3, c = 'k', alpha = 1)
+    #profile_vert /= profile_vert.max()
+    axhoriz.plot(x/1000, profile_vert, lw = 3, c = 'k', alpha = 1)
     axhoriz.set_xlim(x[0], x[-1])
     axhoriz.set_ylim(0, 1)
     axhoriz.set_ylabel(r'$n_e$(x)', fontsize = 23)
 
-    profile_hor     =   domain.ne[:, :, 0].T.sum(axis = 1)
+    profile_hor     =   ne_T.sum(axis = 1)
     profile_hor     =   (profile_hor - profile_hor.min() ) / (profile_hor.max() - profile_hor.min())
-    profile_hor_theory  =  profile_hor
-    axvert.plot(profile_hor, domain.y, lw = 3, c = 'k', alpha = 1)
+    #profile_hor /= profile_hor.max()
+    axvert.plot(profile_hor, y/1000, lw = 3, c = 'k', alpha = 1)
     axvert.set_ylim(y[0], y[-1])
     axvert.set_xlabel(r'$n_e$(z)', fontsize = 23)
 
