@@ -151,6 +151,9 @@ class Beam:
                 s0 = s0.at[4, :].set(c * jnp.cos(χ))
                 s0 = s0.at[3, :].set(c * jnp.sin(χ) * jnp.cos(ϕ))
                 s0 = s0.at[5, :].set(c * jnp.sin(χ) * jnp.sin(ϕ))
+                #s0 = s0.at[3, :].set(c * jnp.sin(1.373))
+                #s0 = s0.at[4, :].set(c * jnp.cos(1.373))
+                #s0 = s0.at[5, :].set(0)
 
                 # Initial position
                 s0 = s0.at[0, :].set(self.beam_size * u * jnp.cos(t))
@@ -330,7 +333,6 @@ class Beam:
                 s0 = s0.at[1, :].set(beam_size_2 * t)
                 s0 = s0.at[2, :].set(ne_extent)
             else: # Default to y
-                print("Default to y")
                 # Initial velocity
                 s0 = s0.at[4, :].set(c * jnp.cos(χ))
                 s0 = s0.at[3, :].set(c * jnp.sin(χ) * jnp.cos(ϕ))
@@ -467,10 +469,14 @@ class ScalarDomain(eqx.Module):
     Np_total: np.int64
     ray_batch_count: np.int64
 
-    mirrored: bool
+    x_offset: jnp.int32
+    y_offset: jnp.int32
+    z_offset: jnp.int32
+
+    zeropoint: jax.Array
 
     def __init__(self, lengths, dims, *, ne_type = None, probing_direction = 'z', auto_batching = True, iteration = 1, region_count = 1, leeway_factor = None, coord_backup = None, future_dims = None, Np = None,
-        s = None, s1 = None, s2 = None, Ly = None, ne_0 = None, ne = None, memory_limit = None, mirrored = True):
+        s = None, s1 = None, s2 = None, Ly = None, ne_0 = None, ne = None, memory_limit = None, zeropoint = None):
 
         # initalise
         self.s = s
@@ -500,9 +506,6 @@ class ScalarDomain(eqx.Module):
         self.memory_limit = memory_limit
         del memory_limit
 
-        self.mirrored = mirrored
-        del mirrored
-
         # working with 10% leeway in estimate for now
         if leeway_factor is not None:
             self.leeway_factor = leeway_factor
@@ -516,6 +519,22 @@ class ScalarDomain(eqx.Module):
             self.Np_total = None
 
         self.ray_batch_count = 1
+
+        if zeropoint is not None:
+            # if 1 length given, assumes all are the same
+            if isinstance(zeropoint, generic_valid_types):
+                self.x_offset, self.y_offset, self.z_offset = zeropoint, zeropoint, zeropoint
+                self.zeropoint = jnp.array([zeropoint, zeropoint, zeropoint])
+            # if array given, checks len = 3 and assigns accordingly
+            else:
+                self.zeropoint = jnp.array(zeropoint)
+                if self.zeropoint.shape != (3,):
+                    raise Exception('zeropoint must have len = 3: (x,y,z)')
+
+                self.x_offset, self.y_offset, self.z_offset = self.zeropoint[0], self.zeropoint[1], self.zeropoint[2]
+        else:
+            self.x_offset, self.y_offset, self.z_offset = 0, 0, 0
+            self.zeropoint = jnp.array([0, 0, 0])
 
         # if 1 length given, assumes all are the same
         if isinstance(lengths, generic_valid_types):
@@ -658,14 +677,9 @@ class ScalarDomain(eqx.Module):
             self.future_dims = None
 
             # define coordinate space
-            if self.mirrored:
-                self.x = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
-                self.y = jnp.float32(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n))
-                self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
-            else:
-                self.x = jnp.float32(jnp.linspace(0, self.x_length, self.x_n))
-                self.y = jnp.float32(jnp.linspace(0, self.y_length, self.y_n))
-                self.z = jnp.float32(jnp.linspace(0, self.z_length, self.z_n))
+            self.x = jnp.float32(self.x_offset + jnp.linspace(0, self.x_length, self.x_n))
+            self.y = jnp.float32(self.y_offset + jnp.linspace(0, self.y_length, self.y_n))
+            self.z = jnp.float32(self.z_offset + jnp.linspace(0, self.z_length, self.z_n))
         else:
             if iteration != 1:
                 self.coord_backup = coord_backup
@@ -681,12 +695,8 @@ class ScalarDomain(eqx.Module):
             if self.probing_direction == 'x':
                 # define coordinate space
                 self.x = self.coord_backup[lower:upper]
-                if self.mirrored:
-                    self.y = jnp.float32(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n))
-                    self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
-                else:
-                    self.y = jnp.float32(jnp.linspace(0, self.y_length, self.y_n))
-                    self.z = jnp.float32(jnp.linspace(0, self.z_length, self.z_n))
+                self.y = jnp.float32(self.y_offset + jnp.linspace(0, self.y_length, self.y_n))
+                self.z = jnp.float32(self.z_offset + jnp.linspace(0, self.z_length, self.z_n))
 
                 self.x_length = self.x[-1] - self.x[0]
                 self.lengths = self.lengths.at[0].set(self.x_length)
@@ -696,12 +706,8 @@ class ScalarDomain(eqx.Module):
             elif self.probing_direction == 'y':
                 # define coordinate space
                 self.y = self.coord_backup[lower:upper]
-                if self.mirrored:
-                    self.x = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
-                    self.z = jnp.float32(jnp.linspace(-self.z_length / 2, self.z_length / 2, self.z_n))
-                else:
-                    self.x = jnp.float32(jnp.linspace(0, self.x_length, self.x_n))
-                    self.z = jnp.float32(jnp.linspace(0, self.z_length, self.z_n))
+                self.x = jnp.float32(self.x_offset + jnp.linspace(0, self.x_length, self.x_n))
+                self.z = jnp.float32(self.z_offset + jnp.linspace(0, self.z_length, self.z_n))
 
                 self.y_length = self.y[-1] - self.y[0]
                 self.lengths = self.lengths.at[1].set(self.y_length)
@@ -711,12 +717,8 @@ class ScalarDomain(eqx.Module):
             elif self.probing_direction == 'z':
                 # define coordinate space
                 self.z = self.coord_backup[lower:upper]
-                if self.mirrored:
-                    self.x = jnp.float32(jnp.linspace(-self.x_length / 2, self.x_length / 2, self.x_n))
-                    self.y = jnp.float32(jnp.linspace(-self.y_length / 2, self.y_length / 2, self.y_n))
-                else:
-                    self.x = jnp.float32(jnp.linspace(0, self.x_length, self.x_n))
-                    self.y = jnp.float32(jnp.linspace(0, self.y_length, self.y_n))
+                self.x = jnp.float32(self.x_offset + jnp.linspace(0, self.x_length, self.x_n))
+                self.y = jnp.float32(self.y_offset + jnp.linspace(0, self.y_length, self.y_n))
 
                 self.z_length = self.z[-1] - self.z[0]
                 self.lengths = self.lengths.at[2].set(self.z_length)
@@ -812,7 +814,7 @@ class ScalarDomain(eqx.Module):
             self.test_B()
         elif self.ne_type == "quad_trough_test":
             print("Generating field for the Quadratic Trough test case...")
-            self.YY, _, _ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)
+            _, self.YY, _ = jnp.meshgrid(self.x, self.y, self.z, indexing = 'ij', copy = True)
 
             self.XX = None
             self.ZZ = None
@@ -883,11 +885,15 @@ class ScalarDomain(eqx.Module):
         if self.s is not None:
             y_c = self.s
 
-        self.YY = self.YY.at[:, :, :].set(1 + (self.YY / y_c) ** 2)
-        self.YY = self.YY.at[:, :, :].set(n_cr * self.YY / 2)
+        self.YY = self.YY.at[:, :, :].set(self.YY / y_c)
+        self.YY = self.YY.at[:, :, :].set(self.YY ** 2)
+        self.YY = self.YY.at[:, :, :].set(self.YY + 1)
+        self.YY = self.YY.at[:, :, :].set(self.YY / 2)
 
         self.ne = self.YY
         self.cleanup()
+
+        self.ne = self.ne.at[:, :, :].set(n_cr * self.ne)
 
     #@partial(jax.jit, static_argnames=("self",))  
     def external_ne(self):
@@ -1154,7 +1160,7 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, dur
     else:
         assert "\nWhat."
 
-def solve(beam, ScalarDomain, probing_depth, *, jitted = True, save_points_per_region = 2, memory_debug = False, lwl = 1064e-9, keep_domain = False, return_raw_results = False, verbose = True):
+def solve(beam, ScalarDomain, probing_depth, *, jitted = True, save_points_per_region = 2, memory_debug = False, lwl = 1064e-9, keep_domain = False, return_raw_results = False, verbose = True, rtol = 1, atol = 1e-5):
     omega = 2 * jnp.pi * c / lwl
 
     region_count = ScalarDomain.region_count
@@ -1229,6 +1235,7 @@ def solve(beam, ScalarDomain, probing_depth, *, jitted = True, save_points_per_r
 
                     lengths = ScalarDomain.lengths
                     dims = ScalarDomain.dims
+                    zeropoint = ScalarDomain.zeropoint
 
                     ne_type = ScalarDomain.ne_type
 
@@ -1241,8 +1248,6 @@ def solve(beam, ScalarDomain, probing_depth, *, jitted = True, save_points_per_r
                     coord_backup = ScalarDomain.coord_backup
                     future_dims = ScalarDomain.future_dims
 
-                    mirrored = ScalarDomain.mirrored
-
                     try:
                         del ScalarDomain
                     except:
@@ -1250,7 +1255,7 @@ def solve(beam, ScalarDomain, probing_depth, *, jitted = True, save_points_per_r
 
                     import simulator.domain as d
                     ScalarDomain = d.ScalarDomain(
-                        lengths, dims,
+                        lengths, dims, zeropoint,
                         ne_type = ne_type,
                         probing_direction = probing_direction,
                         auto_batching = True,
@@ -1258,12 +1263,12 @@ def solve(beam, ScalarDomain, probing_depth, *, jitted = True, save_points_per_r
                         region_count = region_count,
                         leeway_factor = leeway_factor,
                         coord_backup = coord_backup,
-                        future_dims = future_dims,
-                        mirrored = mirrored
+                        future_dims = future_dims
                     )
 
                     del lengths
                     del dims
+                    del zeropoint
 
                     del ne_type
 
@@ -1275,8 +1280,6 @@ def solve(beam, ScalarDomain, probing_depth, *, jitted = True, save_points_per_r
 
                     del coord_backup
                     del future_dims
-
-                    del mirrored
 
                 # Need to make sure all rays have left volume
                 # Conservative estimate of diagonal across volume
@@ -1419,7 +1422,7 @@ def solve(beam, ScalarDomain, probing_depth, *, jitted = True, save_points_per_r
                 ) # the 2e8 choice is very arbritrary
 
             # hardcode to normalise to 1 due to diffrax bug
-            ODE_solve = diffrax_solve(dsdt_ODE, 0, 1, save_points_per_region, ScalarDomain.lengths, ScalarDomain.dims)
+            ODE_solve = diffrax_solve(dsdt_ODE, 0, 1, save_points_per_region, ScalarDomain.lengths, ScalarDomain.dims, rtol = rtol, atol = atol)
 
             from equinox import filter_jit
             ODE_solve = filter_jit(ODE_solve)

@@ -12,6 +12,8 @@ from shared.propagation import ray_to_Jonesvector
 from shared.utils import count_nans
 from shared.utils import round_to_n
 
+from shared.printing import colour
+
 #import jax
 #jax.tree_util.tree_leaves(x, is_leaf = lambda x: x is None)
 
@@ -299,7 +301,7 @@ class Diagnostic:
     """
 
     # this is in mm's not metres - self.rf is converted to mm's (not sure if everything else is covered though)
-    def __init__(self, wavelength, rf, Jf = None, *, focal_plane = 0, L = 400, R = 25, Lx = 18, Ly = 13.5, x = None, y = None, x_l = None, y_l = None, l_x = 0, u_x = 0.3, l_y = -5, u_y = 5):
+    def __init__(self, wavelength, rf, Jf = None, *, focal_plane = 0, L = 400, R = 25, Lx = 18, Ly = 13.5, x = None, y = None, x_l = None, y_l = None, l_x = 0, u_x = 0.3, l_y = -5, u_y = 5, ignore_lens = False, auto_range = False):
         """
         Initialise ray diagnostic.
 
@@ -315,6 +317,8 @@ class Diagnostic:
         self.wavelength, self.focal_plane, self.L, self.R, self.Lx, self.Ly = wavelength, focal_plane, L, R, Lx, Ly
 
         self.x, self.y, self.x_l, self.y_l = x, y, x_l, y_l
+
+        self.ignore_lens, self.auto_range = ignore_lens, auto_range
 
         # these HAVE to stay... for some reason - not entirely sure why you can't just reference self.Beam.r_ directly (or now just rf)
         # if you can make it without the memory duplication work please do, else DON'T REMOVE!
@@ -346,7 +350,7 @@ class Diagnostic:
 
             self.Np_inc = self.rf.shape[-1]
             if self.Np == self.Np_inc:
-                print("\nAll rays incident on lens!")
+                print("\nAll " + str(self.Np) + " received rays incident on lens!")
             else:
                 print("\n{} rays received, {} incident on the first lens.".format(str(self.Np), str(self.Np_inc)))
                 print(" --> {} % of rays wasted!".format(str(round_to_n((1 - self.Np_inc / self.Np) * 100, 3))))
@@ -366,7 +370,7 @@ class Diagnostic:
 
         self.Jf = self.Jf.at[:, :].set(self.Jf[:, :] * jnp.exp(1.0j * k * jnp.sqrt(dx ** 2 + dy ** 2 + (r1[1, :] - r0[1, :]) ** 2)))
 
-    def histogram(self, *, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False, plain_plot = False, extra_info = True):
+    def histogram(self, *, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False, plain_plot = False, extra_info = True, auto_range = False):
         """
         Bin data into a histogram. Defaults are for a KAF-8300.
         Outputs are H, the histogram, and xedges and yedges, the bin edges.
@@ -382,7 +386,16 @@ class Diagnostic:
         else:
             x, y = count_nans(self.rf, ret = True)
 
-        self.H, self.xedges, self.yedges = jnp.histogram2d(x, y, bins=[np.floor(pix_x / bin_scale).astype(np.int64), np.floor(pix_y / bin_scale).astype(np.int64)], range=[[-self.Lx / 2, self.Lx / 2],[-self.Ly / 2, self.Ly / 2]])
+        #if len(x) > 0 & len(y) > 0:
+        #    if auto_range:
+        #        range_x = [x.min(), x.max()]
+        #        range_y = [y.min(), y.max()]
+        #    else:
+        #        range_x = [-self.Lx / 2, self.Lx / 2]
+        #        range_y = [-self.Ly / 2, self.Ly / 2]
+
+        self.H, self.xedges, self.yedges = jnp.histogram2d(x, y, bins=[np.floor(pix_x / bin_scale).astype(np.int64), np.floor(pix_y / bin_scale).astype(np.int64)])#, range=[range_x, range_y])
+        #self.H, self.xedges, self.yedges = jnp.histogram2d(x * pix_x / self.Lx, y * pix_y / self.Ly, bins=[np.floor(pix_x / bin_scale).astype(np.int64), np.floor(pix_y / bin_scale).astype(np.int64)], range=[[-self.Lx / 2, self.Lx / 2], [-self.Ly / 2, self.Ly / 2]])
         self.H = self.H.T
 
         #Optional - clear ray attributes to save memory
@@ -416,7 +429,7 @@ class Diagnostic:
         self.H = amplitude
 
     def plot_rays(self, *, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
-        self.histogram(bin_scale = bin_scale, pix_x = pix_x, pix_y = pix_y, clear_mem = clear_mem, plain_plot = True)
+        self.histogram(bin_scale = bin_scale, pix_x = pix_x, pix_y = pix_y, clear_mem = clear_mem, plain_plot = True, auto_range = self.auto_range)
 
 class Shadowgraphy(Diagnostic):
     """
@@ -428,18 +441,27 @@ class Shadowgraphy(Diagnostic):
     def single_lens_solve(self):
         ## single lens - M = Variable (around ~2) (based on Detector position. Real experimental setup)
         r1 = travel(self.r0, 3 * self.L / 4 - self.focal_plane) #displace rays to lens. Accounts for object with depth
-        r2 = circular_aperture(r1, self.R)      # cut off
-        r3 = sym_lens(r2, self.L / 2)             # lens 1
+        if not self.ignore_lens:
+            r2 = circular_aperture(r1, self.R)      # cut off
+        else:
+            r2 = r1
+        r3 = sym_lens(r1, self.L / 2)             # lens 1
         r4 = travel(r3, 3*self.L / 2)           # detector
         self.rf = r4
 
     def two_lens_solve(self):
         ## 2 lens telescope, M = 1
         r1 = travel(self.r0, self.L - self.focal_plane) #displace rays to lens. Accounts for object with depth
-        r2 = circular_aperture(r1, self.R)    # cut off
+        if not self.ignore_lens:
+            r2 = circular_aperture(r1, self.R)    # cut off
+        else:
+            r2 = r1
         r3 = sym_lens(r2, self.L / 2)           # lens 1
         r4 = travel(r3, self.L * 2)           # displace rays to lens 2.
-        r5 = circular_aperture(r4, self.R)    # cut off
+        if not self.ignore_lens:
+            r5 = circular_aperture(r4, self.R)    # cut off
+        else:
+            r5 = r4
         r6 = sym_lens(r5, self.L / 2)           # lens 2
         r7 = travel(r6, self.L)             # displace rays to detector
         self.rf = r7
@@ -514,7 +536,10 @@ class Refractometry(Diagnostic):
         r2 = circular_aperture(r1, self.R)      # cut off
         r3 = sym_lens(r2, self.L/2)             # lens 1 - spherical
         r4 = travel(r3, 3*self.L/2)           # displace rays to lens 2 - hybrid
-        r5 = rect_aperture(r4, 15, 30)          # rectangular lens cut-off
+        if not self.ignore_lens:
+            r5 = rect_aperture(r4, 15, 30)          # rectangular lens cut-off
+        else:
+            r5 = r4
         r6 = circular_aperture(r5, self.R)      # cut off
         r7 = lens(r6, self.L/3, self.L/2)       # lens 2 - hybrid lens
         r8 = travel(r7, self.L)               # displace rays to detector
@@ -526,7 +551,7 @@ class Refractometry(Diagnostic):
         # propagate E field
         self.propagate_E(r1, self.r0)
 
-        r2, self.Jf = circular_aperture(self.r0, self.R, E = self.Jf)      # cut off
+        r2, self.Jf = circular_aperture(r1, self.R, E = self.Jf)      # cut off
         r3 = sym_lens(r2, self.L / 2)          # lens 1 - spherical
         self.propagate_E(r3, r2)
 

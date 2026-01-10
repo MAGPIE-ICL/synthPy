@@ -8,7 +8,7 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import processing.diagnostics as diag
 from simulator.fresnel_integral import *
 
-def graph_domain(domain, *, save = False, slice = "z"):
+def graph_domain(domain, *, save = False, slice = "z", mark = None):
     fig, ax = plt.subplots(figsize = (9.5, 9.5))
     fig.subplots_adjust(.15, .15, .95, .95, hspace = 0.5)
 
@@ -98,6 +98,27 @@ def graph_domain(domain, *, save = False, slice = "z"):
 
     # ax.text(4, 4.2, s = 'a)', c = 'w', fontsize = 30)
 
+    if mark is not None:
+        mx, my, mz = mark
+
+        if slice == "x":
+            px = my * 1000
+            py = mz * 1000
+        elif slice == "y":
+            px = mz * 1000
+            py = mx * 1000
+        elif slice == "z":
+            px = mx * 1000
+            py = my * 1000
+
+        ax.plot(
+            px, py,
+            marker='+',
+            markersize=20,
+            markeredgewidth=3,
+            color='k'
+        )
+
     # save Figure
     if save:
         from datetime import datetime
@@ -105,14 +126,51 @@ def graph_domain(domain, *, save = False, slice = "z"):
 
 from processing.diagnostics import lens_cutoff
 
-def general_ray_plots(rf, nbins, lwl = 1032e-9, *, l_x = 0, u_x = 0.3, l_y = -5, u_y = 5, extra_info = True):
+def inital_ray_plot(rf, nbins, *, slice = "z"):
+    fig1, ax1 = plt.subplots(1, figsize=(10, 4))
+
+    if rf.shape[0] > 3:
+        rf = rf[:3, :]
+
+    if rf.shape[0] < 3:
+        print("Not enough information to plot!")
+
+    if slice == "x":
+        _, _, _, im1 = ax1.hist2d(rf[1] * 1e3, rf[2] * 1e3, bins=(nbins, nbins), cmap=plt.cm.jet)
+        plt.colorbar(im1, ax = ax1)
+        ax1.set_xlabel("y (mm)")
+        ax1.set_ylabel("z (mm)")
+
+    elif slice == "y":
+        _, _, _, im1 = ax1.hist2d(rf[2] * 1e3, rf[0] * 1e3, bins=(nbins, nbins), cmap=plt.cm.jet)
+        plt.colorbar(im1, ax = ax1)
+        ax1.set_xlabel("z (mm)")
+        ax1.set_ylabel("x (mm)")
+
+    elif slice == "z":
+        _, _, _, im1 = ax1.hist2d(rf[0] * 1e3, rf[1] * 1e3, bins=(nbins, nbins), cmap=plt.cm.jet)
+        plt.colorbar(im1, ax = ax1)
+        ax1.set_xlabel("x (mm)")
+        ax1.set_ylabel("y (mm)")
+
+def general_ray_plots(rf, nbins, lwl = 1032e-9, *, l_x = 0, u_x = 0.3, l_y = -5, u_y = 5, extra_info = True, ignore_lens = False, initial = False, limit = None):
     fig1, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
+
+    if rf.shape[0] > 4 or initial == True:
+        rf = rf[:3, :]
+
+    if rf.shape[0] < 4 or initial == True:
+        rf = np.vstack((rf, np.full((4 - rf.shape[0], rf.shape[1]), np.nan)))
 
     # lens_cutoff may not make a difference to the angle plot (after already masked seperately) - but it does to this
     # lens_cutoff(...) passes a tuple of rf and Jf (= None), not just rf
-    rf, _ = lens_cutoff(rf)
+    if ignore_lens == False or initial == False:
+        rf, _ = lens_cutoff(rf)
 
-    _, _, _, im1 = ax1.hist2d(rf[0] * 1e3, rf[2] * 1e3, bins=(nbins, nbins), cmap=plt.cm.jet)
+    if limit is None:
+        _, _, _, im1 = ax1.hist2d(rf[0] * 1e3, rf[2] * 1e3, bins=(nbins, nbins), cmap=plt.cm.jet)
+    else:
+        _, _, _, im1 = ax1.hist2d(rf[0] * 1e3, rf[2] * 1e3, bins=(nbins, nbins), cmap=plt.cm.jet, range=[[-limit, limit], [-limit, limit]])
     plt.colorbar(im1, ax = ax1)
     ax1.set_xlabel("x (mm)")
     ax1.set_ylabel("y (mm)")
@@ -145,15 +203,15 @@ def general_ray_plots(rf, nbins, lwl = 1032e-9, *, l_x = 0, u_x = 0.3, l_y = -5,
     for i in range(len(axis)):
         axis[i].grid(False)
 
-    shadowgrapher = diag.Shadowgraphy(lwl, rf)
+    shadowgrapher = diag.Shadowgraphy(lwl, rf, ignore_lens = ignore_lens)
     shadowgrapher.single_lens_solve()
-    shadowgrapher.histogram(bin_scale = 1, clear_mem = False, extra_info = extra_info)
+    shadowgrapher.histogram(bin_scale = 1, clear_mem = False, extra_info = extra_info, auto_range = True)
 
     axis[0].imshow(shadowgrapher.H, cmap = 'hot', interpolation = 'nearest', clim = (0.5, 1))
 
-    refractometer = diag.Refractometry(lwl, rf)
+    refractometer = diag.Refractometry(lwl, rf, ignore_lens = ignore_lens)
     refractometer.incoherent_solve()
-    refractometer.histogram(bin_scale = 1, clear_mem = False, extra_info = extra_info)
+    refractometer.histogram(bin_scale = 1, clear_mem = False, extra_info = extra_info, auto_range = True)
 
     axis[1].imshow(refractometer.H, cmap = 'hot', interpolation = 'nearest', clim = (0.5, 1))
 
@@ -181,27 +239,18 @@ def stepped_ray_plot(rf, domain, sample_size = 32, *, indexing = "synthPy"):
         fig = plt.figure()
         ax = fig.add_subplot(projection = '3d')
 
-        sample_indices = np.random.randint(low = rf[0].ys.shape[0], size = sample_size)
+        for i in np.random.randint(low = rf[0].ys.shape[0], size = sample_size):
 
-        x = []
-        y = []
-        z = []
+            x, y, z = [], [], []
 
-        for i in sample_indices:
             for j in range(sol_count):
                 # save_points_per_region SHOULD be constant between regions
                 for k in range(save_points_per_region):
-                    values = rf[j].ys[:, k, :].T    # is this correct when generalised??
-
-                    x.append(values[0, i])
-                    y.append(values[1, i])
-                    z.append(values[2, i])
+                    x.append(rf[j].ys[i, k, 0])    # is this correct when generalised??
+                    y.append(rf[j].ys[i, k, 1])
+                    z.append(rf[j].ys[i, k, 2])
 
             plt.plot(z, x, y, label = 'save_point' + str(k))
-
-            x = []
-            y = []
-            z = []
 
         xx, yy = np.meshgrid(domain.x, domain.y)
         z_plane = np.full(len(domain.z), -(domain.z_length / 2))
@@ -209,9 +258,9 @@ def stepped_ray_plot(rf, domain, sample_size = 32, *, indexing = "synthPy"):
         ax.plot_wireframe(z_plane, xx, yy, rcount = 5, ccount = 5, color="k")
 
         margin = 0.0005
-        ax.set_xlim(-(domain.z_length / 2) - margin, (domain.z_length / 2) + margin)
-        ax.set_ylim(-(domain.x_length / 2) - margin, (domain.x_length / 2) + margin)
-        ax.set_zlim(-(domain.y_length / 2) - margin, (domain.y_length / 2) + margin)
+        ax.set_xlim(domain.z[0] - margin, domain.z[-1] + margin)
+        ax.set_ylim(domain.x[0] - margin, domain.x[-1] + margin)
+        ax.set_zlim(domain.y[0] - margin, domain.y[-1] + margin)
 
         ax.set_xlabel('z (m)')
         ax.set_ylabel('x (m)')
