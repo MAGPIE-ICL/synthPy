@@ -888,7 +888,6 @@ class ScalarDomain(eqx.Module):
         self.YY = self.YY.at[:, :, :].set(self.YY / y_c)
         self.YY = self.YY.at[:, :, :].set(self.YY ** 2)
         self.YY = self.YY.at[:, :, :].set(self.YY + 1)
-        self.YY = self.YY.at[:, :, :].set(self.YY / 2)
 
         self.ne = self.YY
         self.cleanup()
