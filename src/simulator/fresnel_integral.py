@@ -9,6 +9,18 @@ from scipy.interpolate import LinearNDInterpolator as LND
 def prepare_field_for_propagation(U0, pad_factor = 2, alpha = 0.4):
     """
     Prepares a field for propagation using reflection padding and a Tukey window.
+    
+    :param U0: Initial field
+    :type U0: np.array
+    
+    :param pad_factor: Padding factor multiplier
+    :type pad_factor: int, default: 2
+    
+    :param alpha: Alpha parameter for Tukey window
+    :type alpha: float, default: 0.4
+    
+    :return: Padded and windowed field
+    :rtype: np.array
     """
 
     pad_width_x = U0.shape[0] * pad_factor
@@ -27,6 +39,30 @@ def prepare_field_for_propagation(U0, pad_factor = 2, alpha = 0.4):
 def fresnel_propagate(U0_prepared, L, wavelength, z, original_shape, pad_factor=2, lanex_fwhm_m=None):
     """
     Propagates a prepared field using the Fresnel approximation and optionally applies the LANEX PSF.
+    
+    :param U0_prepared: Padded/windowed initial field
+    :type U0_prepared: np.array
+    
+    :param L: Domain lengths (x_len, y_len)
+    :type L: tuple
+    
+    :param wavelength: Laser wavelength
+    :type wavelength: float
+    
+    :param z: Propagation distance
+    :type z: float
+    
+    :param original_shape: Original field shape before padding
+    :type original_shape: tuple
+    
+    :param pad_factor: Padding factor
+    :type pad_factor: int, default: 2
+    
+    :param lanex_fwhm_m: LANEX full width at half maximum in meters
+    :type lanex_fwhm_m: float or None, default: None
+    
+    :return: Propagated field cropped back to original shape
+    :rtype: np.array
     """
 
     # can be modified for rectangular case? or is this an expansion?
@@ -63,6 +99,45 @@ def fresnel_propagate(U0_prepared, L, wavelength, z, original_shape, pad_factor=
 def propagate(lwl, domain, x_pos, y_pos, amplitudes, phases, z, pix_x, pix_y, convolve = True, sigma = 2, pad_factor = 2):
     """
     Prepares and propagates the field, using an energy-dependent PSF.
+    
+    :param lwl: Laser wavelength
+    :type lwl: float
+    
+    :param domain: Domain object
+    :type domain: processing.domain.ScalarDomain
+    
+    :param x_pos: Ray x positions
+    :type x_pos: np.array
+    
+    :param y_pos: Ray y positions
+    :type y_pos: np.array
+    
+    :param amplitudes: Ray amplitudes
+    :type amplitudes: np.array
+    
+    :param phases: Ray phases
+    :type phases: np.array
+    
+    :param z: Propagation distance
+    :type z: float
+    
+    :param pix_x: Number of pixels in x
+    :type pix_x: int
+    
+    :param pix_y: Number of pixels in y
+    :type pix_y: int
+    
+    :param convolve: Whether to apply a gaussian filter
+    :type convolve: bool, default: True
+    
+    :param sigma: Gaussian filter sigma
+    :type sigma: float, default: 2
+    
+    :param pad_factor: Padding factor
+    :type pad_factor: int, default: 2
+    
+    :return: Propagated field array
+    :rtype: np.array
     """
 
     N_f = (domain.x_length)**2 / (lwl * z)

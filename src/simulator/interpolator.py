@@ -14,6 +14,30 @@ from jax._src.numpy.util import check_arraylike, promote_dtypes_inexact
 
 @jax.jit
 def RegularGridInterpolator(points, values, xi, method = "linear", bounds_error = False, fill_value = 0.0):
+    """
+    JAX-compatible regular grid interpolator.
+    
+    :param points: Tuple of 1D arrays defining the grid coordinates
+    :type points: tuple of jax.Array
+    
+    :param values: Array of data values on the grid
+    :type values: jax.Array
+    
+    :param xi: Coordinates to interpolate at
+    :type xi: jax.Array or tuple
+    
+    :param method: Interpolation method
+    :type method: str, default: "linear"
+    
+    :param bounds_error: Whether to raise an error for out of bounds interpolation
+    :type bounds_error: bool, default: False
+    
+    :param fill_value: Value to use for out of bounds points
+    :type fill_value: float, default: 0.0
+    
+    :return: Interpolated values
+    :rtype: jax.Array
+    """
     if method != "linear":
         raise NotImplementedError("`method` has no effect, defaults to `linear` with no other options available")
 

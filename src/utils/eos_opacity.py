@@ -1,5 +1,7 @@
 import numpy as np
 
+# need_hc_table (bool): Whether to read specific heat data. ???
+
 def read_propaceos( file_name, 
                 need_zf_table=False, 
                 need_en_table=False, 
@@ -9,19 +11,42 @@ def read_propaceos( file_name,
                 need_pele=False,
                 need_ross_opacity=False, 
                 need_emiss_opacity=False, 
-                need_abs_opacity=False ):   
-
+                need_abs_opacity=False ):
     """
     Reads tabulated data from a PROPACEOS file.
-
-    Args:
-        file_name (str): Path to the PROPACEOS data file.
-        need_zf_table (bool): Whether to read average ionization data.
-        need_en_table (bool): Whether to read internal energy data.
-        need_hc_table (bool): Whether to read specific heat data.
-
-    Returns:
-        dict: A dictionary with extracted data. Keys depend on requested tables.
+    
+    :param file_name: Path to the PROPACEOS data file
+    :type file_name: str
+    
+    :param need_zf_table: Whether to read average ionization data
+    :type need_zf_table: bool, default: False
+    
+    :param need_en_table: Whether to read internal energy data
+    :type need_en_table: bool, default: False
+    
+    :param need_eion: Whether to read ion energy
+    :type need_eion: bool, default: False
+    
+    :param need_eele: Whether to read electron energy
+    :type need_eele: bool, default: False
+    
+    :param need_pion: Whether to read ion pressure
+    :type need_pion: bool, default: False
+    
+    :param need_pele: Whether to read electron pressure
+    :type need_pele: bool, default: False
+    
+    :param need_ross_opacity: Whether to read Rosseland opacity
+    :type need_ross_opacity: bool, default: False
+    
+    :param need_emiss_opacity: Whether to read emission opacity
+    :type need_emiss_opacity: bool, default: False
+    
+    :param need_abs_opacity: Whether to read absorption opacity
+    :type need_abs_opacity: bool, default: False
+    
+    :return: A dictionary with extracted data. Keys depend on requested tables.
+    :rtype: dict
     """
 
     # Conversion factors

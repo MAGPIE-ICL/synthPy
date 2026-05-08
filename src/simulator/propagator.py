@@ -30,20 +30,72 @@ from shared.propagation import back_propogate
 ##
 
 def omega_pe(ne):
-    """Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28"""
+    """
+    Calculate electron plasma frequency. Output units are rad/sec. From NRL pp 28.
+    
+    :param ne: Electron density
+    :type ne: float or jax.Array
+    
+    :return: Electron plasma frequency
+    :rtype: float or jax.Array
+    """
 
     return 5.64e4 * jnp.sqrt(ne)
 
 # NRL formulary inverse brems - cheers Jack Halliday for coding in Python
 # Converted to rate coefficient by multiplying by group velocity in plasma
 def kappa(ne, Te, Z, omega):
+    """
+    Calculates the inverse bremsstrahlung rate coefficient.
+    
+    :param ne: Electron density
+    :type ne: float or jax.Array
+    
+    :param Te: Electron temperature in eV
+    :type Te: float or jax.Array
+    
+    :param Z: Ionization state
+    :type Z: float or jax.Array
+    
+    :param omega: Laser frequency
+    :type omega: float
+    
+    :return: Rate coefficient
+    :rtype: float or jax.Array
+    """
     # Useful subroutines
     def v_the(Te):
-        """Calculate electron thermal speed. Provide Te in eV. Retrurns result in m/s"""
+        """
+        Calculate electron thermal speed. Provide Te in eV. Returns result in m/s.
+        
+        :param Te: Electron temperature in eV
+        :type Te: float or jax.Array
+        
+        :return: Electron thermal speed
+        :rtype: float or jax.Array
+        """
 
         return 4.19e5 * jnp.sqrt(Te)
 
     def V(ne, Te, Z, omega):
+        """
+        Calculates the velocity used in the Coulomb logarithm.
+        
+        :param ne: Electron density
+        :type ne: float or jax.Array
+        
+        :param Te: Electron temperature
+        :type Te: float or jax.Array
+        
+        :param Z: Ionization state
+        :type Z: float or jax.Array
+        
+        :param omega: Laser frequency
+        :type omega: float
+        
+        :return: Velocity scaling parameter
+        :rtype: float or jax.Array
+        """
         o_pe = omega_pe(ne)
         #o_max = jnp.copy(o_pe)
         #o_max[o_pe < omega] = omega
@@ -56,6 +108,24 @@ def kappa(ne, Te, Z, omega):
         return o_pe * L_max
 
     def coloumbLog(ne, Te, Z, omega):
+        """
+        Calculates the Coulomb logarithm for inverse bremsstrahlung.
+        
+        :param ne: Electron density
+        :type ne: float or jax.Array
+        
+        :param Te: Electron temperature
+        :type Te: float or jax.Array
+        
+        :param Z: Ionization state
+        :type Z: float or jax.Array
+        
+        :param omega: Laser frequency
+        :type omega: float
+        
+        :return: Coulomb logarithm value
+        :rtype: float or jax.Array
+        """
         return jnp.maximum(2.0, jnp.log(v_the(Te) / V(ne, Te, Z, omega)))
 
     ne_cc = ne * 1e-6
@@ -70,9 +140,33 @@ def kappa(ne, Te, Z, omega):
 
 # Plasma refractive index
 def n_refrac(ne, omega):
+    """
+    Calculates the plasma refractive index.
+    
+    :param ne: Electron density
+    :type ne: float or jax.Array
+    
+    :param omega: Laser frequency
+    :type omega: float
+    
+    :return: Refractive index
+    :rtype: float or jax.Array
+    """
     return jnp.sqrt(1.0 - (omega_pe(ne * 1e-6) / omega) ** 2)
 
 def opacity_grid_generation(domain, energy):
+    """
+    Generates an opacity grid from material EMI files.
+    
+    :param domain: Simulation domain object
+    :type domain: processing.domain.ScalarDomain
+    
+    :param energy: Energy of the probing beam
+    :type energy: float
+    
+    :return: Interpolated opacity grid
+    :rtype: RegularGridInterpolator
+    """
     opa_max = domain.z_n/domain.z_length
 
     if domain.num_materials == 1:
@@ -108,6 +202,18 @@ def opacity_grid_generation(domain, energy):
         #opacity_spatial_grid_tot = trilinearInterpolator((domain.x, domain.y, domain.z), opacity_grids_tot, r)
 
 def attenuation(domain, energy):
+    """
+    Calculates the spatial attenuation interpolation object based on opacity files.
+    
+    :param domain: Simulation domain object
+    :type domain: processing.domain.ScalarDomain
+    
+    :param energy: Probing beam energy
+    :type energy: float
+    
+    :return: Spatial interpolation object for attenuation
+    :rtype: RegularGridInterpolator
+    """
     opa_max = domain.z_n/domain.z_length
     
     if domain.num_materials == 1:
@@ -141,13 +247,28 @@ def attenuation(domain, energy):
 
 def dndr(r, gradient_term, omega, x, y, z):
     """
-    Returns the gradient at the locations r
-
-    Args:
-        r (3xN float): N [x, y, z] locations
-
-    Returns:
-        3 x N float: N [dx, dy, dz] electron density gradients
+    Returns the gradient at the locations r.
+    
+    :param r: N [x, y, z] locations
+    :type r: 3xN float array
+    
+    :param gradient_term: Scalar field to compute the gradient of
+    :type gradient_term: 3D float array
+    
+    :param omega: Laser frequency
+    :type omega: float
+    
+    :param x: x grid coordinates
+    :type x: 1D float array
+    
+    :param y: y grid coordinates
+    :type y: 1D float array
+    
+    :param z: z grid coordinates
+    :type z: 1D float array
+    
+    :return: N [dx, dy, dz] electron density gradients
+    :rtype: 3xN float array
     """
 
     grad = jnp.zeros_like(r.T)
@@ -169,15 +290,73 @@ def dndr(r, gradient_term, omega, x, y, z):
 # ODEs of photon paths, standalone function to support the solve()
 def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, omega, VerdetConst, lengths, dims, opacity, edensity, refrac_field, opacity_interp):
     """
-    Returns an array with the gradients and velocity per ray for ode_int
-
-    Args:
-        t (float array): I think this is a dummy variable for ode_int - our problem is time invarient
-        s (9N float array): flattened 9xN array of rays used by ode_int
-        ScalarDomain (ScalarDomain): an ScalarDomain object which can calculate gradients
-
-    Returns:
-        9N float array: flattened array for ode_int
+    Returns an array with the gradients and velocity per ray for ode_int.
+    
+    :param t: Time variable for ode_int
+    :type t: float array
+    
+    :param s: Flattened 9xN array of rays used by ode_int
+    :type s: 9N float array
+    
+    :param parallelise: Whether to run in parallel
+    :type parallelise: bool
+    
+    :param inv_brems: Whether to include inverse bremsstrahlung
+    :type inv_brems: bool
+    
+    :param phaseshift: Whether to calculate phase shift
+    :type phaseshift: bool
+    
+    :param B_on: Whether the B-field is active
+    :type B_on: bool
+    
+    :param ne: Electron density grid
+    :type ne: 3D float array
+    
+    :param B: B-field grid
+    :type B: 4D float array
+    
+    :param Te: Electron temperature grid
+    :type Te: 3D float array
+    
+    :param Z: Ionization state
+    :type Z: float
+    
+    :param x: x grid coordinates
+    :type x: 1D float array
+    
+    :param y: y grid coordinates
+    :type y: 1D float array
+    
+    :param z: z grid coordinates
+    :type z: 1D float array
+    
+    :param omega: Laser frequency
+    :type omega: float
+    
+    :param VerdetConst: Verdet constant
+    :type VerdetConst: float
+    
+    :param lengths: Domain physical lengths
+    :type lengths: array-like
+    
+    :param dims: Domain grid dimensions
+    :type dims: array-like
+    
+    :param opacity: Whether opacity attenuation is active
+    :type opacity: bool
+    
+    :param edensity: Whether gradient is based on electron density
+    :type edensity: bool
+    
+    :param refrac_field: Refractive field grid
+    :type refrac_field: 3D float array
+    
+    :param opacity_interp: Opacity interpolator object
+    :type opacity_interp: RegularGridInterpolator
+    
+    :return: Flattened array of velocity and gradients
+    :rtype: 9N float array
     """
 
     if not parallelise:
@@ -284,6 +463,43 @@ def dsdt(t, s, parallelise, inv_brems, phaseshift, B_on, ne, B, Te, Z, x, y, z, 
 
 def process_results(solutions, depth_traced, trace_depth, probing_direction, return_E, duration, save_points_per_region, ray_batch_count, verbose, amp_phase_return):
     """
+    Processes the raw Diffrax ODE solver solutions into standard ray states or electric fields.
+    
+    :param solutions: List of Diffrax solutions
+    :type solutions: list
+    
+    :param depth_traced: Current depth traced by the rays
+    :type depth_traced: float
+    
+    :param trace_depth: Depth traced in the current step
+    :type trace_depth: float
+    
+    :param probing_direction: Direction of probing
+    :type probing_direction: str
+    
+    :param return_E: Whether to return the electric field
+    :type return_E: bool
+    
+    :param duration: Accumulated duration of the solver
+    :type duration: float
+    
+    :param save_points_per_region: Number of points saved per domain region
+    :type save_points_per_region: int
+    
+    :param ray_batch_count: Number of batches used
+    :type ray_batch_count: int
+    
+    :param verbose: Whether to print verbose info
+    :type verbose: bool
+    
+    :param amp_phase_return: Whether to return amplitude and phase
+    :type amp_phase_return: bool
+    
+    :return: Processed ray data, optionally Jones vectors, and duration
+    :rtype: tuple
+    """
+
+    """
     #for i in enumerate(sol.result):
     #    print(i)
     for idx, result in enumerate(sol.result):
@@ -292,11 +508,11 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, ret
             print(f"Solution at index {idx} succeeded.")
         else:
             print(f"Solution at index {idx} failed.")
+    """
 
     #print(next(sol.result))
     #print(next(sol.result))
     #print(type(sol.result[0]))  # Check the type of results
-    """
 
     #else:
     #    print("Ray tracer failed. This could be a case of diffrax exceeding max steps again due to apparent 'strictness' compared to solve_ivp, check error log.")
@@ -395,6 +611,48 @@ def process_results(solutions, depth_traced, trace_depth, probing_direction, ret
         assert "\nWhat."
 
 def solve(beam, ScalarDomain, probing_depth, *, return_E = False, parallelise = True, jitted = True, save_points_per_region = 2, memory_debug = False, lwl = 1064e-9, keep_domain = False, return_raw_results = False, verbose = True):
+    """
+    Solves the ray propagation equations through the domain.
+    
+    :param beam: Tuple describing beam or array of initial rays
+    :type beam: tuple or np.array
+    
+    :param ScalarDomain: Simulation domain object
+    :type ScalarDomain: processing.domain.ScalarDomain
+    
+    :param probing_depth: Depth to propagate the rays
+    :type probing_depth: float
+    
+    :param return_E: Whether to return electric fields
+    :type return_E: bool, default: False
+    
+    :param parallelise: Whether to run using parallelised jax backend
+    :type parallelise: bool, default: True
+    
+    :param jitted: Whether to JIT compile the solver
+    :type jitted: bool, default: True
+    
+    :param save_points_per_region: Number of saved steps per sub-region
+    :type save_points_per_region: int, default: 2
+    
+    :param memory_debug: Whether to print memory debug info
+    :type memory_debug: bool, default: False
+    
+    :param lwl: Laser wavelength
+    :type lwl: float, default: 1064e-9
+    
+    :param keep_domain: Whether to keep the domain data in memory
+    :type keep_domain: bool, default: False
+    
+    :param return_raw_results: Whether to return raw diffrax output
+    :type return_raw_results: bool, default: False
+    
+    :param verbose: Whether to print detailed logs
+    :type verbose: bool, default: True
+    
+    :return: Processed final ray states, fields, and timing info
+    :rtype: tuple
+    """
     # General assertions
     if return_E == False and ScalarDomain.B_on == True:
         print(colour.BOLD + "Warning:" + colour.END + "return_E == False and ScalarDomain.B_on == True leads to pointless calculations as the output will not be used.")

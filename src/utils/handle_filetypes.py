@@ -12,11 +12,27 @@ import tarfile
 import io
 
 def export_pvti(arr: np.ndarray, fname: str = None, extent_x = None, extent_y = None, extent_z = None):
-    '''
-    Export a 3d array as a pvti file format
-        fname: str, file path and name to save under. A VTI pointed to by a PVTI file are saved in this location. If left blank, the name will default to:
-                ./plasma_PVTI_DD_MM_YYYY_HR_MIN    
-    '''
+    """
+    Export a 3D array as a pvti file format.
+    
+    :param arr: 3D data array
+    :type arr: np.ndarray
+    
+    :param fname: File path and name to save under
+    :type fname: str, default: None
+    
+    :param extent_x: Extent in x direction
+    :type extent_x: float, default: None
+    
+    :param extent_y: Extent in y direction
+    :type extent_y: float, default: None
+    
+    :param extent_z: Extent in z direction
+    :type extent_z: float, default: None
+    
+    :return: No return
+    :rtype: None
+    """
 
     if fname is None:
         import datetime as dt
@@ -89,11 +105,19 @@ def export_pvti(arr: np.ndarray, fname: str = None, extent_x = None, extent_y = 
     print(f'Scalar Domain electron density succesfully saved under {fname}.pvti !')
 
 def pvti_readin(filename):
-    '''
-	Reads in data from pvti with filename, use this to read in electron number density data
-	'''
+    """
+    Reads in data from pvti with filename, use this to read in electron number density data.
+    
+    :param filename: Path to the pvti file
+    :type filename: str
+    
+    :return: Tuple of image data, dimensions, and spacing
+    :rtype: tuple
+    """
+
     import vtk
-    from vtk.util import numpy_support as vtk_np
+    # pyrefly: ignore [missing-import]
+    from vtk.util import numpy_support as vtk_np # need to install vtk locally clearly
 
     reader = vtk.vtkXMLPImageDataReader()
     reader.SetFileName(filename)
@@ -120,9 +144,15 @@ def pvti_readin(filename):
     return img, img.shape, spacing
 
 def hdf_readin(filename):
-    '''
-    Read in hdf5 files and return electron density field
-    '''
+    """
+    Read in hdf5 files and return electron density field.
+    
+    :param filename: Path to the hdf5 file
+    :type filename: str
+    
+    :return: Tuple of electron density, dimensions, and spacing
+    :rtype: tuple
+    """
     import yt
     ds = yt.load(filename)
 
@@ -151,9 +181,18 @@ def hdf_readin(filename):
     return ne, dims, spacing
 
 def hdf_to_pvti(hdf_filename, pvti_filename):
-    '''
-    convert hdf5 format to pvti format
-    '''
+    """
+    Convert hdf5 format to pvti format.
+    
+    :param hdf_filename: Input hdf5 filename
+    :type hdf_filename: str
+    
+    :param pvti_filename: Output pvti filename
+    :type pvti_filename: str
+    
+    :return: No return
+    :rtype: None
+    """
 
     ne, dims, spacing = hdf_readin(hdf_filename)
     extent_x = (dims[0]*spacing[0])/2
@@ -256,16 +295,46 @@ def compress_matrix_to_hdf5_BytesIO(input_matrix, *, dataset_name = 'data', comp
     return hdf5_buffer.getvalue() # return the binary data
 
 def move_file_to_tar_gz(tar_gz_path, filepath, arcname = None):
+    """
+    Move a file into a tar.gz archive and delete the original.
+    
+    :param tar_gz_path: Archive path
+    :type tar_gz_path: str
+    
+    :param filepath: Path to the file to compress
+    :type filepath: str
+    
+    :param arcname: Optional name in the archive
+    :type arcname: str, default: None
+    
+    :return: No return
+    :rtype: None
+    """
     mode = 'a:gz' if os.path.exists(tar_gz_path) else 'w:gz'
 
     try:
         with tarfile.open(tar_gz_path, mode) as tar:
-            tar.add(file_path, arcname = arcname)
-        os.remove(file_path)  # Only remove if no exception occurred during add
+            tar.add(filepath, arcname = arcname)
+        os.remove(filepath)  # Only remove if no exception occurred during add
     except Exception as e:
-        print(f"Failed to add {file_path} to archive: {e}")
+        print(f"Failed to add {filepath} to archive: {e}")
 
 def stream_data_to_tar_gz(tar_gz_path, filename, content_bytes):
+    """
+    Stream data into a tar.gz archive.
+    
+    :param tar_gz_path: Archive path
+    :type tar_gz_path: str
+    
+    :param filename: Name of the file inside the archive
+    :type filename: str
+    
+    :param content_bytes: Byte content to write
+    :type content_bytes: bytes
+    
+    :return: No return
+    :rtype: None
+    """
     mode = 'a:gz' if os.path.exists(tar_gz_path) else 'w:gz'
     print(tar_gz_path)
         
@@ -286,23 +355,15 @@ def stream_data_to_tar_gz(tar_gz_path, filename, content_bytes):
 def load_hdf5_from_tar_gz(tar_gz_path, member_name):
     """
     Load an HDF5 file from inside a tar.gz archive directly into memory.
-
+    
+    :param tar_gz_path: Path to the tar.gz archive
+    :type tar_gz_path: str
+    
+    :param member_name: Member filename inside the archive
+    :type member_name: str
+    
     :return: h5py.File object (in read-only mode)
-    """
-    with tarfile.open(tar_gz_path, 'r:gz') as tar:
-        try:
-            file_bytes = tar.extractfile(tar.getmember(member_name)).read()
-            hdf5_file = h5py.File(io.BytesIO(file_bytes), 'r')
-            return hdf5_file
-        except KeyError:
-            print(f"File '{member_name}' not found in archive.")
-            return None
-
-def load_hdf5_from_tar_gz(tar_gz_path, member_name):
-    """
-    Load an HDF5 file from inside a tar.gz archive directly into memory.
-
-    :return: h5py.File object (in read-only mode)
+    :rtype: h5py.File
     """
 
     with tarfile.open(tar_gz_path, 'r:gz') as tar:
@@ -314,6 +375,18 @@ def load_hdf5_from_tar_gz(tar_gz_path, member_name):
             return None
 
 def load_array_member_from_hdf5_tar_gz(tar_gz_path, member_name):
+    """
+    Load a data array directly from an HDF5 member inside a tar.gz archive.
+    
+    :param tar_gz_path: Path to the tar.gz archive
+    :type tar_gz_path: str
+    
+    :param member_name: Member filename inside the archive
+    :type member_name: str
+    
+    :return: Numpy array containing the data
+    :rtype: np.ndarray
+    """
     h5file = load_hdf5_from_tar_gz(tar_gz_path, member_name)
 
     if h5file is not None:

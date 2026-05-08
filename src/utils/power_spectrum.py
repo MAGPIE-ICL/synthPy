@@ -8,23 +8,19 @@ import numpy as np
 #  Method 1 - Calculate Power Spectrum - Jack Hare
 def scalar1D_fft(data, dx, k_bin_num=100):
     """
-    Calculates and returns the 2D spectrum for a 2D gaussian field of scalars, assuming isotropy of the turbulence
-        Example:
-            d = np.random.randn(101, 101)
-            dx = 1
-            k_bins_weighted, spect3D = spectrum_2D_scalar(d, dx, k_bin_num = 100)
-
-            fig, ax=plt.subplots()
-            ax.scatter(k_bins_weighted, spect3D)
-
-    Arguments:
-        data {(Mx,My) array of floats} -- 2D Gaussian field of scalars
-        dx {float} -- grid spacing, assumed the same for all
-        k_bin_num {int} -- number of bins in reciprocal space
-
-    Returns:
-        k_bins_weighted {array of floats} -- location of bin centres
-        spect2D {array of floats} -- spectral power within bin
+    Calculates and returns the 1D spectrum for a field of scalars, assuming isotropy of the turbulence.
+    
+    :param data: 1D Gaussian field of scalars
+    :type data: np.ndarray
+    
+    :param dx: Grid spacing, assumed the same for all
+    :type dx: float
+    
+    :param k_bin_num: Number of bins in reciprocal space
+    :type k_bin_num: int, default: 100
+    
+    :return: Location of bin centres (k_bins_weighted [array of floats]) and spectral power within bin (spect1D [array of floats])
+    :rtype: tuple
     """
 
     #fourier transform data, shift to have zero freq at centre, find power
@@ -64,7 +60,23 @@ def scalar1D_fft(data, dx, k_bin_num=100):
     return k_bins_weighted, spect1D
 
 def scalar2D_fft(data, dx, k_bin_num=100):
-    """Calculates and returns the 2D spectrum for a 2D gaussian field of scalars, assuming isotropy of the turbulence
+    """
+    Calculates and returns the 2D spectrum for a 2D gaussian field of scalars, assuming isotropy of the turbulence.
+    
+    :param data: 2D Gaussian field of scalars
+    :type data: np.ndarray
+    
+    :param dx: Grid spacing, assumed the same for all
+    :type dx: float
+    
+    :param k_bin_num: Number of bins in reciprocal space
+    :type k_bin_num: int, default: 100
+    
+    :return: Location of bin centres (k_bins_weighted [array of floats]) and spectral power within bin (spect2D [array of floats])
+    :rtype: tuple
+    """
+
+    """
         Example:
             d=np.random.randn(101,101)
             dx=1
@@ -72,14 +84,6 @@ def scalar2D_fft(data, dx, k_bin_num=100):
 
             fig,ax=plt.subplots()
             ax.scatter(k_bins_weighted,spect3D)
-    Arguments:
-        data {(Mx,My) array of floats} -- 2D Gaussian field of scalars
-        dx {float} -- grid spacing, assumed the same for all
-        k_bin_num {int} -- number of bins in reciprocal space
-
-    Returns:
-        k_bins_weighted {array of floats} -- location of bin centres
-        spect2D {array of floats} -- spectral power within bin
     """
 
     #fourier transform data, shift to have zero freq at centre, find power
@@ -121,7 +125,23 @@ def scalar2D_fft(data, dx, k_bin_num=100):
     return k_bins_weighted, spect2D
 
 def scalar3D_fft(data, dx, k_bin_num=100):
-    """Calculates and returns the 3D spectrum for a 3D gaussian field of scalars, assuming isotropy of the turbulence
+    """
+    Calculates and returns the 3D spectrum for a 3D gaussian field of scalars, assuming isotropy of the turbulence.
+    
+    :param data: 3D Gaussian field of scalars
+    :type data: np.ndarray
+    
+    :param dx: Grid spacing, assumed the same for all
+    :type dx: float
+    
+    :param k_bin_num: Number of bins in reciprocal space
+    :type k_bin_num: int, default: 100
+    
+    :return: Location of bin centres (k_bins_weighted [array of floats]) and spectral power within bin (spect3D [array of floats])
+    :rtype: tuple
+    """
+
+    """
         Example:
             d=np.random.randn(101,91,111)
             dx=1
@@ -129,14 +149,6 @@ def scalar3D_fft(data, dx, k_bin_num=100):
 
             fig,ax=plt.subplots()
             ax.scatter(k_bins_weighted,spect3D)
-    Arguments:
-        data {(Mx,My,Mz) array of floats} -- 3D Gaussian field of scalars
-        dx {float} -- grid spacing, assumed the same for all
-        k_bin_width {float} -- width of bins in reciprocal space
-
-    Returns:
-        k_bins_weighted {array of floats} -- location of bin centres
-        spect3D {array of floats} -- spectral power within bin
     """
 
     #fourier transform data, shift to have zero freq at centre, find power
@@ -188,22 +200,40 @@ def scalar3D_fft(data, dx, k_bin_num=100):
 # only for visualisation
 
 def movingaverage(interval, window_size):
+    """
+    Function for smoothing the spectrum using a moving average.
+    
+    :param interval: Data to smooth
+    :type interval: np.ndarray
+    
+    :param window_size: Size of the moving average window
+    :type window_size: int
+    
+    :return: Smoothed data
+    :rtype: np.ndarray
+    """
     window = np.ones(int(window_size)) / float(window_size)
     return np.convolve(interval, window, 'same')
 
-def scalar1D_knyquist(r,lx, smooth = False):
+#    nx: integer
+#        the number of grid points in the x-direction
+### old variable?
+
+def scalar1D_knyquist(r, lx, smooth = False):
     """
-     Parameters:
-    ----------------------------------------------------------------
-    r:  float-vector
-        The 1D random field
-    lx: float
-        the domain size in the x-direction.
-    nx: integer
-        the number of grid points in the x-direction
-    smooth: boolean
-        Active/Disactive smooth function for visualisation
-    -----------------------------------------------------------------
+    Calculates the 1D power spectrum and Nyquist wavenumber.
+    
+    :param r: The 1D random field
+    :type r: np.ndarray (float-vector)
+    
+    :param lx: The domain size in the x-direction
+    :type lx: float
+    
+    :param smooth: Active/Disactive smooth function for visualisation
+    :type smooth: bool, default: False
+    
+    :return: Nyquist wavenumber, wave numbers array, and TKE spectrum
+    :rtype: tuple
     """
 
     nx = len(r)
@@ -231,19 +261,28 @@ def scalar1D_knyquist(r,lx, smooth = False):
     #
     return knyquist, wave_numbers, tke_spectrum
 
-def scalar2D_knyquist(r,lx, ly, smooth = False):
+#    nx: integer
+#        the number of grid points in the x-direction
+### old variable?
+
+def scalar2D_knyquist(r, lx, ly, smooth = False):
     """
-     Parameters:
-    ----------------------------------------------------------------
-    r:  float-vector
-        The 2D random field
-    lx: float
-        the domain size in the x-direction.
-    nx: integer
-        the number of grid points in the x-direction
-    smooth: boolean
-        Active/Disactive smooth function for visualisation
-    -----------------------------------------------------------------
+    Calculates the 2D power spectrum and Nyquist wavenumber.
+    
+    :param r: The 2D random field
+    :type r: np.ndarray
+    
+    :param lx: The domain size in the x-direction
+    :type lx: float
+    
+    :param ly: The domain size in the y-direction
+    :type ly: float
+    
+    :param smooth: Active/Disactive smooth function for visualisation
+    :type smooth: bool, default: False
+    
+    :return: Nyquist wavenumber, wave numbers array, and TKE spectrum
+    :rtype: tuple
     """
 
     nx = len(r[:,0])
@@ -275,19 +314,31 @@ def scalar2D_knyquist(r,lx, ly, smooth = False):
     #
     return knyquist, wave_numbers, tke_spectrum
 
-def scalar3D_knyquist(r,lx, ly, lz, smooth = False):
+#    nx: integer
+#        the number of grid points in the x-direction
+### old variable?
+
+def scalar3D_knyquist(r, lx, ly, lz, smooth = False):
     """
-     Parameters:
-    ----------------------------------------------------------------
-    r:  float-vector
-        The 3D random field
-    lx: float
-        the domain size in the x-direction.
-    nx: integer
-        the number of grid points in the x-direction
-    smooth: boolean
-        Active/Disactive smooth function for visualisation
-    -----------------------------------------------------------------
+    Calculates the 3D power spectrum and Nyquist wavenumber.
+    
+    :param r: The 3D random field
+    :type r: np.ndarray
+    
+    :param lx: The domain size in the x-direction
+    :type lx: float
+    
+    :param ly: The domain size in the y-direction
+    :type ly: float
+    
+    :param lz: The domain size in the z-direction
+    :type lz: float
+    
+    :param smooth: Active/Disactive smooth function for visualisation
+    :type smooth: bool, default: False
+    
+    :return: Nyquist wavenumber, wave numbers array, and TKE spectrum
+    :rtype: tuple
     """
 
     nx = len(r[:,0,0])
@@ -324,19 +375,25 @@ def scalar3D_knyquist(r,lx, ly, lz, smooth = False):
 
 # Method 3 - Calculate Power Spectrum - Louis Evans
 
+#    nx: integer
+#        the number of grid points in the x-direction
+### old variable?
+
 def radial_1Dspectrum(r, lx, smooth = False):
     """
-     Parameters:
-    ----------------------------------------------------------------
-    r:  float-vector
-        The 3D random field
-    lx: float
-        the domain size in the x-direction.
-    nx: integer
-        the number of grid points in the x-direction
-    smooth: boolean
-        Active/Disactive smooth function for visualisation
-    -----------------------------------------------------------------
+    Calculates the 1D radial power spectrum.
+    
+    :param r: The 1D random field
+    :type r: np.ndarray
+    
+    :param lx: The domain size in the x-direction
+    :type lx: float
+    
+    :param smooth: Active/Disactive smooth function for visualisation
+    :type smooth: bool, default: False
+    
+    :return: Nyquist wavenumber, wave numbers array, and TKE spectrum
+    :rtype: tuple
     """
 
     from numpy.fft import fft2, fftshift, fftn, fft
@@ -371,19 +428,22 @@ def radial_1Dspectrum(r, lx, smooth = False):
 
 def radial_2Dspectrum(r, lx, ly, smooth=False):
     """
-     Parameters:
-    ----------------------------------------------------------------
-    r:  float-vector
-        The 3D random field
-        - Contains, nx: integer and ny: integer
-            the number of grid points in the []-direction
-    lx: float
-        the domain size in the x-direction.
-    ly: float
-        the domain size in the y-direction.
-    smooth: boolean
-        Active/Disactive smooth function for visualisation
-    -----------------------------------------------------------------
+    Calculates the 2D radial power spectrum.
+    
+    :param r: The 2D random field - Contains, nx: integer and ny: integer, the number of grid points in the []-direction
+    :type r: np.ndarray (float-vector)
+    
+    :param lx: The domain size in the x-direction
+    :type lx: float
+    
+    :param ly: The domain size in the y-direction
+    :type ly: float
+    
+    :param smooth: Active/Disactive smooth function for visualisation
+    :type smooth: bool, default: False
+    
+    :return: Nyquist wavenumber, wave numbers array, and TKE spectrum
+    :rtype: tuple
     """
 
     from numpy.fft import fft2, fftshift, fftn, fft
@@ -420,19 +480,31 @@ def radial_2Dspectrum(r, lx, ly, smooth=False):
     
     return knyquist, k_centers, tke_spectrum
 
+#    nx: integer
+#        the number of grid points in the x-direction
+### old variable?
+
 def radial_3Dspectrum(r, lx, ly, lz, smooth=False):
     """
-     Parameters:
-    ----------------------------------------------------------------
-    r:  float-vector
-        The 3D random field
-    lx: float
-        the domain size in the x-direction.
-    nx: integer
-        the number of grid points in the x-direction
-    smooth: boolean
-        Active/Disactive smooth function for visualisation
-    -----------------------------------------------------------------
+    Calculates the 3D radial power spectrum.
+    
+    :param r: The 3D random field
+    :type r: np.ndarray (float-vector)
+    
+    :param lx: The domain size in the x-direction
+    :type lx: float
+    
+    :param ly: The domain size in the y-direction
+    :type ly: float
+    
+    :param lz: The domain size in the z-direction
+    :type lz: float
+    
+    :param smooth: Active/Disactive smooth function for visualisation
+    :type smooth: bool, default: False
+    
+    :return: Nyquist wavenumber, wave numbers array, and TKE spectrum
+    :rtype: tuple
     """
     
     from numpy.fft import fft2, fftshift, fftn, fft

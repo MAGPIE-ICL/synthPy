@@ -3,16 +3,20 @@ import numpy as np
 def read(file_path, flag_show = False):
     """
     Reads the integral quantities from the specified file into a structured numpy array.
-
-    Parameters:
-    - file_path (str): Path to the ASCII file containing the integral quantities.
-
-    Returns:
-    - np.ndarray: A structured numpy array with named columns for each integral quantity.
-
-    Examples:
-        data = read_integral_quantities("path/to/integral_quantities.txt")
+    
+    :param file_path: Path to the ASCII file containing the integral quantities
+    :type file_path: str
+    
+    :param flag_show: Whether to print loading info
+    :type flag_show: bool, default: False
+    
+    :return: A structured numpy array with named columns for each integral quantity
+    :rtype: np.ndarray
     """
+
+    #    Examples:
+    #    data = read("path/to/integral_quantities.txt")
+
     try:
         # Use numpy's genfromtxt to handle the header and read data
         # We skip the header line with column units and only read data

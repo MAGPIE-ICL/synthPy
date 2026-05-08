@@ -1,15 +1,45 @@
 class ValueHolder:
     def __init__(self, name, default, help):
+        """
+        Initializes a ValueHolder for configuration flags.
+        
+        :param name: The name of the flag
+        :type name: str
+        
+        :param default: The default value
+        :type default: any
+        
+        :param help: Description of the flag
+        :type help: str
+        
+        :return: No return
+        :rtype: None
+        """
         self.name = name
         self.default = default
         self.value = default
         self.help = help
 
     def set(self, value):
+        """
+        Sets a new value.
+        
+        :param value: New value for the flag
+        :type value: any
+        
+        :return: No return
+        :rtype: None
+        """
         self.value = value
 
 class flags:
     def __init__(self):
+        """
+        Initializes the configuration flags with their default values and help text.
+        
+        :return: No return
+        :rtype: None
+        """
         self.error_message = "Unrecognized config option: {} - is this in the docs?, check the case?"
 
         self.value_holders: dict[str, ValueHolder] = {
@@ -55,22 +85,58 @@ class flags:
         }
 
     def update(self, name, value):
+        """
+        Updates a specific flag.
+        
+        :param name: Flag name
+        :type name: str
+        
+        :param value: New value
+        :type value: any
+        
+        :return: No return
+        :rtype: None
+        """
         if name not in self.value_holders:
             raise AttributeError(self.error_message.format(name = name))
 
         self.value_holders[name].set(value)
 
     def reset(self, name):
+        """
+        Resets a specific flag to its default value.
+        
+        :param name: Flag name
+        :type name: str
+        
+        :return: No return
+        :rtype: None
+        """
         if name not in self._value_holders:
             raise AttributeError(self.error_message.format(name = name))
 
         self.value_holders[name].set(self.value_holders[name].default)
 
     def reset_all(self):
+        """
+        Resets all flags to their default values.
+        
+        :return: No return
+        :rtype: None
+        """
         for i, (k, v) in enumerate(self.value_holders):
             self.value_holders[k].value = self.value_holders[k].default
 
 def resolve_path(path: str) -> str:
+    """
+    Resolves a file path by evaluating '.' and '..' components.
+    
+    :param path: The path to resolve
+    :type path: str
+    
+    :return: The resolved path
+    :rtype: str
+    """
     # Split the path into parts
     parts = path.strip().split('/')
     stack = []

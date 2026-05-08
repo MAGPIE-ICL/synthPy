@@ -1,3 +1,4 @@
+from yt.utilities import hierarchy_inspection
 import sys
 import os
 
@@ -410,7 +411,10 @@ def memory_report(running_device = None, memory_limit = None):
             results['total_raw'] = memory_limit
             results['total'] = mem_conversion(results['total_raw'])
 
-            results['free_raw'] = memory_stats['total_raw'] - results['used_raw']
+            # could be referencing memory_stats in shared_utils for results['total_raw'] instead -> memory_stats()['total_raw']
+            # turns out memory_stats in shared_utils was renamed to memory_report, this is memory_report() function so referencing internally
+            # naming lead to confusion...
+            results['free_raw'] = results['total_raw'] - results['used_raw']
             results['free'] = mem_conversion(results['free_raw'])
 
     return results
@@ -1438,9 +1442,12 @@ def solve(beam, ScalarDomain, probing_depth, *, jitted = True, save_points_per_r
                             os.mkdir(target_folder)
                         except OSError as e:
                             print("\nFailed to create folder at " + target_folder)
-                            if e.errno != errno.EEXIST:
+                            if e.errno != e.errno.EEXIST: # was initially errno.EEXIST, this does not exist... I take it this does?
                                 raise
 
+                    # clearly need to import datetime...
+                    # why on earth was this not included in the imports at the top??
+                    import datetime
                     tar_gz_path = target_folder + "/ray_output_total_" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".hdf5.tar.gz"
 
                     from utils.handle_filetypes import compress_matrix_to_hdf5_BytesIO

@@ -11,14 +11,26 @@ def ray_to_Jonesvector(rays, *, ne_extent = None, probing_direction = 'z', keep_
     Gives position (and angles) in other axes at point where ray is in end plane of its extent in the probing axis
     (if keep_current_plane is set to True, it does not return the rays to the end of volume - just returns current 2D slice position)
 
-    Args:
-        rays (6xN float): N rays in (x,y,z,vx,vy,vz) format, m and m/s and amplitude, phase and polarisation
-        ne_extent (float): edge lengths of shape (cuboid) in probing direction, m
-        probing_direction (str): x, y or z.
-        keep_current_plane (boolean): flag to enable compatability (via True) with use in diagnostics.py, defaults to False
+    :param rays: N rays in (x,y,z,vx,vy,vz) format, m and m/s and amplitude, phase and polarisation
+    :type rays: 6xN float array
+    
+    :param ne_extent: edge lengths of shape (cuboid) in probing direction, m
+    :type ne_extent: float
+    
+    :param probing_direction: x, y or z.
+    :type probing_direction: str
+    
+    :param keep_current_plane: flag to enable compatability (via True) with use in diagnostics.py, defaults to False
+    :type keep_current_plane: bool
+    
+    :param return_E: Whether to return the electric field
+    :type return_E: bool
+    
+    :param amp_phase_return: Whether to return amplitude and phase instead
+    :type amp_phase_return: bool
 
-    Returns:
-        [type]: [description]
+    :return: ray positions and optionally electric field or amplitude/phase
+    :rtype: tuple
     """
 
     if ne_extent is None and keep_current_plane == False:
@@ -140,6 +152,21 @@ def ray_to_Jonesvector(rays, *, ne_extent = None, probing_direction = 'z', keep_
     return ray_p, None
 
 def back_propogate(rays, ne_extent, probing_direction):
+    """
+    Back-propagates rays to the starting extent of the simulation volume.
+    
+    :param rays: Array containing ray states (x, y, z, vx, vy, vz)
+    :type rays: jax.Array
+    
+    :param ne_extent: Extent length of the simulation volume
+    :type ne_extent: float
+    
+    :param probing_direction: Direction of probing ('x', 'y', or 'z')
+    :type probing_direction: str
+    
+    :return: Array of back-propagated rays
+    :rtype: jax.Array
+    """
     Np = rays.shape[1] # number of photons
 
     x, y, z, vx, vy, vz = rays[0], rays[1], rays[2], rays[3], rays[4], rays[5]

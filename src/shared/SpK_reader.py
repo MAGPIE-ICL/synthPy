@@ -1,6 +1,15 @@
 import numpy as np
 
 def open_emi_files(efile):
+	"""
+	Opens and parses an EMI file to extract group centres, groups, rho, Te, and emi_data.
+	
+	:param efile: Path to the EMI file
+	:type efile: str
+	
+	:return: A tuple containing (grp_centres, grps, rho, Te, emi_data)
+	:rtype: tuple
+	"""
 	with open(efile,'rb') as f:
 		line = f.readline()
 		# print(line)

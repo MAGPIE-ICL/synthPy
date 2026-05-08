@@ -9,6 +9,24 @@ import processing.diagnostics as diag
 from simulator.fresnel_integral import *
 
 def graph_domain(domain, *, save = False, slice = "z", mark = None):
+    """
+    Graphs a 2D slice of the electron density domain.
+    
+    :param domain: Domain object containing electron density data
+    :type domain: processing.domain.ScalarDomain
+    
+    :param save: Whether to save the figure to disk
+    :type save: bool, default: False
+    
+    :param slice: Which slice of the domain to graph ('x', 'y', or 'z')
+    :type slice: str, default: "z"
+    
+    :param mark: Optional coordinates (x, y, z) to mark on the plot
+    :type mark: tuple, default: None
+    
+    :return: No return, generates plot
+    :rtype: None
+    """
     fig, ax = plt.subplots(figsize = (9.5, 9.5))
     fig.subplots_adjust(.15, .15, .95, .95, hspace = 0.5)
 
@@ -127,6 +145,21 @@ def graph_domain(domain, *, save = False, slice = "z", mark = None):
 from processing.diagnostics import lens_cutoff
 
 def inital_ray_plot(rf, nbins, *, slice = "z"):
+    """
+    Plots the initial ray positions as a 2D histogram.
+    
+    :param rf: Array of ray data
+    :type rf: jax.Array
+    
+    :param nbins: Number of bins for the histogram
+    :type nbins: int
+    
+    :param slice: Plane to plot ('x', 'y', or 'z')
+    :type slice: str, default: "z"
+    
+    :return: No return, displays the plot
+    :rtype: None
+    """
     fig1, ax1 = plt.subplots(1, figsize=(10, 4))
 
     if rf.shape[0] > 3:
@@ -154,6 +187,45 @@ def inital_ray_plot(rf, nbins, *, slice = "z"):
         ax1.set_ylabel("y (mm)")
 
 def general_ray_plots(rf, nbins, lwl = 1032e-9, *, l_x = 0, u_x = 0.3, l_y = -5, u_y = 5, extra_info = True, ignore_lens = False, initial = False, limit = None):
+    """
+    Generates a set of general ray plots including spatial and angular histograms, as well as shadowgraphy and refractometry.
+    
+    :param rf: Array of ray data
+    :type rf: jax.Array
+    
+    :param nbins: Number of bins for the histograms
+    :type nbins: int
+    
+    :param lwl: Wavelength
+    :type lwl: float, default: 1032e-9
+    
+    :param l_x: Lower limit for theta
+    :type l_x: float, default: 0
+    
+    :param u_x: Upper limit for theta
+    :type u_x: float, default: 0.3
+    
+    :param l_y: Lower limit for phi
+    :type l_y: float, default: -5
+    
+    :param u_y: Upper limit for phi
+    :type u_y: float, default: 5
+    
+    :param extra_info: Whether to print extra information
+    :type extra_info: bool, default: True
+    
+    :param ignore_lens: Whether to ignore the lens cutoff
+    :type ignore_lens: bool, default: False
+    
+    :param initial: Indicates if these are initial rays
+    :type initial: bool, default: False
+    
+    :param limit: Spatial range limit for the plot
+    :type limit: float, default: None
+    
+    :return: No return, displays the plots
+    :rtype: None
+    """
     fig1, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
 
     if rf.shape[0] > 4 or initial == True:
@@ -218,6 +290,24 @@ def general_ray_plots(rf, nbins, lwl = 1032e-9, *, l_x = 0, u_x = 0.3, l_y = -5,
     plt.show()
 
 def stepped_ray_plot(rf, domain, sample_size = 32, *, indexing = "synthPy"):
+    """
+    Plots the trajectories of a sampled subset of rays through the domain.
+    
+    :param rf: Array of ray path data
+    :type rf: jax.Array or list
+    
+    :param domain: Domain object containing dimensions
+    :type domain: processing.domain.ScalarDomain
+    
+    :param sample_size: Number of rays to plot
+    :type sample_size: int, default: 32
+    
+    :param indexing: Indexing convention
+    :type indexing: str, default: "synthPy"
+    
+    :return: No return, displays the 3D plot
+    :rtype: None
+    """
     ##
     ## Matplotlib's plotting means that the axis that we would like to be used as z for display purposes is actually the x
     ## Hence why we assign x, y, z --> z, x, y here when using matplotlib
@@ -269,6 +359,42 @@ def stepped_ray_plot(rf, domain, sample_size = 32, *, indexing = "synthPy"):
         plt.show()
 
 def initial_field(domain, x, y, phases, amplitudes, pix_x, pix_y, title, savefig = False, fname = "hi"):
+    """
+    Plots the intensity of the initial optical field.
+    
+    :param domain: Domain object
+    :type domain: processing.domain.ScalarDomain
+    
+    :param x: Ray x positions
+    :type x: np.array
+    
+    :param y: Ray y positions
+    :type y: np.array
+    
+    :param phases: Ray phases
+    :type phases: np.array
+    
+    :param amplitudes: Ray amplitudes
+    :type amplitudes: np.array
+    
+    :param pix_x: Pixels in x direction
+    :type pix_x: int
+    
+    :param pix_y: Pixels in y direction
+    :type pix_y: int
+    
+    :param title: Plot title
+    :type title: str
+    
+    :param savefig: Whether to save the figure
+    :type savefig: bool, default: False
+    
+    :param fname: Filename for the saved plot
+    :type fname: str, default: "hi"
+    
+    :return: No return, shows plot
+    :rtype: None
+    """
     from scipy.interpolate import LinearNDInterpolator as LND
     phases_interp = LND((x, y), phases, fill_value = 0.0)
     amplitudes_interp = LND((x, y), amplitudes, fill_value = 0.0)
@@ -291,6 +417,57 @@ def initial_field(domain, x, y, phases, amplitudes, pix_x, pix_y, title, savefig
         plt.savefig(f"../../../{fname}.png",dpi=800, bbox_inches='tight', pad_inches=0.1)
 
 def propagated_field(domain, x_pos, y_pos, z, phases, amplitudes, pix_x, pix_y, title, lwl, pad_factor = 2, vmin = None, vmax = None, savefig = False, fname = "hi"):
+    """
+    Propagates a field and plots its intensity.
+    
+    :param domain: Domain object
+    :type domain: processing.domain.ScalarDomain
+    
+    :param x_pos: Ray x positions
+    :type x_pos: np.array
+    
+    :param y_pos: Ray y positions
+    :type y_pos: np.array
+    
+    :param z: Propagation distance
+    :type z: float
+    
+    :param phases: Ray phases
+    :type phases: np.array
+    
+    :param amplitudes: Ray amplitudes
+    :type amplitudes: np.array
+    
+    :param pix_x: Resolution in x
+    :type pix_x: int
+    
+    :param pix_y: Resolution in y
+    :type pix_y: int
+    
+    :param title: Plot title
+    :type title: str
+    
+    :param lwl: Laser wavelength
+    :type lwl: float
+    
+    :param pad_factor: Padding factor for FFT
+    :type pad_factor: int, default: 2
+    
+    :param vmin: Minimum intensity for color map
+    :type vmin: float, default: None
+    
+    :param vmax: Maximum intensity for color map
+    :type vmax: float, default: None
+    
+    :param savefig: Whether to save the figure
+    :type savefig: bool, default: False
+    
+    :param fname: Output filename
+    :type fname: str, default: "hi"
+    
+    :return: No return, shows plot
+    :rtype: None
+    """
     fig, axs = plt.subplots()
     final_field = propagate(lwl, domain, x_pos, y_pos, amplitudes, phases, z, pix_x, pix_y, pad_factor)
     im = axs.imshow(np.absolute(final_field)**2, extent = (-domain.x_length/2, domain.x_length/2, -domain.y_length/2, domain.y_length/2), origin = "lower", cmap = "viridis", vmin = vmin, vmax = vmax)
@@ -304,6 +481,57 @@ def propagated_field(domain, x_pos, y_pos, z, phases, amplitudes, pix_x, pix_y, 
 
 def phase_on_off(params, suptitle, lwl, domain, z, pad_factor = 2, titles = ["Phase off", "Phase on"], savefig = False, fname = "hi", pix_x = 400, pix_y = 400, 
          vmin = None, vmax = None, vmin1 = None, vmax1 = None):
+    """
+    Plots side-by-side comparison of propagated fields with phase disabled vs phase enabled.
+    
+    :param params: List of two parameter sets (for phase off and phase on)
+    :type params: list
+    
+    :param suptitle: Plot super title
+    :type suptitle: str
+    
+    :param lwl: Laser wavelength
+    :type lwl: float
+    
+    :param domain: Domain object
+    :type domain: processing.domain.ScalarDomain
+    
+    :param z: Propagation distance
+    :type z: float
+    
+    :param pad_factor: Padding factor
+    :type pad_factor: int, default: 2
+    
+    :param titles: Subplot titles
+    :type titles: list, default: ["Phase off", "Phase on"]
+    
+    :param savefig: Whether to save the figure
+    :type savefig: bool, default: False
+    
+    :param fname: Output filename
+    :type fname: str, default: "hi"
+    
+    :param pix_x: x resolution
+    :type pix_x: int, default: 400
+    
+    :param pix_y: y resolution
+    :type pix_y: int, default: 400
+    
+    :param vmin: min color bound (phase off)
+    :type vmin: float, default: None
+    
+    :param vmax: max color bound (phase off)
+    :type vmax: float, default: None
+    
+    :param vmin1: min color bound (phase on)
+    :type vmin1: float, default: None
+    
+    :param vmax1: max color bound (phase on)
+    :type vmax1: float, default: None
+    
+    :return: No return, shows plot
+    :rtype: None
+    """
     fig, axs = plt.subplots(1,2)
     fig.suptitle(suptitle, y=0.8)
     fig.tight_layout()
@@ -329,6 +557,57 @@ def phase_on_off(params, suptitle, lwl, domain, z, pad_factor = 2, titles = ["Ph
         plt.savefig(f"../../../{fname}.png",dpi=800, bbox_inches='tight', pad_inches=0.1)
 
 def var_distance(domain, x_pos, y_pos, z, phases, amplitudes, pix_x, pix_y, title, lwl, pad_factor = 2, a = 2, b = 3, savefig = False, fname = "hi"):
+    """
+    Plots propagated fields over multiple distances.
+    
+    :param domain: Domain object
+    :type domain: processing.domain.ScalarDomain
+    
+    :param x_pos: Initial x positions
+    :type x_pos: np.array
+    
+    :param y_pos: Initial y positions
+    :type y_pos: np.array
+    
+    :param z: Array of distances
+    :type z: np.array or list
+    
+    :param phases: Field phases
+    :type phases: np.array
+    
+    :param amplitudes: Field amplitudes
+    :type amplitudes: np.array
+    
+    :param pix_x: Number of pixels in x
+    :type pix_x: int
+    
+    :param pix_y: Number of pixels in y
+    :type pix_y: int
+    
+    :param title: Suptitle for figure
+    :type title: str
+    
+    :param lwl: Laser wavelength
+    :type lwl: float
+    
+    :param pad_factor: Padding factor
+    :type pad_factor: int, default: 2
+    
+    :param a: Number of subplot rows
+    :type a: int, default: 2
+    
+    :param b: Number of subplot columns
+    :type b: int, default: 3
+    
+    :param savefig: Whether to save
+    :type savefig: bool, default: False
+    
+    :param fname: Output filename
+    :type fname: str, default: "hi"
+    
+    :return: No return, shows plot
+    :rtype: None
+    """
     if len(z) != a*b:
         raise ValueError("z must have length equal to a*b, i.e. number of plots")
 
@@ -361,6 +640,48 @@ def var_distance(domain, x_pos, y_pos, z, phases, amplitudes, pix_x, pix_y, titl
         plt.savefig(f"../../../{fname}",dpi=800, bbox_inches='tight', pad_inches=0.1)
 
 def interpolated_phase(domain, x_pos, y_pos, phases, pix_x, pix_y, title = "Interpolated Phase", savefig = False, fname = "hi", wrapped = False, vmin = None, vmax = None):
+    """
+    Plots an interpolated 2D grid of the given phase values.
+    
+    :param domain: Domain object
+    :type domain: processing.domain.ScalarDomain
+    
+    :param x_pos: Ray x positions
+    :type x_pos: np.array
+    
+    :param y_pos: Ray y positions
+    :type y_pos: np.array
+    
+    :param phases: Ray phases
+    :type phases: np.array
+    
+    :param pix_x: Resolution in x
+    :type pix_x: int
+    
+    :param pix_y: Resolution in y
+    :type pix_y: int
+    
+    :param title: Plot title
+    :type title: str, default: "Interpolated Phase"
+    
+    :param savefig: Whether to save to file
+    :type savefig: bool, default: False
+    
+    :param fname: Output filename
+    :type fname: str, default: "hi"
+    
+    :param wrapped: Whether to wrap phase values Mod 2*pi
+    :type wrapped: bool, default: False
+    
+    :param vmin: Minimum intensity for color map
+    :type vmin: float, default: None
+    
+    :param vmax: Maximum intensity for color map
+    :type vmax: float, default: None
+    
+    :return: No return, shows plot
+    :rtype: None
+    """
     
     phases_interp = LND((x_pos, y_pos), phases, fill_value = 0.0)
     x = np.linspace(-domain.x_length/2, domain.x_length/2, pix_x)

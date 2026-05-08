@@ -546,6 +546,15 @@ class Refractometry(Diagnostic):
         self.rf = r8
 
     def coherent_solve(self):
+        """
+        Imaging the spatial axis with magnification M = 2, Coherent Implementation of the Refractometer.
+        
+        :param self: Instance of the Refractometry class
+        :type self: processing.diagnostics.Refractometry
+        
+        :return: No return, updates the self.rf and self.Jf attributes
+        :rtype: None
+        """
         ## Imaging the spatial axis - M = 2 - Coherent Implementation of the Refractometer
         r1 = travel(self.r0, 3 * self.L / 4 - self.focal_plane)
         # propagate E field
@@ -566,6 +575,15 @@ class Refractometry(Diagnostic):
         self.propagate_E(self.rf, r6)
 
     def coherent_solve_alt(self):
+        """
+        Alternative coherent implementation of the refractometer for imaging the spatial axis with M = 2.
+        
+        :param self: Instance of the Refractometry class
+        :type self: processing.diagnostics.Refractometry
+        
+        :return: No return, updates the self.rf and self.Jf attributes
+        :rtype: None
+        """
         ## Imaging the spatial axis - M = 2 - Coherent Implementation of the Refractometer
         r1 = travel(self.r0, 3 * self.L / 4 - self.focal_plane)
 
@@ -589,9 +607,45 @@ class Refractometry(Diagnostic):
         self.propagate_E(self.rf, r6)
 
     def refractogram(self, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
+        """
+        Generates a refractogram by histogramming the accumulated rays.
+        
+        :param bin_scale: Scaling factor for histogram bins
+        :type bin_scale: int, default: 1
+        
+        :param pix_x: Number of pixels in the x direction
+        :type pix_x: int, default: 3448
+        
+        :param pix_y: Number of pixels in the y direction
+        :type pix_y: int, default: 2574
+        
+        :param clear_mem: Whether to clear ray data from memory after computation
+        :type clear_mem: bool, default: False
+        
+        :return: No return, computes and stores histogram attributes
+        :rtype: None
+        """
         self.histogram_legacy(bin_scale = bin_scale, pix_x = pix_x, pix_y = pix_y, clear_mem = clear_mem)
 
     def fresnel_solve(self, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
+        """
+        Solves propagation using the Fresnel integral method and histograms the result.
+        
+        :param bin_scale: Scaling factor for histogram bins
+        :type bin_scale: int, default: 1
+        
+        :param pix_x: Number of pixels in the x direction
+        :type pix_x: int, default: 3448
+        
+        :param pix_y: Number of pixels in the y direction
+        :type pix_y: int, default: 2574
+        
+        :param clear_mem: Whether to clear memory after computation
+        :type clear_mem: bool, default: False
+        
+        :return: No return, updates self.Jf and runs histogram legacy method
+        :rtype: None
+        """
         self.Jf = fresnel_integral.propagate(self.wavelength, self.x, self.y, self.x_l, self.y_l, self.r0, self.amp, self.phase, 3 * self.L / 4 - self.focal_plane)
         self.histogram_legacy(bin_scale = bin_scale, pix_x = pix_x, pix_y = pix_y, clear_mem = clear_mem)
 
@@ -605,8 +659,14 @@ class Interferometry(Diagnostic):
         Input beam ray positions and electric field component, and desired angle of evenly spaced background fringes. 
         Deg is angle in degrees from the vertical axis
 
-        Returns:
-            'Interfered with' E field
+        :param n_fringes: Number of fringes to apply
+        :type n_fringes: float
+
+        :param deg: Angle in degrees from the vertical axis
+        :type deg: float
+
+        :return: 'Interfered with' E field (modifies self.Jf in place)
+        :rtype: None
         """
 
         assert self.Jf is not None, print("\nThis diagnostic requires a calculated Jf matrix.")
@@ -623,6 +683,27 @@ class Interferometry(Diagnostic):
         self.Jf = self.Jf.at[1, :].set(self.Jf[1, :] + ref_beam) # assume ref_beam is polarised in y
 
     def bkg(self, domain_length, n_fringes, deg, ne_extent, probing_direction):
+        """
+        Computes the background interferogram signal without objects.
+        
+        :param domain_length: Length of the domain to propagate through
+        :type domain_length: float
+        
+        :param n_fringes: Number of fringes
+        :type n_fringes: float
+        
+        :param deg: Angle in degrees for the background fringes
+        :type deg: float
+        
+        :param ne_extent: Extent of electron density grid
+        :type ne_extent: float
+        
+        :param probing_direction: Direction of probing (e.g. 'z')
+        :type probing_direction: str
+        
+        :return: No return, updates self.bkg_signal
+        :rtype: None
+        """
         rr0, E0 = ray_to_Jonesvector(self.rf, ne_extent, probing_direction = probing_direction, keep_current_plane = True, return_E = True)
 
         E = self.Jf.copy() #temporarily store E field in another variable
@@ -654,6 +735,15 @@ class Interferometry(Diagnostic):
         self.Jf = E #restore E field
 
     def two_lens_solve(self):
+        """
+        Solves ray propagation for a 2-lens telescope setup with M = 1 in an interferometry diagnostic.
+        
+        :param self: Instance of the Interferometry class
+        :type self: processing.diagnostics.Interferometry
+        
+        :return: No return, updates self.rf and propagates E-field
+        :rtype: None
+        """
         # assuming reference is recombined with the probe beam at the exit of the domain (should be changed)
         self.interfere_ref_beam(10, 20)
         ## 2 lens telescope, M = 1
@@ -680,4 +770,22 @@ class Interferometry(Diagnostic):
         self.rf = r7
 
     def interferogram(self, *, bin_scale = 1, pix_x = 3448, pix_y = 2574, clear_mem = False):
+        """
+        Generates an interferogram by building a histogram of the ray amplitudes.
+        
+        :param bin_scale: Scaling factor for histogram bins
+        :type bin_scale: int, default: 1
+        
+        :param pix_x: Number of pixels in the x direction
+        :type pix_x: int, default: 3448
+        
+        :param pix_y: Number of pixels in the y direction
+        :type pix_y: int, default: 2574
+        
+        :param clear_mem: Whether to clear ray data from memory
+        :type clear_mem: bool, default: False
+        
+        :return: No return, computes and stores histogram attributes
+        :rtype: None
+        """
         self.histogram_legacy(bin_scale = bin_scale, pix_x = pix_x, pix_y = pix_y, clear_mem = clear_mem)
